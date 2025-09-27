@@ -2,8 +2,8 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 import pandas as pd
 import json
 import os
-import re  # TAMBAH IMPORT INI
-from datetime import datetime, timedelta  # 
+import re  
+from datetime import datetime, timedelta  
 import plotly
 import plotly.graph_objs as go
 from werkzeug.utils import secure_filename
@@ -493,87 +493,238 @@ def forecast_chart():
             'details': 'Check server console for full error details'
         })
     
-@app.route('/api/model-comparison-chart')
-def model_comparison_chart():
-    """Generate model performance metrics with optimization"""
+@app.route('/api/forecast-chart-data')
+def forecast_chart_data():
+    """Simple and reliable forecast chart data API"""
     try:
-        # Quick response for better UX
-        dashboard_data = forecast_service.get_dashboard_data()
+        print("📊 API /api/forecast-chart-data called")
         
-        if not dashboard_data['success'] or not dashboard_data.get('model_summary'):
-            return jsonify({'error': 'No model performance data available'})
-        
-        model_summary = dashboard_data['model_summary']
-        
-        # Process model metrics efficiently
-        model_metrics = []
-        
-        # Pre-calculate min/max for normalization
-        all_maes = [data.get('latest_mae', 0) for data in model_summary.values() if data.get('latest_mae', 0) > 0]
-        all_times = [data.get('avg_training_time', 0) for data in model_summary.values()]
-        all_counts = [data.get('training_count', 0) for data in model_summary.values()]
-        
-        max_mae = max(all_maes) if all_maes else 1
-        min_mae = min(all_maes) if all_maes else 0
-        max_time = max(all_times) if all_times else 1
-        max_count = max(all_counts) if all_counts else 1
-        
-        for model_name, data in model_summary.items():
-            mae = data.get('latest_mae', 0)
-            training_time = data.get('avg_training_time', 0)
-            training_count = data.get('training_count', 0)
-            
-            # Quick normalization
-            performance_score = max(0, min(100, ((max_mae - mae) / (max_mae - min_mae + 0.001)) * 100)) if mae > 0 else 50
-            speed_score = max(0, min(100, ((max_time - training_time) / (max_time + 0.001)) * 100))
-            experience_score = min(100, (training_count / max(max_count, 1)) * 100)
-            
-            overall_score = (performance_score * 0.6 + speed_score * 0.25 + experience_score * 0.15)
-            
-            # Quick status determination
-            if overall_score >= 80:
-                status, status_color, status_icon = 'excellent', 'success', 'fa-star'
-            elif overall_score >= 60:
-                status, status_color, status_icon = 'good', 'info', 'fa-thumbs-up'
-            elif overall_score >= 40:
-                status, status_color, status_icon = 'fair', 'warning', 'fa-minus-circle'
-            else:
-                status, status_color, status_icon = 'poor', 'danger', 'fa-times-circle'
-            
-            model_metrics.append({
-                'name': model_name.replace('_', ' '),
-                'mae': float(mae),
-                'training_time': float(training_time),
-                'training_count': int(training_count),
-                'performance_score': round(performance_score, 1),
-                'speed_score': round(speed_score, 1),
-                'experience_score': round(experience_score, 1),
-                'overall_score': round(overall_score, 1),
-                'status': status,
-                'status_color': status_color,
-                'status_icon': status_icon,
-                'trend': data.get('trend_direction', 'stable')
+        # Get historical data
+        try:
+            historical_df = forecast_service.data_handler.load_historical_data()
+            print(f"📈 Loaded {len(historical_df)} historical records")
+        except Exception as e:
+            print(f"❌ Error loading historical data: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Historical data error: {str(e)}'
             })
         
-        # Sort by overall score
-        model_metrics.sort(key=lambda x: x['overall_score'], reverse=True)
+        if historical_df.empty:
+            return jsonify({
+                'success': False,
+                'error': 'No historical data available'
+            })
+        
+        # Process historical data
+        historical_df['Tanggal'] = pd.to_datetime(historical_df['Tanggal'])
+        historical_df = historical_df.sort_values('Tanggal')
+        
+        historical_data = []
+        for _, row in historical_df.iterrows():
+            try:
+                historical_data.append({
+                    'date': row['Tanggal'].strftime('%Y-%m-%d'),
+                    'value': float(row['Indikator_Harga'])
+                })
+            except Exception as e:
+                print(f"⚠️ Error processing historical row: {e}")
+                continue
+        
+        print(f"✅ Processed {len(historical_data)} historical points")
+        
+        # Get forecast data
+        forecast_data = []
+        metadata = {
+            'model_name': 'No Model',
+            'weeks_forecasted': 0,
+            'has_forecast': False
+        }
+        
+        try:
+            forecast_result = forecast_service.get_current_forecast()
+            print(f"🔮 Forecast result success: {forecast_result.get('success', False)}")
+            
+            if forecast_result.get('success') and forecast_result.get('forecast', {}).get('data'):
+                forecast_info = forecast_result['forecast']
+                
+                # Update metadata
+                metadata.update({
+                    'model_name': forecast_info.get('model_name', 'Unknown Model'),
+                    'weeks_forecasted': forecast_info.get('weeks_forecasted', len(forecast_info.get('data', []))),
+                    'has_forecast': True
+                })
+                
+                # Process forecast data
+                for item in forecast_info['data']:
+                    try:
+                        forecast_data.append({
+                            'date': item['Tanggal'][:10] if isinstance(item['Tanggal'], str) else item['Tanggal'].strftime('%Y-%m-%d'),
+                            'prediction': float(item['Prediksi']),
+                            'lower_bound': float(item.get('Batas_Bawah', item['Prediksi'])),
+                            'upper_bound': float(item.get('Batas_Atas', item['Prediksi']))
+                        })
+                    except Exception as e:
+                        print(f"⚠️ Error processing forecast row: {e}")
+                        continue
+                
+                print(f"✅ Processed {len(forecast_data)} forecast points")
+            else:
+                print("ℹ️ No forecast data available")
+                
+        except Exception as e:
+            print(f"⚠️ Error getting forecast: {str(e)}")
         
         result = {
             'success': True,
-            'metrics': model_metrics,
-            'best_model': model_metrics[0] if model_metrics else None,
-            'total_models': len(model_metrics),
-            'cached_at': datetime.now().isoformat()
+            'historical': historical_data,
+            'forecast': forecast_data,
+            'metadata': metadata,
+            'timestamp': datetime.now().isoformat()
         }
         
+        print(f"✅ API returning: historical={len(historical_data)}, forecast={len(forecast_data)}")
         return jsonify(result)
         
     except Exception as e:
+        error_msg = f"API Error: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        
         return jsonify({
             'success': False,
-            'error': f'Error generating metrics: {str(e)}'
+            'error': error_msg,
+            'historical': [],
+            'forecast': [],
+            'metadata': {'model_name': 'Error', 'weeks_forecasted': 0}
         })
-            
+
+@app.route('/api/model-comparison-chart')
+def model_comparison_chart():
+    """API endpoint for model comparison data"""
+    try:
+        model_summary = forecast_service.model_manager.get_model_performance_summary()
+        
+        if not model_summary:
+            return jsonify({
+                'success': False, 
+                'message': 'No model data available',
+                'metrics': []
+            })
+        
+        metrics = []
+        for model_name, summary in model_summary.items():
+            latest_performance = summary.get('performances', [])
+            latest_perf = latest_performance[-1] if latest_performance else {}
+
+            mae_val = safe_float(summary.get('latest_mae', 0.0))
+            rmse_val = safe_float(latest_perf.get('rmse', 0.0))
+            r2_val = safe_float(summary.get('latest_r2', 0.0))
+            mape_val = safe_float(latest_perf.get('mape', 0.0))
+
+            # Calculate overall score
+            overall_score = calculate_overall_model_score(
+                mae=mae_val,
+                rmse=rmse_val,
+                r2_score=r2_val,
+                mape=mape_val
+            )
+
+            # Status badge
+            badge = get_model_status_badge(overall_score, mae_val)
+
+            metrics.append({
+                'name': model_name.replace('_', ' '),
+                'mae': mae_val,
+                'rmse': rmse_val,
+                'r2_score': r2_val,
+                'mape': mape_val,
+                'overall_score': int(round(overall_score)),
+                'status': badge['status'],
+                'status_color': badge['color'],
+                'status_icon': badge['icon'],
+                'training_count': summary.get('training_count', 0),
+                'trend_direction': summary.get('trend_direction', 'stable')
+            })
+        
+        # Sort by overall score (best first)
+        metrics.sort(key=lambda x: x['overall_score'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'metrics': metrics,
+            'total_models': len(metrics)
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ Error in model comparison API: {str(e)}")
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False, 
+            'error': str(e),
+            'metrics': []
+        })
+
+def safe_float(value):
+    """Safely convert value to float"""
+    try:
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            if np.isnan(value) or np.isinf(value):
+                return 0.0
+            return float(value)
+        return float(str(value))
+    except (ValueError, TypeError):
+        return 0.0
+
+def calculate_overall_model_score(mae, rmse, r2_score, mape):
+    """Calculate weighted overall score for model"""
+    try:
+        # ✅ PERBAIKAN: Better normalization with bounds checking
+        
+        # MAE Score (0-2 range, lower is better)
+        mae_score = max(0, min(100, (2.0 - min(mae, 2.0)) / 2.0 * 100))
+        
+        # RMSE Score (0-3 range, lower is better)  
+        rmse_score = max(0, min(100, (3.0 - min(rmse, 3.0)) / 3.0 * 100))
+        
+        # R² Score (0-1 range, higher is better)
+        r2_normalized = max(0, min(100, max(r2_score, 0) * 100))
+        
+        # ✅ MAPE Score (0-100% range, lower is better)
+        mape_score = max(0, min(100, (100 - min(mape, 100))))
+
+        # ✅ UPDATED WEIGHTS: MAE(35%) + RMSE(25%) + R²(25%) + MAPE(15%)
+        overall = (
+            mae_score * 0.35 +
+            rmse_score * 0.25 +
+            r2_normalized * 0.25 +
+            mape_score * 0.15
+        )
+        
+        return max(0, min(100, overall))
+        
+    except Exception as e:
+        print(f"⚠️ Error calculating overall score: {e}")
+        return 0.0
+
+def get_model_status_badge(overall_score, mae):
+    """Determine status badge based on scores"""
+    try:
+        if overall_score >= 85 and mae < 0.5:
+            return {'status': 'Excellent', 'color': 'success', 'icon': 'fa-star'}
+        elif overall_score >= 70 and mae < 1.0:
+            return {'status': 'Good', 'color': 'info', 'icon': 'fa-thumbs-up'}
+        elif overall_score >= 50 and mae < 2.0:
+            return {'status': 'Fair', 'color': 'warning', 'icon': 'fa-minus-circle'}
+        else:
+            return {'status': 'Poor', 'color': 'danger', 'icon': 'fa-times-circle'}
+    except:
+        return {'status': 'Unknown', 'color': 'secondary', 'icon': 'fa-question'}
+
 @app.route('/api/data-summary')
 def api_data_summary():
     """API endpoint for data summary"""
@@ -1483,6 +1634,24 @@ def api_commodity_data_status():
             'error_details': str(e)
         })
 
+@app.route('/api/economic-alerts')
+def get_economic_alerts():
+    """Get real-time economic alerts - WITH DEBUG"""
+    print("🔍 API /api/economic-alerts called")
+    try:
+        alerts_data = forecast_service.get_real_economic_alerts()
+        print(f"✅ API returning: success={alerts_data['success']}, alerts_count={len(alerts_data.get('alerts', []))}")
+        return jsonify(alerts_data)
+    except Exception as e:
+        error_msg = f"API error: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'alerts': []
+        })
 
 app.add_url_rule('/upload', 'data_control', data_control)
 

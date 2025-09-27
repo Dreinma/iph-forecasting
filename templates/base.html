@@ -78,6 +78,22 @@
             background: var(--primary-color);
             color: white;
         }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         
         @media (max-width: 768px) {
             .sidebar {
@@ -107,9 +123,9 @@
             <div class="text-center mb-4 px-3">
                 <h4 class="text-white fw-bold brand-text">
                     <i class="fas fa-chart-line me-2"></i>
-                    <span class="nav-text">Dashboard IPH</span>
+                    <span class="nav-text">PRISMA</span>
                 </h4>
-                <small class="text-white-50 nav-text">Sistem Forecasting</small>
+                <small class="text-white-50 nav-text">Price Indicator Smart Monitoring & Analytics</small>
             </div>
             
             <!-- Navigation Menu -->

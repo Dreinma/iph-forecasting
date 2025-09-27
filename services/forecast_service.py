@@ -48,48 +48,67 @@ class ForecastService:
     def __init__(self):
         self.model_manager = ModelManager()
         self.data_handler = DataHandler()
-        self._latest_forecast = None  # 🚨 PERBAIKAN: Store latest forecast
-        
+        self._latest_forecast = None
+        self._alerts_cache = None
+        self._alerts_cache_time = None
+
         print("🚀 ForecastService initialized")
         print("   🤖 Model manager ready")
         print("   📊 Data handler ready")
     
     def process_new_data_and_forecast(self, new_data_df, forecast_weeks=8):
         """ENHANCED pipeline with all ML improvements"""
-        print("🚀 STARTING ENHANCED ML PIPELINE")
+        print("=" * 60)
+        print("🔄 STARTING ENHANCED ML PIPELINE")
+        print("=" * 60)
         
         pipeline_start_time = datetime.now()
-
+        
         try:
-            # Step 1: Data processing (unchanged)
+            # Step 1: Process and merge new data
+            print("\n📥 STEP 1: Processing new data...")
             combined_df, merge_info = self.data_handler.merge_and_save_data(new_data_df)
             
             # ✅ NEW: Check for model drift
-            drift_result = self.model_manager.check_model_health(new_data_df)
+            print("\n🔍 STEP 1.5: Checking for model drift...")
+            try:
+                drift_result = self.model_manager.check_model_health(new_data_df)
+            except Exception as drift_error:
+                print(f"⚠️ Drift detection failed: {str(drift_error)}")
+                drift_result = {'drift_detected': False, 'reason': f'Drift check error: {str(drift_error)}'}
             
-            if drift_result['drift_detected']:
-                print(f"🚨 Drift detected: {drift_result['drift_signals']}")
+            force_retrain = drift_result.get('drift_detected', False)
+            
+            if force_retrain:
+                print(f"🚨 Drift detected: {drift_result.get('drift_signals', [])}")
                 print("🔄 Forcing model retraining due to drift...")
-                force_retrain = True
-            else:
-                force_retrain = False
             
-            # Step 2: Enhanced model training
-            if force_retrain or not self.model_manager.get_current_best_model():
+            # Step 2: Train and compare models
+            print("\n🤖 STEP 2: Training and comparing models...")
+            current_best = self.model_manager.get_current_best_model()
+            
+            if force_retrain or not current_best:
                 training_result = self.model_manager.train_and_compare_models(combined_df)
             else:
                 print("✅ Using existing models (no drift detected)")
-                training_result = None
+                training_result = {
+                    'training_results': {},
+                    'comparison': {'is_improvement': False, 'new_best_model': current_best},
+                    'summary': {'total_models_trained': 0}
+                }
             
-            # Step 3: Enhanced forecasting
+            # Step 3: Generate forecast with best model
+            print("\n🔮 STEP 3: Generating forecast...")
             best_model = self.model_manager.get_current_best_model()
-            best_model_name = best_model['model_name'] if best_model else 'XGBoost_Advanced'
             
-            # Use enhanced forecasting
+            if not best_model:
+                raise ValueError("No trained models available")
+            
+            best_model_name = best_model['model_name']
+            
             forecast_df, model_performance, forecast_summary = self.model_manager.engine.generate_forecast(
                 best_model_name, forecast_weeks
             )
-            
             
             # Calculate pipeline duration
             pipeline_duration = (datetime.now() - pipeline_start_time).total_seconds()
@@ -99,6 +118,13 @@ class ForecastService:
                 'success': True,
                 'pipeline_duration': float(pipeline_duration),
                 'timestamp': datetime.now().isoformat(),
+                
+                # ✅ NEW: Enhanced features
+                'enhanced_features': {
+                    'drift_detection': drift_result,
+                    'model_optimization': force_retrain,
+                    'ensemble_used': best_model_name == 'Ensemble'
+                },
                 
                 # Data processing results
                 'data_processing': {
@@ -112,42 +138,19 @@ class ForecastService:
                     'data_summary': clean_data_for_json(self.data_handler.get_data_summary())
                 },
                 
-                # Model training results - convert numpy types dan handle NaN
-                'model_training': {
-                    'training_results': {
-                        name: {
-                            'mae': float(perf['mae']) if not np.isnan(perf['mae']) else 0.0,
-                            'rmse': float(perf['rmse']) if not np.isnan(perf['rmse']) else 0.0,
-                            'r2_score': float(perf['r2_score']) if not np.isnan(perf['r2_score']) else 0.0,
-                            'mape': float(perf['mape']) if not np.isnan(perf['mape']) else 0.0,
-                            'training_time': float(perf['training_time']),
-                            'data_size': int(perf['data_size']),
-                            'is_best': bool(perf.get('is_best', False))
-                        } for name, perf in training_result['training_results'].items()
-                    },
-                    'comparison': clean_data_for_json({
-                        'is_improvement': bool(training_result['comparison']['is_improvement']),
-                        'new_best_model': {
-                            'model_name': training_result['comparison']['new_best_model']['model_name'],
-                            'mae': float(training_result['comparison']['new_best_model']['mae']) if not np.isnan(training_result['comparison']['new_best_model']['mae']) else 0.0,
-                            'rmse': float(training_result['comparison']['new_best_model']['rmse']) if not np.isnan(training_result['comparison']['new_best_model']['rmse']) else 0.0,
-                            'r2_score': float(training_result['comparison']['new_best_model']['r2_score']) if not np.isnan(training_result['comparison']['new_best_model']['r2_score']) else 0.0
-                        },
-                        'improvement_percentage': float(training_result['comparison']['improvement_percentage']) if training_result['comparison']['improvement_percentage'] is not None and not np.isnan(training_result['comparison']['improvement_percentage']) else 0.0
-                    }),
-                    'summary': clean_data_for_json(training_result['summary'])
-                },
+                # Model training results
+                'model_training': training_result,
                 
                 # Best model information
                 'best_model': {
                     'name': best_model_name,
                     'performance': {
-                        'mae': float(model_performance['mae']) if not np.isnan(model_performance['mae']) else 0.0,
-                        'rmse': float(model_performance['rmse']) if not np.isnan(model_performance['rmse']) else 0.0,
-                        'r2_score': float(model_performance['r2_score']) if not np.isnan(model_performance['r2_score']) else 0.0,
-                        'training_time': float(model_performance['training_time'])
+                        'mae': float(model_performance.get('mae', 0)) if not np.isnan(model_performance.get('mae', 0)) else 0.0,
+                        'rmse': float(model_performance.get('rmse', 0)) if not np.isnan(model_performance.get('rmse', 0)) else 0.0,
+                        'r2_score': float(model_performance.get('r2_score', 0)) if not np.isnan(model_performance.get('r2_score', 0)) else 0.0,
+                        'training_time': float(model_performance.get('training_time', 0))
                     },
-                    'is_improvement': bool(training_result['comparison']['is_improvement'])
+                    'is_improvement': training_result.get('comparison', {}).get('is_improvement', False)
                 },
                 
                 # Forecast results
@@ -163,7 +166,7 @@ class ForecastService:
             result = clean_data_for_json(result)
             
             print("\n" + "=" * 60)
-            print("✅ PIPELINE COMPLETED SUCCESSFULLY!")
+            print("✅ ENHANCED PIPELINE COMPLETED!")
             print(f"   ⏱️ Total time: {pipeline_duration:.2f} seconds")
             print(f"   📊 Data records: {merge_info['total_records']}")
             print(f"   🏆 Best model: {best_model_name}")
@@ -174,15 +177,16 @@ class ForecastService:
             return result
             
         except Exception as e:
-            error_msg = f"Pipeline failed: {str(e)}"
+            error_msg = f"Enhanced pipeline failed: {str(e)}"
             print(f"\n❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
             
             return {
                 'success': False,
                 'error': error_msg,
                 'timestamp': datetime.now().isoformat(),
-                'pipeline_duration': float((datetime.now() - pipeline_start_time).total_seconds()),
-                'data_summary': self.data_handler.get_data_summary()
+                'pipeline_duration': float((datetime.now() - pipeline_start_time).total_seconds())
             }
         
     def get_current_forecast(self, model_name=None, forecast_weeks=8):
@@ -757,3 +761,244 @@ class ForecastService:
             
         except Exception as e:
             return {'success': False, 'error': str(e), 'alerts': []}
+        
+    def get_real_economic_alerts(self):
+        """Generate real-time economic alerts based on historical data and forecasting"""
+        try:
+
+            current_time = datetime.now()
+            if (self._alerts_cache and self._alerts_cache_time and 
+                (current_time - self._alerts_cache_time).seconds < 300):
+                print("🔄 Using cached alerts")
+                return self._alerts_cache
+            
+            print("🔄 Generating fresh alerts")
+
+            alerts = []
+            
+            # Load historical data
+            df = self.data_handler.load_historical_data()
+            if df.empty or len(df) < 10:
+                return {
+                    'success': False,
+                    'alerts': [],
+                    'message': 'Insufficient data for alert generation'
+                }
+            
+            # Get current forecast
+            forecast_result = self.get_current_forecast()
+            forecast_data = None
+            if forecast_result['success']:
+                forecast_data = forecast_result['forecast']['data']
+            
+            # Sort data by date
+            df['Tanggal'] = pd.to_datetime(df['Tanggal'])
+            df = df.sort_values('Tanggal').reset_index(drop=True)  
+
+            np.random.seed(42)
+
+            # Calculate statistical thresholds
+            recent_data = df.tail(30)  
+            mean_iph = df['Indikator_Harga'].mean()
+            std_iph = df['Indikator_Harga'].std()
+            latest_iph = df['Indikator_Harga'].iloc[-1]
+            latest_date = df['Tanggal'].iloc[-1]
+            
+            # 1. PRICE SPIKE ALERT
+            if len(df) >= 7:
+                week_ago_iph = df['Indikator_Harga'].iloc[-7]
+                weekly_change = ((latest_iph - week_ago_iph) / week_ago_iph) * 100
+                
+                if abs(weekly_change) > 2.0:  # More than 2% change
+                    alert_type = 'spike' if weekly_change > 0 else 'drop'
+                    icon = 'fa-arrow-up' if weekly_change > 0 else 'fa-arrow-down'
+                    color = 'warning' if weekly_change > 0 else 'info'
+                    
+                    alerts.append({
+                        'type': alert_type,
+                        'severity': 'warning' if abs(weekly_change) < 5 else 'critical',
+                        'icon': icon,
+                        'color': color,
+                        'title': f"{'Lonjakan' if weekly_change > 0 else 'Penurunan'} Harga Signifikan",
+                        'message': f"IPH {'naik' if weekly_change > 0 else 'turun'} {abs(weekly_change):.1f}% dalam 7 hari terakhir",
+                        'detail': f"Dari {week_ago_iph:.3f} menjadi {latest_iph:.3f}",
+                        'date': latest_date.strftime('%d/%m/%Y'),
+                        'priority': 'high' if abs(weekly_change) > 5 else 'medium'
+                    })
+            
+            # 2. STATISTICAL BOUNDARY ALERT
+            upper_2sigma = mean_iph + 2 * std_iph
+            lower_2sigma = mean_iph - 2 * std_iph
+            upper_3sigma = mean_iph + 3 * std_iph
+            lower_3sigma = mean_iph - 3 * std_iph
+            
+            if latest_iph > upper_3sigma:
+                alerts.append({
+                    'type': 'boundary_critical',
+                    'severity': 'critical',
+                    'icon': 'fa-exclamation-triangle',
+                    'color': 'danger',
+                    'title': 'IPH Melampaui Batas Kritis Atas',
+                    'message': f'IPH {latest_iph:.3f}% melampaui batas 3-sigma ({upper_3sigma:.3f}%)',
+                    'detail': f'Probabilitas kejadian: < 0.3%',
+                    'date': latest_date.strftime('%d/%m/%Y'),
+                    'priority': 'critical'
+                })
+            elif latest_iph < lower_3sigma:
+                alerts.append({
+                    'type': 'boundary_critical',
+                    'severity': 'critical',
+                    'icon': 'fa-exclamation-triangle',
+                    'color': 'danger',
+                    'title': 'IPH Melampaui Batas Kritis Bawah',
+                    'message': f'IPH {latest_iph:.3f}% di bawah batas 3-sigma ({lower_3sigma:.3f}%)',
+                    'detail': f'Probabilitas kejadian: < 0.3%',
+                    'date': latest_date.strftime('%d/%m/%Y'),
+                    'priority': 'critical'
+                })
+            elif latest_iph > upper_2sigma:
+                alerts.append({
+                    'type': 'boundary_warning',
+                    'severity': 'warning',
+                    'icon': 'fa-arrow-up',
+                    'color': 'warning',
+                    'title': 'IPH Mendekati Batas Atas',
+                    'message': f'IPH {latest_iph:.3f}% mendekati batas 2-sigma ({upper_2sigma:.3f}%)',
+                    'detail': f'Perlu monitoring ketat',
+                    'date': latest_date.strftime('%d/%m/%Y'),
+                    'priority': 'medium'
+                })
+            elif latest_iph < lower_2sigma:
+                alerts.append({
+                    'type': 'boundary_warning',
+                    'severity': 'warning',
+                    'icon': 'fa-arrow-down',
+                    'color': 'warning',
+                    'title': 'IPH Mendekati Batas Bawah',
+                    'message': f'IPH {latest_iph:.3f}% mendekati batas 2-sigma ({lower_2sigma:.3f}%)',
+                    'detail': f'Perlu monitoring ketat',
+                    'date': latest_date.strftime('%d/%m/%Y'),
+                    'priority': 'medium'
+                })
+            
+            # 3. VOLATILITY ALERT
+            if len(df) >= 14:
+                recent_volatility = df['Indikator_Harga'].tail(14).std()
+                historical_volatility = df['Indikator_Harga'].std()
+                
+                if recent_volatility > historical_volatility * 1.5:
+                    alerts.append({
+                        'type': 'volatility',
+                        'severity': 'warning',
+                        'icon': 'fa-chart-line',
+                        'color': 'info',
+                        'title': 'Volatilitas Tinggi Terdeteksi',
+                        'message': f'Volatilitas 2 minggu terakhir meningkat {((recent_volatility/historical_volatility-1)*100):.0f}%',
+                        'detail': f'Volatilitas: {recent_volatility:.3f}% vs rata-rata {historical_volatility:.3f}%',
+                        'date': latest_date.strftime('%d/%m/%Y'),
+                        'priority': 'medium'
+                    })
+            
+            # 4. TREND CHANGE ALERT
+            if len(df) >= 10:
+                recent_trend = df['Indikator_Harga'].tail(5).diff().mean()
+                if abs(recent_trend) > std_iph * 0.3:
+                    trend_direction = "naik" if recent_trend > 0 else "turun"
+                    alerts.append({
+                        'type': 'trend_change',
+                        'severity': 'info',
+                        'icon': 'fa-exchange-alt',
+                        'color': 'info',
+                        'title': 'Perubahan Tren Terdeteksi',
+                        'message': f'Tren {trend_direction} konsisten dalam 5 periode terakhir',
+                        'detail': f'Rata-rata perubahan: {recent_trend:.3f}',
+                        'date': latest_date.strftime('%d/%m/%Y'),
+                        'priority': 'low'
+                    })
+            
+            # 5. FORECAST-BASED ALERTS
+            if forecast_data and len(forecast_data) > 0:
+                # Get forecast trend
+                first_forecast = forecast_data[0]['Prediksi']
+                last_forecast = forecast_data[-1]['Prediksi']
+                forecast_change = ((last_forecast - first_forecast) / first_forecast) * 100
+                
+                # Forecast vs Current Alert
+                current_vs_forecast = ((first_forecast - latest_iph) / latest_iph) * 100
+                
+                if abs(current_vs_forecast) > 3:
+                    direction = "naik" if current_vs_forecast > 0 else "turun"
+                    alerts.append({
+                        'type': 'forecast_divergence',
+                        'severity': 'info',
+                        'icon': 'fa-crystal-ball',
+                        'color': 'primary',
+                        'title': f'Prediksi Menunjukkan Perubahan',
+                        'message': f'Model memprediksi IPH akan {direction} {abs(current_vs_forecast):.1f}% minggu depan',
+                        'detail': f'Dari {latest_iph:.3f} ke {first_forecast:.3f}',
+                        'date': pd.to_datetime(forecast_data[0]['Tanggal']).strftime('%d/%m/%Y'),
+                        'priority': 'medium'
+                    })
+                
+                # Long-term forecast trend
+                if abs(forecast_change) > 5:
+                    trend_dir = "naik" if forecast_change > 0 else "turun"
+                    alerts.append({
+                        'type': 'forecast_trend',
+                        'severity': 'info',
+                        'icon': 'fa-chart-line',
+                        'color': 'primary',
+                        'title': f'Tren Jangka Menengah: {trend_dir.title()}',
+                        'message': f'Peramalan menunjukkan tren {trend_dir} {abs(forecast_change):.1f}% dalam 8 minggu',
+                        'detail': f'Dari {first_forecast:.3f} ke {last_forecast:.3f}',
+                        'date': pd.to_datetime(forecast_data[-1]['Tanggal']).strftime('%d/%m/%Y'),
+                        'priority': 'low'
+                    })
+            
+            # 6. MODEL CONFIDENCE ALERT
+            best_model = self.model_manager.get_current_best_model()
+            if best_model and best_model.get('mae', 0) > 1.0:
+                alerts.append({
+                    'type': 'model_confidence',
+                    'severity': 'warning',
+                    'icon': 'fa-robot',
+                    'color': 'warning',
+                    'title': 'Akurasi Model Menurun',
+                    'message': f'Model {best_model["model_name"]} memiliki error tinggi (MAE: {best_model["mae"]:.3f})',
+                    'detail': 'Disarankan untuk melakukan retraining model',
+                    'date': datetime.now().strftime('%d/%m/%Y'),
+                    'priority': 'medium'
+                })
+            
+            # Sort alerts by priority
+            priority_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+            alerts.sort(key=lambda x: priority_order.get(x['priority'], 3))
+            
+            result = {
+                'success': True,
+                'alerts': alerts[:5],  # Limit to 5 most important alerts
+                'total_alerts': len(alerts),
+                'generated_at': datetime.now().isoformat(),
+                'cache_info': {
+                    'cached': False,
+                    'generated_fresh': True
+                },
+                'data_period': {
+                    'start': df['Tanggal'].min().strftime('%d/%m/%Y'),
+                    'end': df['Tanggal'].max().strftime('%d/%m/%Y'),
+                    'records': len(df)
+                }
+            }
+            
+            self._alerts_cache = result
+            self._alerts_cache_time = current_time
+
+            return result
+
+        except Exception as e:
+            print(f"❌ Error generating economic alerts: {str(e)}")
+            return {
+                'success': False,
+                'alerts': [],
+                'error': str(e)
+            }

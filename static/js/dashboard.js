@@ -246,127 +246,190 @@ class ForecastingDashboard {
 
     async loadForecastChart() {
         try {
-            console.log("📊 LOADING FORECAST CHART:");
+            console.log('📊 Loading forecast chart...');
             
-            const chartDiv = document.getElementById('forecastChart');
-            if (!chartDiv) {
-                console.log('   ❌ Chart div not found');
-                return;
-            }
-
-            // Show loading state
-            chartDiv.innerHTML = `
-                <div class="d-flex justify-content-center align-items-center h-100">
-                    <div class="text-center text-muted">
-                        <div class="loading-spinner mb-3"></div>
-                        <p class="mb-0">Loading forecast chart...</p>
-                    </div>
-                </div>
-            `;
-
-            const timestamp = new Date().getTime();
-            const response = await fetch('/api/forecast-chart?' + timestamp);
+            const response = await fetch('/api/forecast-chart-data');
+            const data = await response.json();
             
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load chart data');
             }
             
-            const result = await response.json();
+            // Prepare data for Plotly
+            const traces = [];
             
-            console.log('   📥 Chart response:', {
-                hasError: !!result.error,
-                hasData: !!result.data,
-                hasLayout: !!result.layout,
-                dataLength: result.data ? result.data.length : 0
-            });
-
-            if (result.error) {
-                chartDiv.innerHTML = `
-                    <div class="alert alert-warning m-4">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-exclamation-triangle me-3"></i>
-                            <div>
-                                <strong>Chart Loading Error</strong>
-                                <div class="mt-1">${result.error}</div>
-                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="dashboard.loadForecastChart()">
-                                    <i class="fas fa-redo me-1"></i>Retry
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                return;
+            // Historical data trace
+            if (data.historical && data.historical.length > 0) {
+                traces.push({
+                    x: data.historical.map(d => d.date),
+                    y: data.historical.map(d => d.value),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: '📊 Data Historis',
+                    line: { 
+                        color: '#007bff', 
+                        width: 2 
+                    },
+                    marker: { 
+                        size: 4,
+                        color: '#007bff'
+                    }
+                });
             }
-
-            if (!result.data || !result.layout) {
-                chartDiv.innerHTML = `
-                    <div class="alert alert-danger m-4">
-                        <i class="fas fa-times-circle me-2"></i>
-                        Invalid chart data structure
-                    </div>
-                `;
-                return;
-            }
-
-            // Clear and create new chart
-            chartDiv.innerHTML = '';
             
-            try {
-                await Plotly.newPlot('forecastChart', result.data, result.layout, result.config || {
-                    responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d', 'autoScale2d']
+            // Forecast data trace
+            if (data.forecast && data.forecast.length > 0) {
+                traces.push({
+                    x: data.forecast.map(d => d.date),
+                    y: data.forecast.map(d => d.prediction),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: '🔮 Prediksi',
+                    line: { 
+                        color: '#dc3545', 
+                        width: 2,
+                        dash: 'dot'
+                    },
+                    marker: { 
+                        size: 6,
+                        color: '#dc3545',
+                        symbol: 'diamond'
+                    }
                 });
                 
-                console.log('   ✅ Chart created successfully');
-                this.charts.forecast = true;
-                
-                // Update chart info if available
-                const dashboardData = await fetch('/api/data-summary').then(r => r.json());
-                if (dashboardData && dashboardData.current_forecast) {
-                    this.updateChartInfo(dashboardData.current_forecast);
+                // ✅ PERBAIKAN: Tambahkan interval kepercayaan
+                if (data.forecast[0].lower_bound !== undefined && data.forecast[0].upper_bound !== undefined) {
+                    // Upper bound trace
+                    traces.push({
+                        x: data.forecast.map(d => d.date),
+                        y: data.forecast.map(d => d.upper_bound),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Batas Atas',
+                        line: { 
+                            color: 'rgba(220, 53, 69, 0.3)', 
+                            width: 1 
+                        },
+                        showlegend: false,
+                        hovertemplate: 'Batas Atas: %{y:.3f}%<extra></extra>'
+                    });
+                    
+                    // Lower bound trace
+                    traces.push({
+                        x: data.forecast.map(d => d.date),
+                        y: data.forecast.map(d => d.lower_bound),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: '📊 Interval Kepercayaan',
+                        line: { 
+                            color: 'rgba(220, 53, 69, 0.3)', 
+                            width: 1 
+                        },
+                        fill: 'tonexty',
+                        fillcolor: 'rgba(220, 53, 69, 0.1)',
+                        hovertemplate: 'Batas Bawah: %{y:.3f}%<extra></extra>'
+                    });
                 }
-                
-            } catch (plotlyError) {
-                console.error('   ❌ Plotly error:', plotlyError);
-                chartDiv.innerHTML = `
-                    <div class="alert alert-danger m-4">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-chart-line me-3"></i>
-                            <div>
-                                <strong>Chart Rendering Error</strong>
-                                <div class="mt-1">${plotlyError.message}</div>
-                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="dashboard.loadForecastChart()">
-                                    <i class="fas fa-redo me-1"></i>Try Again
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
             }
-
+            
+            // Chart layout
+            const layout = {
+                title: {
+                    text: '📈 IPH Forecast & Historical Data',
+                    font: { size: 16, family: 'Arial, sans-serif' }
+                },
+                xaxis: {
+                    title: 'Tanggal',
+                    type: 'date',
+                    tickformat: '%b %Y'
+                },
+                yaxis: {
+                    title: 'IPH (%)',
+                    tickformat: '.2f'
+                },
+                hovermode: 'x unified',
+                legend: {
+                    orientation: 'h',
+                    x: 0,
+                    y: -0.2
+                },
+                margin: { l: 50, r: 50, t: 60, b: 80 },
+                paper_bgcolor: 'white',
+                plot_bgcolor: 'white',
+                grid: {
+                    rows: 1,
+                    columns: 1,
+                    pattern: 'independent'
+                }
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+            };
+            
+            // Render chart
+            Plotly.newPlot('forecastChart', traces, layout, config);
+            
+            // ✅ PERBAIKAN: Update badges dengan data terbaru
+            this.updateForecastBadges(data);
+            
+            console.log('✅ Forecast chart loaded successfully');
+            
         } catch (error) {
-            console.error('❌ Network error loading forecast chart:', error);
-            const chartDiv = document.getElementById('forecastChart');
-            if (chartDiv) {
-                chartDiv.innerHTML = `
-                    <div class="alert alert-danger m-4">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-wifi me-3"></i>
-                            <div>
-                                <strong>Network Error</strong>
-                                <div class="mt-1">Failed to fetch chart data: ${error.message}</div>
-                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="dashboard.loadForecastChart()">
-                                    <i class="fas fa-redo me-1"></i>Retry
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
+            console.error('❌ Error loading forecast chart:', error);
+            document.getElementById('forecastChart').innerHTML = `
+                <div class="alert alert-danger m-4">
+                    <h5>Error Loading Chart</h5>
+                    <p>${error.message}</p>
+                    <button class="btn btn-outline-danger btn-sm" onclick="dashboard.loadForecastChart()">
+                        <i class="fas fa-retry me-1"></i>Retry
+                    </button>
+                </div>
+            `;
         }
     }
-    
+
+    // ✅ PERBAIKAN: Method baru untuk update badges
+    updateForecastBadges(data) {
+        try {
+            // Update model name badge
+            const modelNameElement = document.getElementById('currentModelName');
+            const modelBadgeElement = document.getElementById('currentModelBadge');
+            
+            if (data.metadata && data.metadata.model_name) {
+                const modelDisplayName = data.metadata.model_name.replace('_', ' ');
+                if (modelNameElement) {
+                    modelNameElement.textContent = modelDisplayName;
+                }
+                console.log(`✅ Updated model badge: ${modelDisplayName}`);
+            }
+            
+            // Update weeks count badge
+            const weeksCountElement = document.getElementById('currentWeeksCount');
+            const weeksBadgeElement = document.getElementById('currentWeeksBadge');
+            
+            if (data.forecast && data.forecast.length > 0) {
+                const weeksCount = data.forecast.length;
+                if (weeksCountElement) {
+                    weeksCountElement.textContent = weeksCount;
+                }
+                console.log(`✅ Updated weeks badge: ${weeksCount}`);
+            }
+            
+            // Update table badges if exists
+            const tableBadges = document.querySelectorAll('.forecast-table-badge');
+            tableBadges.forEach(badge => {
+                if (data.metadata && data.metadata.model_name) {
+                    badge.textContent = data.metadata.model_name.replace('_', ' ');
+                }
+            });
+            
+        } catch (error) {
+            console.warn('⚠️ Error updating badges:', error);
+        }
+    }    
     async loadModelComparisonChart() {
         const container = document.getElementById('modelMetricsContainer');
         if (!container) return;
