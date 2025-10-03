@@ -113,11 +113,11 @@ python app.py
 3. View Results - Dashboard menampilkan forecast dan performance.
 
 ## 📊 Fitur Dashboard
-### 🏠 Main Dashboard
-- Key Metrics Cards - Total records, best model MAE, data quality.
-- Interactive Forecast Chart - Historical + prediction dengan confidence intervals.
-- Model Performance Grid - Real-time comparison 4 models.
-- Economic Insights - Analisis statistik dan rekomendasi.
+### 🏠 Dashboard Utama
+- Interactive Forecast Chart - Menampilkan data historis, prediksi dengan interval kepercayaan, dan info model aktif.
+- Model Performance Grid - Perbandingan real-time metrik kinerja (MAE, RMSE, R², dll.) untuk semua model dengan indikator status visual.
+- Economic Alerts & Notifications - Panel peringatan yang menampilkan notifikasi ekonomi berdasarkan tingkat prioritas dan keparahan.
+- Forecast Data Table - Tabel rinci yang menampilkan nilai-nilai hasil peramalan, termasuk batas atas dan bawah.
 
 ### 📁 Data Control
 - Drag & Drop Upload - CSV/Excel dengan preview.
@@ -126,11 +126,9 @@ python app.py
 - Model Retraining - Retrain semua model dengan data terbaru.
 
 ### 📊 Advanced Visualization
-- Time Series Decomposition - Trend + Seasonal + Residual.
 - Moving Averages - SMA, EMA, WMA dengan toggle.
 - Volatility Analysis - Rolling standard deviation.
-- Distribution Analysis - Histogram + pie chart kategorisasi.
-- Temporal Aggregation - Monthly/quarterly/yearly views.
+- Model Performance - Trend, MAE Visualized, Model Drift
 
 ### 🌾 Commodity Insights
 - Current Week Analysis - Dampak komoditas real-time.

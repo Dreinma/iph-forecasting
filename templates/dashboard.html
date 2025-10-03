@@ -36,9 +36,6 @@
                                 minggu
                             </span>
                         </div>
-                        <button class="btn btn-outline-primary btn-sm" onclick="refreshForecastChart()" id="refreshChartBtn">
-                            <i class="fas fa-sync-alt me-1"></i>Segarkan Grafik
-                        </button>
                     </div>
                 </div>                
             </div>
@@ -224,6 +221,9 @@ function refreshForecastChart() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📊 Dashboard loaded');
     
+    // Load forecast chart first
+    loadForecastChart();
+
     // Load model metrics
     loadModelMetrics();
     
@@ -300,6 +300,194 @@ async function loadEconomicAlerts() {
                 Error memuat peringatan: ${error.message}
             </div>
         `;
+    }
+}
+
+async function loadForecastChart() {
+    console.log('📊 Loading forecast chart...');
+    
+    try {
+        const chartContainer = document.getElementById('forecastChart');
+        
+        // Show loading state
+        chartContainer.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center h-100">
+                <div class="text-center text-muted">
+                    <div class="spinner-border text-primary mb-3"></div>
+                    <p class="mb-0">Memuat grafik peramalan...</p>
+                </div>
+            </div>
+        `;
+        
+        const response = await fetch('/api/forecast-chart-data');
+        const data = await response.json();
+        
+        console.log('📊 Chart data received:', data);
+        
+        if (data.success && data.historical && data.historical.length > 0) {
+            // Update metadata badges
+            updateMetadataBadges(data.metadata);
+            
+            // Create chart traces
+            const traces = [];
+            
+            // Historical data trace
+            traces.push({
+                x: data.historical.map(item => item.date),
+                y: data.historical.map(item => item.value),
+                type: 'scatter',
+                mode: 'lines',
+                name: '📊 Data Historis',
+                line: {
+                    color: '#1f77b4',
+                    width: 3
+                },
+                hovertemplate: '<b>%{x}</b><br>IPH: %{y:.3f}%<extra></extra>'
+            });
+            
+            // Forecast data trace (if available)
+            if (data.forecast && data.forecast.length > 0) {
+                traces.push({
+                    x: data.forecast.map(item => item.date),
+                    y: data.forecast.map(item => item.prediction),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: '🔮 Prediksi',
+                    line: {
+                        color: '#ff6b6b',
+                        width: 4,
+                        dash: 'dot'
+                    },
+                    marker: {
+                        size: 8,
+                        symbol: 'diamond',
+                        color: '#ff6b6b',
+                        line: {color: 'white', width: 2}
+                    },
+                    hovertemplate: '<b>%{x}</b><br>Prediksi: %{y:.3f}%<extra></extra>'
+                });
+                
+                // Confidence interval (if bounds available)
+                if (data.forecast[0].lower_bound !== undefined) {
+                    const forecastDates = data.forecast.map(item => item.date);
+                    const upperBounds = data.forecast.map(item => item.upper_bound);
+                    const lowerBounds = data.forecast.map(item => item.lower_bound);
+                    
+                    traces.push({
+                        x: [...forecastDates, ...forecastDates.reverse()],
+                        y: [...upperBounds, ...lowerBounds.reverse()],
+                        type: 'scatter',
+                        mode: 'lines',
+                        fill: 'toself',
+                        fillcolor: 'rgba(255, 107, 107, 0.2)',
+                        line: {color: 'rgba(255,255,255,0)'},
+                        name: '📈 Interval Kepercayaan',
+                        showlegend: true,
+                        hoverinfo: 'skip'
+                    });
+                }
+            }
+            
+            // Chart layout
+            const layout = {
+                title: {
+                    text: '📊 IPH Forecast & Historical Data',
+                    x: 0.5,
+                    font: {size: 16, color: '#2D3748'}
+                },
+                xaxis: {
+                    title: 'Tanggal',
+                    showgrid: true,
+                    gridwidth: 1,
+                    gridcolor: 'rgba(128,128,128,0.2)'
+                },
+                yaxis: {
+                    title: 'IPH (%)',
+                    showgrid: true,
+                    gridwidth: 1,
+                    gridcolor: 'rgba(128,128,128,0.2)',
+                    zeroline: true,
+                    zerolinewidth: 2,
+                    zerolinecolor: 'rgba(128,128,128,0.5)'
+                },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                hovermode: 'x unified',
+                showlegend: true,
+                height: 500,
+                margin: {l: 60, r: 60, t: 60, b: 60}
+            };
+            
+            // Clear container and create chart
+            chartContainer.innerHTML = '';
+            Plotly.newPlot('forecastChart', traces, layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d', 'autoScale2d']
+            });
+            
+            console.log('✅ Forecast chart loaded successfully');
+            
+        } else {
+            // No data available
+            chartContainer.innerHTML = `
+                <div class="d-flex justify-content-center align-items-center h-100">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-line fa-3x mb-3 text-secondary"></i>
+                        <h5>Tidak Ada Data Chart</h5>
+                        <p class="mb-0">${data.error || 'Silakan upload data historis terlebih dahulu'}</p>
+                        <a href="/data-control" class="btn btn-primary mt-3">
+                            <i class="fas fa-upload me-2"></i>Upload Data
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('❌ Chart loading error:', error);
+        document.getElementById('forecastChart').innerHTML = `
+            <div class="d-flex justify-content-center align-items-center h-100">
+                <div class="text-center text-danger">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                    <h5>Error Memuat Chart</h5>
+                    <p class="mb-0">Error: ${error.message}</p>
+                    <button class="btn btn-outline-danger mt-3" onclick="loadForecastChart()">
+                        <i class="fas fa-redo me-2"></i>Coba Lagi
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function updateMetadataBadges(metadata) {
+    console.log('🏷️ Updating metadata badges:', metadata);
+    
+    if (metadata) {
+        // Update model name badge
+        const modelNameElement = document.getElementById('currentModelName');
+        if (modelNameElement) {
+            modelNameElement.textContent = metadata.model_name || 'No Model';
+        }
+        
+        // Update weeks count badge
+        const weeksCountElement = document.getElementById('currentWeeksCount');
+        if (weeksCountElement) {
+            weeksCountElement.textContent = metadata.weeks_forecasted || 0;
+        }
+        
+        // Update badge colors based on forecast availability
+        const modelBadge = document.getElementById('currentModelBadge');
+        const weeksBadge = document.getElementById('currentWeeksBadge');
+        
+        if (metadata.has_forecast) {
+            if (modelBadge) modelBadge.className = 'badge bg-success me-2';
+            if (weeksBadge) weeksBadge.className = 'badge bg-info me-2';
+        } else {
+            if (modelBadge) modelBadge.className = 'badge bg-secondary me-2';
+            if (weeksBadge) weeksBadge.className = 'badge bg-secondary me-2';
+        }
     }
 }
 

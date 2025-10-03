@@ -4,6 +4,8 @@ import os
 import shutil
 from datetime import datetime, timedelta
 import warnings
+
+from streamlit import json
 warnings.filterwarnings('ignore')
 
 class DataHandler:
@@ -507,6 +509,45 @@ class DataHandler:
         
         return backup_files[:limit]
     
+    def load_performance_history(self):
+        """Load model performance history"""
+        try:
+            import os
+            performance_file = os.path.join('data', 'models', 'performance_history.json')
+            
+            if os.path.exists(performance_file):
+                with open(performance_file, 'r') as f:
+                    data = json.load(f)
+                    # Convert date strings back to datetime
+                    data['dates'] = [pd.to_datetime(d) for d in data['dates']]
+                    return data
+            else:
+                return None
+                
+        except Exception as e:
+            print(f"Error loading performance history: {e}")
+            return None
+
+    def save_performance_history(self, performance_data):
+        """Save model performance history"""
+        try:
+            import os
+            os.makedirs(os.path.join('data', 'models'), exist_ok=True)
+            
+            # Convert datetime to strings for JSON serialization
+            data_to_save = performance_data.copy()
+            data_to_save['dates'] = [d.strftime('%Y-%m-%d') for d in performance_data['dates']]
+            
+            performance_file = os.path.join('data', 'models', 'performance_history.json')
+            with open(performance_file, 'w') as f:
+                json.dump(data_to_save, f, indent=2)
+                
+            return True
+            
+        except Exception as e:
+            print(f"Error saving performance history: {e}")
+            return False
+        
     def restore_from_backup(self, backup_filename):
         """Restore data from a specific backup"""
         backup_filepath = os.path.join(self.backup_path, backup_filename)

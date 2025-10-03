@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Visualisasi Data - IPH Forecasting{% endblock %}
+{% block title %}Visualisasi Data - IPH Monitoring{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -10,31 +10,24 @@
             <i class="fas fa-chart-area me-2"></i>
             Visualisasi Data IPH
         </h1>
-        <p class="text-muted mb-0">Analisis mendalam data Indikator Perubahan Harga</p>
+        <p class="text-muted mb-0">Monitoring & analisis praktis Indikator Perubahan Harga</p>
     </div>
     <div class="btn-toolbar">
         <div class="btn-group me-2">
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('3M')">3 Bulan</button>
             <button type="button" class="btn btn-outline-primary active" onclick="changeTimeframe('6M')">6 Bulan</button>
             <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('1Y')">1 Tahun</button>
-            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('ALL')">Semua</button>
         </div>
         <button type="button" class="btn btn-primary" onclick="refreshVisualization()">
-            <i class="fas fa-sync-alt me-1"></i>
-            Refresh
+            <i class="fas fa-sync-alt me-1"></i>Refresh
         </button>
     </div>
 </div>
 
-<!-- Visualization Tabs -->
+<!-- Enhanced Tabs -->
 <ul class="nav nav-tabs mb-4" id="vizTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="decomposition-tab" data-bs-toggle="tab" data-bs-target="#decomposition" type="button">
-            <i class="fas fa-layer-group me-1"></i>
-            Dekomposisi Time Series
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="moving-avg-tab" data-bs-toggle="tab" data-bs-target="#moving-avg" type="button">
+        <button class="nav-link active" id="moving-avg-tab" data-bs-toggle="tab" data-bs-target="#moving-avg" type="button">
             <i class="fas fa-chart-line me-1"></i>
             Moving Averages
         </button>
@@ -46,49 +39,17 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="distribution-tab" data-bs-toggle="tab" data-bs-target="#distribution" type="button">
-            <i class="fas fa-chart-pie me-1"></i>
-            Distribusi Perubahan
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="aggregation-tab" data-bs-toggle="tab" data-bs-target="#aggregation" type="button">
-            <i class="fas fa-calendar-alt me-1"></i>
-            Agregasi Periode
+        <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button">
+            <i class="fas fa-tachometer-alt me-1"></i>
+            Model Performance
         </button>
     </li>
 </ul>
 
 <!-- Tab Content -->
 <div class="tab-content" id="vizTabContent">
-    <!-- Time Series Decomposition -->
-    <div class="tab-pane fade show active" id="decomposition" role="tabpanel">
-        <div class="row g-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-layer-group text-primary me-2"></i>
-                            Dekomposisi Time Series (Trend + Seasonal + Residual)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="decompositionChart" style="height: 600px;">
-                            <div class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-2">Memuat dekomposisi time series...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Moving Averages -->
-    <div class="tab-pane fade" id="moving-avg" role="tabpanel">
+    <div class="tab-pane fade show active" id="moving-avg" role="tabpanel">
         <div class="row g-4">
             <div class="col-12">
                 <div class="card">
@@ -98,17 +59,14 @@
                             Moving Averages Analysis
                         </h5>
                         <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary active" onclick="toggleMA('SMA')">SMA</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('EMA')">EMA</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('WMA')">WMA</button>
+                            <button type="button" class="btn btn-outline-secondary active" onclick="toggleMA('short')">Short Term</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('long')">Long Term</button>
                         </div>
                     </div>
                     <div class="card-body">
                         <div id="movingAvgChart" style="height: 500px;">
                             <div class="text-center py-5">
-                                <div class="spinner-border text-success" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
+                                <div class="spinner-border text-success"></div>
                                 <p class="mt-2">Memuat analisis moving averages...</p>
                             </div>
                         </div>
@@ -118,7 +76,7 @@
         </div>
     </div>
 
-    <!-- Volatility Analysis -->
+    <!-- Volatility Analysis - FIXED -->
     <div class="tab-pane fade" id="volatility" role="tabpanel">
         <div class="row g-4">
             <div class="col-12">
@@ -126,7 +84,7 @@
                     <div class="card-header bg-white">
                         <h5 class="card-title mb-0">
                             <i class="fas fa-chart-bar text-warning me-2"></i>
-                            Analisis Volatilitas (Rolling Standard Deviation)
+                            Analisis Volatilitas & Risk Assessment
                         </h5>
                     </div>
                     <div class="card-body">
@@ -134,9 +92,7 @@
                             <div class="col-md-8">
                                 <div id="volatilityChart" style="height: 400px;">
                                     <div class="text-center py-5">
-                                        <div class="spinner-border text-warning" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
+                                        <div class="spinner-border text-warning"></div>
                                         <p class="mt-2">Menghitung volatilitas...</p>
                                     </div>
                                 </div>
@@ -144,7 +100,7 @@
                             <div class="col-md-4">
                                 <div class="card bg-light">
                                     <div class="card-body">
-                                        <h6 class="card-title">Statistik Volatilitas</h6>
+                                        <h6 class="card-title">Statistik Risk</h6>
                                         <div id="volatilityStats">
                                             <div class="mb-3">
                                                 <small class="text-muted">Volatilitas Saat Ini</small>
@@ -155,12 +111,8 @@
                                                 <h5 id="avgVolatility30">-</h5>
                                             </div>
                                             <div class="mb-3">
-                                                <small class="text-muted">Volatilitas Maksimum</small>
-                                                <h5 class="text-danger" id="maxVolatility">-</h5>
-                                            </div>
-                                            <div>
-                                                <small class="text-muted">Volatilitas Minimum</small>
-                                                <h5 class="text-success" id="minVolatility">-</h5>
+                                                <small class="text-muted">Risk Level</small>
+                                                <h5 id="riskLevel">-</h5>
                                             </div>
                                         </div>
                                     </div>
@@ -173,73 +125,211 @@
         </div>
     </div>
 
-    <!-- Price Change Distribution -->
-    <div class="tab-pane fade" id="distribution" role="tabpanel">
+    <!-- Model Performance -->
+    <div class="tab-pane fade" id="performance" role="tabpanel">
         <div class="row g-4">
-            <div class="col-md-6">
+            <!-- Performance Overview -->
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>Analisis Performa Model Machine Learning</h6>
+                    <p class="mb-0">Bandingkan akurasi semua model ML, lihat trend performa, dan pantau stabilitas prediksi IPH dari waktu ke waktu.</p>
+                </div>
+            </div>
+            
+            <!-- Accuracy Trends -->
+            <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-white">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-pie text-info me-2"></i>
-                            Distribusi Perubahan Harga
+                            <i class="fas fa-chart-line text-primary me-2"></i>
+                             Trend Akurasi Model
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div id="distributionChart" style="height: 400px;">
+                        <div id="accuracyTrendsChart" style="height: 450px;">
                             <div class="text-center py-5">
-                                <div class="spinner-border text-info" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
+                                <div class="spinner-border text-primary"></div>
+                                <p class="mt-2">Memuat trend akurasi...</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            
+            <!-- Row for Forecast vs Actual and Performance Stats -->
+            <div class="col-lg-8">
                 <div class="card">
                     <div class="card-header bg-white">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-bar text-purple me-2"></i>
-                            Histogram Perubahan
+                            <i class="fas fa-crosshairs text-success me-2"></i>
+                             Perbandingan Prediksi vs Aktual
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div id="histogramChart" style="height: 400px;">
+                        <div id="forecastActualChart" style="height: 450px;">
                             <div class="text-center py-5">
-                                <div class="spinner-border text-purple" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
+                                <div class="spinner-border text-success"></div>
+                                <p class="mt-2">Memuat perbandingan forecast...</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Monthly/Quarterly Aggregation -->
-    <div class="tab-pane fade" id="aggregation" role="tabpanel">
-        <div class="row g-4">
+            
+            <!-- Enhanced Performance Stats -->
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tachometer-alt text-info me-2"></i>
+                             Statistik Performa
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="performanceStats">
+                            <!-- Best Model Info -->
+                            <div class="mb-3 p-3 bg-light rounded">
+                                <small class="text-muted"> Model Terbaik</small>
+                                <h4 class="text-primary mb-1" id="bestModel">-</h4>
+                                <small class="text-success" id="bestModelAccuracy">-</small>
+                            </div>
+                            
+                            <!-- Current Performance -->
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted">MAE Saat Ini</small>
+                                    <h5 class="text-primary" id="currentMAE">-</h5>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">R² Score</small>
+                                    <h5 class="text-info" id="currentR2">-</h5>
+                                </div>
+                            </div>
+                            
+                            <!-- Model Status -->
+                            <div class="mb-3">
+                                <small class="text-muted">Status Model</small>
+                                <h5 id="modelStatus">-</h5>
+                            </div>
+                            
+                            <!-- Data Info -->
+                            <div class="mb-3">
+                                <small class="text-muted"> Periode Data</small>
+                                <p class="mb-1 small" id="dataCoverage">-</p>
+                                <small class="text-muted"> Total Data Points</small>
+                                <p class="mb-1 small" id="totalDataPoints">-</p>
+                                <small class="text-muted"> Volatilitas Data</small>
+                                <p class="mb-1 small" id="dataVolatility">-</p>
+                            </div>
+                            
+                            <!-- Drift Alert -->
+                            <div class="alert alert-warning" id="driftAlert" style="display: none;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <small>Model drift terdeteksi!</small>
+                            </div>
+                            
+                            <!-- Recommendation -->
+                            <div class="alert alert-info" id="recommendationAlert" style="display: none;">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                <small id="recommendationText">-</small>
+                            </div>
+                            
+                            <!-- Last Updated -->
+                            <div class="text-center mt-3">
+                                <small class="text-muted">Terakhir diperbarui</small>
+                                <br>
+                                <small id="lastUpdated">-</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model Comparison Table -->
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-calendar-alt text-secondary me-2"></i>
-                            Agregasi Bulanan & Kuartalan
+                            <i class="fas fa-table text-warning me-2"></i>
+                            Tabel Perbandingan Model
                         </h5>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary active" onclick="changeAggregation('monthly')">Bulanan</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="changeAggregation('quarterly')">Kuartalan</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="changeAggregation('yearly')">Tahunan</button>
-                        </div>
+                        <small class="text-muted">Ranking berdasarkan MAE (semakin kecil semakin baik)</small>
                     </div>
                     <div class="card-body">
-                        <div id="aggregationChart" style="height: 450px;">
-                            <div class="text-center py-5">
-                                <div class="spinner-border text-secondary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="modelComparisonTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Model</th>
+                                        <th>MAE Saat Ini</th>
+                                        <th>RMSE Saat Ini</th>
+                                        <th>R² Score</th>
+                                        <th>Akurasi</th>
+                                        <th>Grade</th>
+                                        <th>Trend</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modelComparisonBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center py-3">
+                                            <div class="spinner-border spinner-border-sm text-primary"></div>
+                                            <span class="ms-2">Memuat data perbandingan...</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Insights Panel -->
+                        <div class="row mt-4" id="insightsPanel" style="display: none;">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-trophy fa-2x mb-2"></i>
+                                        <h6>Model Terbaik</h6>
+                                        <p class="mb-0 small" id="bestPerformerInsight">-</p>
+                                    </div>
                                 </div>
-                                <p class="mt-2">Menghitung agregasi data...</p>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                        <h6>Status Stabilitas</h6>
+                                        <p class="mb-0 small" id="stabilityInsight">-</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                        <h6>Karakteristik Data</h6>
+                                        <p class="mb-0 small" id="dataCharacteristicsInsight">-</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model Drift Detection -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Deteksi Penurunan Performa Model
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="modelDriftChart" style="height: 350px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-warning"></div>
+                                <p class="mt-2">Menganalisis model drift...</p>
                             </div>
                         </div>
                     </div>
@@ -252,314 +342,274 @@
 
 {% block scripts %}
 <script>
-    // Visualization page JavaScript
     let currentTimeframe = '6M';
-    let currentAggregation = 'monthly';
     
-    async function loadDecomposition() {
-        console.log('Loading decomposition...');
-        try {
-            const response = await fetch(`/api/visualization/decomposition?timeframe=${currentTimeframe}`);
-            const data = await response.json();
-            
-            console.log('Decomposition response:', data);
-            
-            if (data.success) {
-                // Clear loading spinner
-                document.getElementById('decompositionChart').innerHTML = '';
-                
-                // Create plot using the chart data directly
-                Plotly.newPlot('decompositionChart', data.chart.data, data.chart.layout, {
-                    responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-                });
-            } else {
-                document.getElementById('decompositionChart').innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Gagal memuat data'}
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Error loading decomposition:', error);
-            document.getElementById('decompositionChart').innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Error: ${error.message}
-                </div>
-            `;
-        }
-    }
-
     async function loadMovingAverages() {
-        console.log('Loading moving averages...');
         try {
             const response = await fetch(`/api/visualization/moving-averages?timeframe=${currentTimeframe}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
             const data = await response.json();
-            
-            console.log('Moving averages response:', data);
             
             const chartDiv = document.getElementById('movingAvgChart');
             
-            if (data.success && data.chart) {
-                // Clear loading spinner
+            if (data.success) {
                 chartDiv.innerHTML = '';
-                
-                // Create plot directly with data structure
                 Plotly.newPlot('movingAvgChart', data.chart.data, data.chart.layout, {
                     responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                    displayModeBar: true
                 });
-                
-                console.log('✅ Moving averages chart loaded successfully');
             } else {
-                chartDiv.innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Gagal memuat data moving averages'}
-                    </div>
-                `;
+                chartDiv.innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
             }
         } catch (error) {
-            console.error('Error loading moving averages:', error);
-            document.getElementById('movingAvgChart').innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Network Error: ${error.message}
-                    <div class="mt-2">
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadMovingAverages()">
-                            <i class="fas fa-redo me-1"></i>Retry
-                        </button>
-                    </div>
-                </div>
-            `;
+            document.getElementById('movingAvgChart').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
 
     async function loadVolatility() {
-        console.log('Loading volatility...');
+        console.log('🔄 Loading volatility...');
         try {
             const response = await fetch(`/api/visualization/volatility?timeframe=${currentTimeframe}`);
             const data = await response.json();
             
-            if (data.success) {
+            console.log('📊 Volatility response:', data);
+            
+            if (data.success && data.chart) {
                 document.getElementById('volatilityChart').innerHTML = '';
+                
+                // ✅ FIXED: Use same structure as moving averages
                 Plotly.newPlot('volatilityChart', data.chart.data, data.chart.layout, {
                     responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                    displayModeBar: true
                 });
                 
                 // Update stats
                 if (data.stats) {
-                    document.getElementById('currentVolatility').textContent = data.stats.current.toFixed(3) + '%';
-                    document.getElementById('avgVolatility30').textContent = data.stats.avg30.toFixed(3) + '%';
-                    document.getElementById('maxVolatility').textContent = data.stats.max.toFixed(3) + '%';
-                    document.getElementById('minVolatility').textContent = data.stats.min.toFixed(3) + '%';
+                    document.getElementById('currentVolatility').textContent = data.stats.current.toFixed(3);
+                    document.getElementById('avgVolatility30').textContent = data.stats.avg30.toFixed(3);
+                    
+                    // Risk level calculation
+                    const riskLevel = data.stats.current > data.stats.avg30 * 1.5 ? 'HIGH' : 
+                                     data.stats.current > data.stats.avg30 * 1.2 ? 'MEDIUM' : 'LOW';
+                    const riskColor = riskLevel === 'HIGH' ? 'text-danger' : 
+                                     riskLevel === 'MEDIUM' ? 'text-warning' : 'text-success';
+                    
+                    const riskElement = document.getElementById('riskLevel');
+                    riskElement.textContent = riskLevel;
+                    riskElement.className = `h5 ${riskColor}`;
                 }
-            } else {
-                document.getElementById('volatilityChart').innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Gagal memuat data'}
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Error loading volatility:', error);
-            document.getElementById('volatilityChart').innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Error: ${error.message}
-                </div>
-            `;
-        }
-    }
-
-    async function loadDistribution() {
-        console.log('Loading distribution...');
-        try {
-            const response = await fetch(`/api/visualization/distribution?timeframe=${currentTimeframe}`);
-            const data = await response.json();
-            
-            if (data.success) {
-                document.getElementById('distributionChart').innerHTML = '';
-                document.getElementById('histogramChart').innerHTML = '';
                 
-                Plotly.newPlot('distributionChart', data.pieChart.data, data.pieChart.layout, {
-                    responsive: true,
-                    displayModeBar: false
-                });
-                
-                Plotly.newPlot('histogramChart', data.histogram.data, data.histogram.layout, {
-                    responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-                });
+                console.log('✅ Volatility chart loaded successfully');
             } else {
-                const errorMsg = `
-                    <div class="alert alert-warning m-3">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Gagal memuat data'}
-                    </div>
-                `;
-                document.getElementById('distributionChart').innerHTML = errorMsg;
-                document.getElementById('histogramChart').innerHTML = errorMsg;
+                document.getElementById('volatilityChart').innerHTML = 
+                    `<div class="alert alert-warning">${data.message || 'Gagal memuat volatilitas'}</div>`;
             }
         } catch (error) {
-            console.error('Error loading distribution:', error);
-            const errorMsg = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Error: ${error.message}
-                </div>
-            `;
-            document.getElementById('distributionChart').innerHTML = errorMsg;
-            document.getElementById('histogramChart').innerHTML = errorMsg;
+            console.error('❌ Volatility error:', error);
+            document.getElementById('volatilityChart').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
-
-    async function loadAggregation() {
-        console.log('Loading aggregation...');
-        try {
-            const response = await fetch(`/api/visualization/aggregation?type=${currentAggregation}&timeframe=${currentTimeframe}`);
-            const data = await response.json();
-            
-            if (data.success) {
-                document.getElementById('aggregationChart').innerHTML = '';
-                Plotly.newPlot('aggregationChart', data.chart.data, data.chart.layout, {
-                    responsive: true,
-                    displayModeBar: true,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-                });
-            } else {
-                document.getElementById('aggregationChart').innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Gagal memuat data'}
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Error loading aggregation:', error);
-            document.getElementById('aggregationChart').innerHTML = `
-                <div class="alert alert-danger m-3">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Error: ${error.message}
-                </div>
-            `;
-        }
-    }
-
     
+    async function loadModelPerformance() {
+        console.log('🔄 Loading model performance...');
+        try {
+            const response = await fetch(`/api/visualization/model-performance?timeframe=${currentTimeframe}`);
+            const data = await response.json();
+            
+            console.log('📊 Model performance response:', data);
+            
+            if (data.success && data.charts) {
+                // Load accuracy trends
+                if (data.charts.accuracy_trends) {
+                    document.getElementById('accuracyTrendsChart').innerHTML = '';
+                    Plotly.newPlot('accuracyTrendsChart', 
+                        data.charts.accuracy_trends.data, 
+                        data.charts.accuracy_trends.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Load forecast vs actual
+                if (data.charts.forecast_vs_actual) {
+                    document.getElementById('forecastActualChart').innerHTML = '';
+                    Plotly.newPlot('forecastActualChart', 
+                        data.charts.forecast_vs_actual.data, 
+                        data.charts.forecast_vs_actual.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Load model drift
+                if (data.charts.model_drift) {
+                    document.getElementById('modelDriftChart').innerHTML = '';
+                    Plotly.newPlot('modelDriftChart', 
+                        data.charts.model_drift.data, 
+                        data.charts.model_drift.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Update stats
+                if (data.stats) {
+                    // Basic stats
+                    document.getElementById('bestModel').textContent = data.stats.best_model;
+                    document.getElementById('bestModelAccuracy').textContent = data.stats.forecast_accuracy;
+                    document.getElementById('currentMAE').textContent = data.stats.current_mae.toFixed(4);
+                    document.getElementById('currentR2').textContent = data.stats.current_r2.toFixed(3);
+                    document.getElementById('dataCoverage').textContent = data.stats.data_coverage;
+                    document.getElementById('totalDataPoints').textContent = data.stats.total_data_points;
+                    document.getElementById('dataVolatility').textContent = `${data.stats.data_volatility} (${data.stats.volatility_level})`;
+                    document.getElementById('lastUpdated').textContent = data.stats.last_updated;
+                    
+                    // Model status
+                    const status = data.stats.model_stability;
+                    const statusColor = status === 'STABIL' ? 'text-success' : 'text-warning';
+                    const statusElement = document.getElementById('modelStatus');
+                    statusElement.textContent = status;
+                    statusElement.className = `h5 ${statusColor}`;
+                    
+                    // Drift alert
+                    const driftAlert = document.getElementById('driftAlert');
+                    if (data.stats.drift_detected) {
+                        driftAlert.style.display = 'block';
+                    } else {
+                        driftAlert.style.display = 'none';
+                    }
+                    
+                    // Recommendation
+                    const recommendationAlert = document.getElementById('recommendationAlert');
+                    const recommendationText = document.getElementById('recommendationText');
+                    if (data.stats.recommendation) {
+                        recommendationText.textContent = data.stats.recommendation;
+                        recommendationAlert.style.display = 'block';
+                    }
+                    
+                    // Model Comparison Table
+                    if (data.stats.model_comparison_table) {
+                        updateModelComparisonTable(data.stats.model_comparison_table);
+                    }
+                    
+                    // Insights
+                    if (data.stats.insights) {
+                        updateInsightsPanel(data.stats.insights);
+                    }
+                }
+                
+                console.log('✅ Model performance loaded successfully');
+            } else {
+                const errorMsg = data.message || 'Gagal memuat model performance';
+                document.getElementById('accuracyTrendsChart').innerHTML = 
+                    `<div class="alert alert-warning">${errorMsg}</div>`;
+            }
+        } catch (error) {
+            console.error('❌ Model performance error:', error);
+            document.getElementById('accuracyTrendsChart').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        }
+    }
+
     function changeTimeframe(timeframe) {
         currentTimeframe = timeframe;
         
         // Update button states
-        document.querySelectorAll('.btn-group button').forEach(btn => {
-            btn.classList.remove('active');
-        });
+        document.querySelectorAll('.btn-group button').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
         
-        // Reload all charts
         refreshVisualization();
     }
     
-    function changeAggregation(type) {
-        currentAggregation = type;
-        
-        // Update button states
-        event.target.parentElement.querySelectorAll('button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.classList.add('active');
-        
-        loadAggregation();
-    }
-    
     function toggleMA(type) {
-        // Toggle visibility of moving average types
-        const traces = document.getElementById('movingAvgChart')._fullData;
-        
-        if (traces) {
-            Plotly.restyle('movingAvgChart', {
-                visible: traces.map(trace => {
-                    if (trace.name.includes('IPH')) return true;
-                    if (type === 'SMA' && trace.name.includes('SMA')) return true;
-                    if (type === 'EMA' && trace.name.includes('EMA')) return true;
-                    if (type === 'WMA' && trace.name.includes('WMA')) return true;
-                    return false;
-                })
+        const chart = document.getElementById('movingAvgChart');
+        if (chart && chart._fullData) {
+            const updates = chart._fullData.map(trace => {
+                if (trace.name.includes('IPH')) return true;
+                if (type === 'short' && (trace.name.includes('MA 3') || trace.name.includes('MA 7'))) return true;
+                if (type === 'long' && (trace.name.includes('MA 14') || trace.name.includes('MA 30'))) return true;
+                return false;
             });
+            
+            Plotly.restyle('movingAvgChart', {visible: updates});
         }
         
-        // Update button states
-        event.target.parentElement.querySelectorAll('button').forEach(btn => {
-            btn.classList.remove('active');
-        });
+        event.target.parentElement.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
     }
     
     function refreshVisualization() {
-        // Get active tab
         const activeTab = document.querySelector('.tab-pane.active').id;
         
         switch(activeTab) {
-            case 'decomposition':
-                loadDecomposition();
-                break;
-            case 'moving-avg':
-                loadMovingAverages();
-                break;
-            case 'volatility':
-                loadVolatility();
-                break;
-            case 'distribution':
-                loadDistribution();
-                break;
-            case 'aggregation':
-                loadAggregation();
-                break;
+            case 'moving-avg': loadMovingAverages(); break;
+            case 'volatility': loadVolatility(); break;
+            case 'performance': loadModelPerformance(); break;
         }
     }
-    
-    // Load initial data when tab changes
+
+    function updateModelComparisonTable(tableData) {
+        const tbody = document.getElementById('modelComparisonBody');
+        tbody.innerHTML = '';
+        
+        tableData.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = row.is_best ? 'table-success' : '';
+            
+            // Trend icon
+            const trendIcon = row.performance_trend === 'IMPROVING' ? '📈' : 
+                            row.performance_trend === 'DECLINING' ? '📉' : '➡️';
+            
+            // Status badge
+            const statusBadge = row.is_best ? '<span class="badge bg-success">TERBAIK</span>' : 
+                            row.grade === 'EXCELLENT' ? '<span class="badge bg-primary">EXCELLENT</span>' :
+                            row.grade === 'GOOD' ? '<span class="badge bg-info">GOOD</span>' :
+                            row.grade === 'FAIR' ? '<span class="badge bg-warning">FAIR</span>' :
+                            '<span class="badge bg-secondary">POOR</span>';
+            
+            tr.innerHTML = `
+                <td><strong>${row.rank}</strong></td>
+                <td>
+                    <strong>${row.model}</strong>
+                    ${row.is_best ? ' 🏆' : ''}
+                </td>
+                <td>${row.current_mae}</td>
+                <td>${row.current_rmse}</td>
+                <td>${row.current_r2}</td>
+                <td><strong>${row.accuracy_pct}%</strong></td>
+                <td><span class="badge bg-${row.grade_color}">${row.grade}</span></td>
+                <td>${trendIcon} ${row.performance_trend}</td>
+                <td>${statusBadge}</td>
+            `;
+            
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateInsightsPanel(insights) {
+        document.getElementById('bestPerformerInsight').textContent = insights.best_performer;
+        document.getElementById('stabilityInsight').textContent = insights.stability_status;
+        document.getElementById('dataCharacteristicsInsight').textContent = insights.data_characteristics;
+        document.getElementById('insightsPanel').style.display = 'block';
+    }
+
+    // Tab change handlers
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
         tab.addEventListener('shown.bs.tab', function (event) {
             const targetId = event.target.getAttribute('data-bs-target').substring(1);
             
             switch(targetId) {
-                case 'decomposition':
-                    loadDecomposition();
-                    break;
-                case 'moving-avg':
-                    loadMovingAverages();
-                    break;
-                case 'volatility':
-                    loadVolatility();
-                    break;
-                case 'distribution':
-                    loadDistribution();
-                    break;
-                case 'aggregation':
-                    loadAggregation();
-                    break;
+                case 'moving-avg': loadMovingAverages(); break;
+                case 'volatility': loadVolatility(); break;
+                case 'performance': loadModelPerformance(); break;
             }
         });
     });
     
-    // Initialize on page load
+    // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('Visualization page loaded');
-        loadDecomposition();
+        loadMovingAverages();
     });
-    </script>
+</script>
 {% endblock %}
