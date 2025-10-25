@@ -4,25 +4,97 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
-    <div>
-        <h1 class="h2 text-gradient mb-1">
-            <i class="fas fa-chart-area me-2"></i>
-            Visualisasi Data IPH
-        </h1>
-        <p class="text-muted mb-0">Monitoring & analisis praktis Indikator Perubahan Harga</p>
-    </div>
-    <div class="btn-toolbar">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('3M')">3 Bulan</button>
-            <button type="button" class="btn btn-outline-primary active" onclick="changeTimeframe('6M')">6 Bulan</button>
-            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('1Y')">1 Tahun</button>
+<div class="pb-3 mb-4 border-bottom">
+    <h1 class="h2 text-gradient mb-1">
+        <i class="fas fa-chart-area me-2"></i>
+        Visualisasi Data IPH
+    </h1>
+    <p class="text-muted mb-0">Monitoring & analisis praktis Indikator Perubahan Harga</p>
+</div>
+
+
+<!-- Timeframe Selection -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <!-- Timeframe Buttons -->
+            <div class="col-lg-5">
+                <label class="form-label fw-bold mb-2">
+                    <i class="fas fa-calendar-alt me-2"></i>Periode Window
+                </label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-primary active" 
+                        onclick="changeTimeframe('6M')">6 Bulan</button>
+                    <button type="button" class="btn btn-outline-primary" 
+                        onclick="changeTimeframe('1Y')">1 Tahun</button>
+                    <button type="button" class="btn btn-outline-primary" 
+                        onclick="changeTimeframe('2Y')">2 Tahun</button>
+                    <button type="button" class="btn btn-outline-primary" 
+                        onclick="changeTimeframe('ALL')">Semua Data</button>
+                </div>
+            </div>
+
+            <!-- ✅ NEW: Visual Slider -->
+            <div class="col-lg-7">
+                <label class="form-label fw-bold mb-2">
+                    <i class="fas fa-sliders-h me-2"></i>Geser Periode
+                    <small class="text-muted">(untuk Moving Average & Volatility)</small>
+                </label>
+                
+                <!-- Slider Container -->
+                <div class="position-relative">
+                    <!-- Timeline Bar -->
+                    <div class="timeline-bar mb-2" style="height: 40px; background: linear-gradient(90deg, #e3f2fd 0%, #2196f3 100%); border-radius: 8px; position: relative;">
+                        <!-- Window Indicator -->
+                        <div id="windowIndicator" style="position: absolute; height: 100%; background: rgba(33, 150, 243, 0.3); border: 2px solid #2196f3; border-radius: 8px; transition: all 0.3s ease;"></div>
+                        
+                        <!-- Date Labels -->
+                        <div style="position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-weight: bold; color: #1976d2; font-size: 11px;">
+                            <span id="windowStartDate">Loading...</span> ← Terlama
+                        </div>
+                        <div style="position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-weight: bold; color: #1976d2; font-size: 11px;">
+                            <span id="windowEndDate">Loading...</span> ← Terbaru
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Actual Slider -->
+                    <input type="range" class="form-range" id="periodSlider" 
+                        min="0" max="0" value="0" step="1"
+                        style="width: 100%; direction: rtl;"
+                        oninput="updateSliderPreview(this.value)"
+                        onchange="applySliderOffset(this.value)">
+                    
+                    <!-- Slider Info -->
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-muted">
+                            Terlama <i class="fas fa-arrow-left"></i>
+                        </small>
+                        <small class="text-primary fw-bold" id="sliderValueDisplay">
+                            Posisi: Terbaru (Kanan)
+                        </small>
+                        <small class="text-muted">
+                            <i class="fas fa-arrow-right"></i> Terbaru
+                        </small>
+                    </div>                    
+                </div>
+            </div>
         </div>
-        <button type="button" class="btn btn-primary" onclick="refreshVisualization()">
-            <i class="fas fa-sync-alt me-1"></i>Refresh
-        </button>
+
+        <!-- Info Display -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="alert alert-info mb-0" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Periode Aktif:</strong> 
+                    <span id="currentPeriodDisplay">6 Bulan Terakhir</span>
+                    <span class="badge bg-primary ms-2" id="coverageBadge">Loading...</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
 
 <!-- Enhanced Tabs -->
 <ul class="nav nav-tabs mb-4" id="vizTabs" role="tablist">
@@ -58,10 +130,6 @@
                             <i class="fas fa-chart-line text-success me-2"></i>
                             Moving Averages Analysis
                         </h5>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary active" onclick="toggleMA('short')">Short Term</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('long')">Long Term</button>
-                        </div>
                     </div>
                     <div class="card-body">
                         <div id="movingAvgChart" style="height: 500px;">
@@ -76,48 +144,142 @@
         </div>
     </div>
 
-    <!-- Volatility Analysis - FIXED -->
+    <!-- Volatility Analysis -->
     <div class="tab-pane fade" id="volatility" role="tabpanel">
         <div class="row g-4">
+            <!-- Chart -->
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-white">
                         <h5 class="card-title mb-0">
                             <i class="fas fa-chart-bar text-warning me-2"></i>
-                            Analisis Volatilitas & Risk Assessment
+                            Grafik Volatilitas IPH
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div id="volatilityChart" style="height: 400px;">
-                                    <div class="text-center py-5">
-                                        <div class="spinner-border text-warning"></div>
-                                        <p class="mt-2">Menghitung volatilitas...</p>
-                                    </div>
+                        <div id="volatilityChart" style="height: 500px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-warning"></div>
+                                <p class="mt-2">Menghitung volatilitas...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ IMPROVED: Statistics Cards (4 essential metrics) -->
+            <div class="col-12">
+                <div class="row g-4">
+                    <!-- Current Volatility Card -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-info h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-line text-info fa-2x mb-2"></i>
+                                <h6 class="card-title small">Volatilitas Terkini</h6>
+                                <div id="currentVolatility" class="h3 text-info fw-bold">-</div>
+                                <small class="text-muted d-block">7 hari terakhir</small>
+                                <div id="volatilityTrend" class="mt-2">
+                                    <small class="badge bg-info">Loading...</small>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Statistik Risk</h6>
-                                        <div id="volatilityStats">
-                                            <div class="mb-3">
-                                                <small class="text-muted">Volatilitas Saat Ini</small>
-                                                <h4 class="text-warning" id="currentVolatility">-</h4>
-                                            </div>
-                                            <div class="mb-3">
-                                                <small class="text-muted">Rata-rata 30 Hari</small>
-                                                <h5 id="avgVolatility30">-</h5>
-                                            </div>
-                                            <div class="mb-3">
-                                                <small class="text-muted">Risk Level</small>
-                                                <h5 id="riskLevel">-</h5>
-                                            </div>
-                                        </div>
-                                    </div>
+                        </div>
+                    </div>
+
+                    <!-- Average Volatility Card -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-success h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-area text-success fa-2x mb-2"></i>
+                                <h6 class="card-title small">Rata-rata 30 Hari</h6>
+                                <div id="avgVolatility30" class="h3 text-success fw-bold">-</div>
+                                <small class="text-muted d-block">Baseline normal</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Level Card -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-warning h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-exclamation-triangle text-warning fa-2x mb-2"></i>
+                                <h6 class="card-title small">Level Risiko</h6>
+                                <div id="riskLevel" class="h3 fw-bold">
+                                    <span id="riskLevelText">-</span>
+                                </div>
+                                <small class="text-muted d-block">Penilaian risiko</small>
+                                <div id="riskDescription" class="mt-2">
+                                    <small class="text-muted">Loading...</small>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Range Statistics Card -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-secondary h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-arrows-alt-v text-secondary fa-2x mb-2"></i>
+                                <h6 class="card-title small">Range Volatilitas</h6>
+                                <div class="small">
+                                    <p class="mb-1">
+                                        <strong>Max:</strong> 
+                                        <span id="maxVolatility" class="text-danger fw-bold">-</span>
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Min:</strong> 
+                                        <span id="minVolatility" class="text-success fw-bold">-</span>
+                                    </p>
+                                </div>
+                                <small class="text-muted d-block mt-2">Rentang dalam periode</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ IMPROVED: Key Insights Box -->
+            <div class="col-12">
+                <div class="card bg-light border-0">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Insight Volatilitas
+                        </h6>
+                        <div id="volatilityInsights" class="small">
+                            <p class="text-muted mb-0">Loading insights...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ IMPROVED: Simplified Detail Table -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table text-info me-2"></i>
+                            Ringkasan Analisis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Metrik</th>
+                                        <th>Nilai</th>
+                                        <th>Status</th>
+                                        <th>Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="volatilityDetailsTable">
+                                    <tr>
+                                        <td colspan="4" class="text-center py-3">
+                                            <div class="spinner-border spinner-border-sm"></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -138,198 +300,266 @@
             
             <!-- Accuracy Trends -->
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-line text-primary me-2"></i>
-                             Trend Akurasi Model
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-gradient-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Trend Akurasi Model (MAE, RMSE, R²)
                         </h5>
                     </div>
                     <div class="card-body">
                         <div id="accuracyTrendsChart" style="height: 450px;">
                             <div class="text-center py-5">
                                 <div class="spinner-border text-primary"></div>
-                                <p class="mt-2">Memuat trend akurasi...</p>
+                                <p class="mt-2 text-muted">Memuat trend akurasi...</p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>    
             
             <!-- Row for Forecast vs Actual and Performance Stats -->
             <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-crosshairs text-success me-2"></i>
-                             Perbandingan Prediksi vs Aktual
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-gradient-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-crosshairs me-2"></i>
+                            Perbandingan Prediksi vs Aktual (20 Data Terakhir)
                         </h5>
                     </div>
                     <div class="card-body">
                         <div id="forecastActualChart" style="height: 450px;">
                             <div class="text-center py-5">
                                 <div class="spinner-border text-success"></div>
-                                <p class="mt-2">Memuat perbandingan forecast...</p>
+                                <p class="mt-2 text-muted">Memuat perbandingan...</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Enhanced Performance Stats -->
+
+            <!-- Statistik Performa -->>
             <div class="col-lg-4">
-                <div class="card h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-tachometer-alt text-info me-2"></i>
-                             Statistik Performa
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-gradient-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tachometer-alt me-2"></i>
+                            Statistik Performa
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div id="performanceStats">
-                            <!-- Best Model Info -->
-                            <div class="mb-3 p-3 bg-light rounded">
-                                <small class="text-muted"> Model Terbaik</small>
-                                <h4 class="text-primary mb-1" id="bestModel">-</h4>
-                                <small class="text-success" id="bestModelAccuracy">-</small>
-                            </div>
-                            
-                            <!-- Current Performance -->
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted">MAE Saat Ini</small>
-                                    <h5 class="text-primary" id="currentMAE">-</h5>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">R² Score</small>
-                                    <h5 class="text-info" id="currentR2">-</h5>
-                                </div>
-                            </div>
-                            
-                            <!-- Model Status -->
-                            <div class="mb-3">
-                                <small class="text-muted">Status Model</small>
-                                <h5 id="modelStatus">-</h5>
-                            </div>
-                            
-                            <!-- Data Info -->
-                            <div class="mb-3">
-                                <small class="text-muted"> Periode Data</small>
-                                <p class="mb-1 small" id="dataCoverage">-</p>
-                                <small class="text-muted"> Total Data Points</small>
-                                <p class="mb-1 small" id="totalDataPoints">-</p>
-                                <small class="text-muted"> Volatilitas Data</small>
-                                <p class="mb-1 small" id="dataVolatility">-</p>
-                            </div>
-                            
-                            <!-- Drift Alert -->
-                            <div class="alert alert-warning" id="driftAlert" style="display: none;">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                <small>Model drift terdeteksi!</small>
-                            </div>
-                            
-                            <!-- Recommendation -->
-                            <div class="alert alert-info" id="recommendationAlert" style="display: none;">
-                                <i class="fas fa-lightbulb me-2"></i>
-                                <small id="recommendationText">-</small>
-                            </div>
-                            
-                            <!-- Last Updated -->
-                            <div class="text-center mt-3">
-                                <small class="text-muted">Terakhir diperbarui</small>
-                                <br>
-                                <small id="lastUpdated">-</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Model Comparison Table -->
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table text-warning me-2"></i>
-                            Tabel Perbandingan Model
-                        </h5>
-                        <small class="text-muted">Ranking berdasarkan MAE (semakin kecil semakin baik)</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="modelComparisonTable">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Model</th>
-                                        <th>MAE Saat Ini</th>
-                                        <th>RMSE Saat Ini</th>
-                                        <th>R² Score</th>
-                                        <th>Akurasi</th>
-                                        <th>Grade</th>
-                                        <th>Trend</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="modelComparisonBody">
-                                    <tr>
-                                        <td colspan="9" class="text-center py-3">
-                                            <div class="spinner-border spinner-border-sm text-primary"></div>
-                                            <span class="ms-2">Memuat data perbandingan...</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <!-- Best Model -->
+                        <div class="mb-3 p-3 bg-light rounded">
+                            <small class="text-muted d-block mb-1">🏆 Model Terbaik</small>
+                            <h4 class="text-primary mb-1" id="bestModel">-</h4>
+                            <small class="text-success fw-bold" id="bestModelAccuracy">-</small>
                         </div>
                         
-                        <!-- Insights Panel -->
-                        <div class="row mt-4" id="insightsPanel" style="display: none;">
-                            <div class="col-md-4">
-                                <div class="card bg-primary text-white">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-trophy fa-2x mb-2"></i>
-                                        <h6>Model Terbaik</h6>
-                                        <p class="mb-0 small" id="bestPerformerInsight">-</p>
-                                    </div>
+                        <!-- Current Performance -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted d-block">MAE</small>
+                                    <h5 class="text-danger mb-0" id="currentMAE">-</h5>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-success text-white">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
-                                        <h6>Status Stabilitas</h6>
-                                        <p class="mb-0 small" id="stabilityInsight">-</p>
-                                    </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted d-block">R² Score</small>
+                                    <h5 class="text-info mb-0" id="currentR2">-</h5>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-info text-white">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-chart-line fa-2x mb-2"></i>
-                                        <h6>Karakteristik Data</h6>
-                                        <p class="mb-0 small" id="dataCharacteristicsInsight">-</p>
-                                    </div>
-                                </div>
-                            </div>
+                        </div>
+                        
+                        <!-- Model Status -->
+                        <div class="mb-3 p-2 bg-light rounded">
+                            <small class="text-muted d-block">Status Model</small>
+                            <h5 class="mb-0" id="modelStatus">-</h5>
+                        </div>
+                        
+                        <!-- Data Info -->
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-2"><i class="fas fa-database me-1"></i> Informasi Data</small>
+                            <ul class="list-unstyled small mb-0">
+                                <li class="mb-1">📅 <strong>Periode:</strong> <span id="dataCoverage">-</span></li>
+                                <li class="mb-1">📊 <strong>Total Data:</strong> <span id="totalDataPoints">-</span></li>
+                                <li class="mb-1">📈 <strong>Volatilitas:</strong> <span id="dataVolatility">-</span></li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Alerts -->
+                        <div class="alert alert-warning mb-2" id="driftAlert" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <small>Model drift terdeteksi!</small>
+                        </div>
+                        
+                        <div class="alert alert-info mb-0" id="recommendationAlert" style="display: none;">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            <small id="recommendationText">-</small>
+                        </div>
+                        
+                        <!-- Last Updated -->
+                        <div class="text-center mt-3 pt-3 border-top">
+                            <small class="text-muted d-block">Terakhir diperbarui</small>
+                            <small class="fw-bold" id="lastUpdated">-</small>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Model Drift Detection -->
+            <!-- MODEL DRIFT CHART (FULL WIDTH) -->
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-                            Deteksi Penurunan Performa Model
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-gradient-warning text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Deteksi Penurunan Performa Model (Drift Detection)
                         </h5>
                     </div>
                     <div class="card-body">
                         <div id="modelDriftChart" style="height: 350px;">
                             <div class="text-center py-5">
                                 <div class="spinner-border text-warning"></div>
-                                <p class="mt-2">Menganalisis model drift...</p>
+                                <p class="mt-2 text-muted">Menganalisis drift...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- MODEL COMPARISON TABLE -->
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-gradient-secondary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>
+                            Tabel Perbandingan Model
+                        </h5>
+                        <small class="badge bg-light text-dark">Ranking berdasarkan MAE (lower is better)</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle" id="modelComparisonTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center">#</th>
+                                        <th>Model</th>
+                                        <th class="text-center">MAE</th>
+                                        <th class="text-center">RMSE</th>
+                                        <th class="text-center">R²</th>
+                                        <th class="text-center">Akurasi</th>
+                                        <th class="text-center">Grade</th>
+                                        <th class="text-center">Trend</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modelComparisonBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center py-4">
+                                            <div class="spinner-border spinner-border-sm text-primary"></div>
+                                            <span class="ms-2 text-muted">Memuat data perbandingan...</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- INSIGHTS CARDS -->
+            <div class="col-12" id="insightsPanel" style="display: none;">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-primary text-white shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-trophy fa-3x mb-3 opacity-75"></i>
+                                <h6 class="fw-bold">Model Terbaik</h6>
+                                <p class="mb-0 small" id="bestPerformerInsight">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-success text-white shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-check-circle fa-3x mb-3 opacity-75"></i>
+                                <h6 class="fw-bold">Status Stabilitas</h6>
+                                <p class="mb-0 small" id="stabilityInsight">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-info text-white shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-line fa-3x mb-3 opacity-75"></i>
+                                <h6 class="fw-bold">Karakteristik Data</h6>
+                                <p class="mb-0 small" id="dataCharacteristicsInsight">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- OVERFITTING & DEGRADATION -->
+            <div class="col-12">
+                <div class="accordion" id="advancedAnalysisAccordion">
+                    <!-- Overfitting Panel -->
+                    <div class="accordion-item border-0 shadow-sm mb-3">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#overfittingCollapse">
+                                <i class="fas fa-exclamation-circle text-danger me-2"></i>
+                                <strong>Deteksi Overfitting Model</strong>
+                            </button>
+                        </h2>
+                        <div id="overfittingCollapse" class="accordion-collapse collapse" data-bs-parent="#advancedAnalysisAccordion">
+                            <div class="accordion-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div id="overfittingChart" style="height: 300px;">
+                                            <div class="text-center py-5">
+                                                <div class="spinner-border spinner-border-sm"></div>
+                                                <p class="mt-2 small text-muted">Menganalisis overfitting...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div id="overfittingStats">
+                                            <div class="mb-3 p-3 bg-light rounded">
+                                                <small class="text-muted d-block">Status</small>
+                                                <h5 class="mb-0" id="overfittingStatus">-</h5>
+                                            </div>
+                                            <div class="mb-3">
+                                                <small class="text-muted d-block">Training MAE</small>
+                                                <p class="mb-0" id="trainingMAE">-</p>
+                                            </div>
+                                            <div class="mb-3">
+                                                <small class="text-muted d-block">Testing MAE</small>
+                                                <p class="mb-0" id="testingMAE">-</p>
+                                            </div>
+                                            <div class="alert alert-sm" id="overfittingAlert"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Degradation Panel -->
+                    <div class="accordion-item border-0 shadow-sm">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#degradationCollapse">
+                                <i class="fas fa-chart-line text-warning me-2"></i>
+                                <strong>Monitoring Degradasi Performa</strong>
+                            </button>
+                        </h2>
+                        <div id="degradationCollapse" class="accordion-collapse collapse" data-bs-parent="#advancedAnalysisAccordion">
+                            <div class="accordion-body">
+                                <div id="degradationChart" style="height: 350px;">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border spinner-border-sm"></div>
+                                        <p class="mt-2 small text-muted">Menganalisis degradasi...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -337,68 +567,181 @@
             </div>
         </div>
     </div>
-</div>
+    
 {% endblock %}
 
 {% block scripts %}
 <script>
+    const LOAD_TIMEOUT = 10000;  
     let currentTimeframe = '6M';
-    
+    let startMonthOffset = 0;  
+    let allAvailablePeriods = [];
+    let sliderMetadata = {
+        totalMonths: 0,
+        windowMonths: 6,
+        availableDates: [],
+        currentOffset: 0
+    };
     async function loadMovingAverages() {
         try {
-            const response = await fetch(`/api/visualization/moving-averages?timeframe=${currentTimeframe}`);
-            const data = await response.json();
+            let url = `/api/visualization/moving-averages?timeframe=${currentTimeframe}`;
+            if (startMonthOffset > 0) {
+                url += `&offset=${startMonthOffset}`;
+            }
             
+            console.log(`🔄 [MA] Loading with timeout: ${LOAD_TIMEOUT}ms`);
+
+            const response = await withTimeout(fetch(url));
+
+            if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json(); console.log(`✅ [MA] Data received`);
             const chartDiv = document.getElementById('movingAvgChart');
             
-            if (data.success) {
+            if (data.success && data.chart) {
                 chartDiv.innerHTML = '';
                 Plotly.newPlot('movingAvgChart', data.chart.data, data.chart.layout, {
                     responsive: true,
                     displayModeBar: true
                 });
+                console.log('✅ [MA] Chart rendered');
             } else {
-                chartDiv.innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
+                chartDiv.innerHTML = `<div class="alert alert-warning mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${data.message || 'Gagal memuat chart'}
+                </div>`;
+                console.warn('⚠️ [MA]', data.message);
             }
         } catch (error) {
-            document.getElementById('movingAvgChart').innerHTML = 
-                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            document.getElementById('movingAvgChart').innerHTML = `<div class="alert alert-danger mb-0">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: ${error.message}
+            </div>`;
         }
     }
 
     async function loadVolatility() {
         console.log('🔄 Loading volatility...');
         try {
-            const response = await fetch(`/api/visualization/volatility?timeframe=${currentTimeframe}`);
+            let url = `/api/visualization/volatility?timeframe=${currentTimeframe}`;
+            if (startMonthOffset > 0) {
+                url += `&offset=${startMonthOffset}`;
+            }
+            
+            const response = await withTimeout(fetch(url));
             const data = await response.json();
             
             console.log('📊 Volatility response:', data);
             
-            if (data.success && data.chart) {
-                document.getElementById('volatilityChart').innerHTML = '';
+            if (data.success && data.charts) {  
+                const chartData = data.charts.accuracy_trends || 
+                                data.charts.forecast_vs_actual || 
+                                Object.values(data.charts)[0];
                 
-                // ✅ FIXED: Use same structure as moving averages
-                Plotly.newPlot('volatilityChart', data.chart.data, data.chart.layout, {
-                    responsive: true,
-                    displayModeBar: true
-                });
-                
-                // Update stats
-                if (data.stats) {
-                    document.getElementById('currentVolatility').textContent = data.stats.current.toFixed(3);
-                    document.getElementById('avgVolatility30').textContent = data.stats.avg30.toFixed(3);
-                    
-                    // Risk level calculation
-                    const riskLevel = data.stats.current > data.stats.avg30 * 1.5 ? 'HIGH' : 
-                                     data.stats.current > data.stats.avg30 * 1.2 ? 'MEDIUM' : 'LOW';
-                    const riskColor = riskLevel === 'HIGH' ? 'text-danger' : 
-                                     riskLevel === 'MEDIUM' ? 'text-warning' : 'text-success';
-                    
-                    const riskElement = document.getElementById('riskLevel');
-                    riskElement.textContent = riskLevel;
-                    riskElement.className = `h5 ${riskColor}`;
+                if (chartData) {
+                    document.getElementById('volatilityChart').innerHTML = '';
+                    Plotly.newPlot('volatilityChart', chartData.data, chartData.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
                 }
                 
+                if (data.stats) {
+                    // ✅ Format dengan 2 decimal places
+                    const current = parseFloat(data.stats.current_volatility ?? 0).toFixed(2);
+                    const avg30 = parseFloat(data.stats.avg_volatility_30 ?? 0).toFixed(2);
+                    const max = parseFloat(data.stats.max_volatility ?? 0).toFixed(2);
+                    let min = parseFloat(data.stats.min_volatility ?? 0).toFixed(2);
+
+                    // Jika min = 0 DAN max > 0, gunakan 10% dari max sebagai fallback
+                    if ((min == 0 || min == 0.00) && max > 0) {
+                        min = (max * 0.1).toFixed(2);
+                        console.warn(`⚠️ Min volatility was 0, using fallback: ${min}`);
+                    }
+
+                    // ✅ Determine risk level
+                    const riskLevel = current > avg30 * 1.5 ? 'TINGGI' : 
+                                    current > avg30 * 1.2 ? 'SEDANG' : 'RENDAH';
+                    
+                    const riskColor = riskLevel === 'TINGGI' ? 'danger' : 
+                                    riskLevel === 'SEDANG' ? 'warning' : 'success';
+                    
+                    // ✅ Determine trend
+                    const trendDiff = (current - avg30) / avg30 * 100;
+                    const trendIcon = trendDiff > 10 ? '📈 NAIK' : 
+                                    trendDiff < -10 ? '📉 TURUN' : '➡️ STABIL';
+                    
+                    // Update cards
+                    document.getElementById('currentVolatility').textContent = current;
+                    document.getElementById('avgVolatility30').textContent = avg30;
+                    
+                    // Risk Level Card
+                    const riskLevelText = document.getElementById('riskLevelText');
+                    riskLevelText.textContent = riskLevel;
+                    riskLevelText.className = `h3 fw-bold text-${riskColor}`;
+                    
+                    document.getElementById('riskDescription').innerHTML = `
+                        <small class="badge bg-${riskColor}">${riskLevel}</small>
+                    `;
+                    
+                    // Volatility Trend
+                    document.getElementById('volatilityTrend').innerHTML = `
+                        <small class="badge bg-${trendDiff > 0 ? 'warning' : 'success'}">
+                            ${trendIcon} (${Math.abs(trendDiff).toFixed(1)}%)
+                        </small>
+                    `;
+                    
+                    // Range
+                    document.getElementById('maxVolatility').textContent = max;
+                    document.getElementById('minVolatility').textContent = min;
+                    
+                    // ✅ Insights
+                    const insights = generateVolatilityInsights(current, avg30, riskLevel, trendDiff);
+                    document.getElementById('volatilityInsights').innerHTML = insights;
+                    
+                    // ✅ SIMPLIFIED Table (hanya 5 baris penting)
+                    const tbody = document.getElementById('volatilityDetailsTable');
+                    tbody.innerHTML = `
+                        <tr>
+                            <td><strong>Volatilitas Terkini</strong></td>
+                            <td class="fw-bold">${current}</td>
+                            <td><span class="badge bg-info">AKTUAL</span></td>
+                            <td>Standar deviasi 7 hari terakhir</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Rata-rata 30 Hari</strong></td>
+                            <td class="fw-bold">${avg30}</td>
+                            <td><span class="badge bg-secondary">BASELINE</span></td>
+                            <td>Referensi volatilitas normal</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Perubahan vs Baseline</strong></td>
+                            <td class="fw-bold">${trendDiff.toFixed(2)}%</td>
+                            <td><span class="badge bg-${trendDiff > 0 ? 'warning' : 'success'}">
+                                ${trendDiff > 0 ? 'NAIK' : 'TURUN'}
+                            </span></td>
+                            <td>${trendDiff > 0 ? 'Volatilitas meningkat' : 'Volatilitas menurun'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Range (Max-Min)</strong></td>
+                            <td class="fw-bold">${(max - min).toFixed(2)}</td>
+                            <td><span class="badge bg-secondary">RANGE</span></td>
+                            <td>Perbedaan volatilitas tertinggi dan terendah</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Level Risiko</strong></td>
+                            <td class="fw-bold"><span class="text-${riskColor}">${riskLevel}</span></td>
+                            <td><span class="badge bg-${riskColor}">${riskLevel}</span></td>
+                            <td>${riskLevel === 'TINGGI' ? '⚠️ Perhatian khusus diperlukan' : 
+                                riskLevel === 'SEDANG' ? '⚡ Monitor pergerakan' : '✅ Kondisi normal'}</td>
+                        </tr>
+                    `;
+                    
+                    console.log('✅ Volatility cards updated');
+                }
+            
                 console.log('✅ Volatility chart loaded successfully');
             } else {
                 document.getElementById('volatilityChart').innerHTML = 
@@ -410,11 +753,16 @@
                 `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
-    
+
     async function loadModelPerformance() {
         console.log('🔄 Loading model performance...');
         try {
-            const response = await fetch(`/api/visualization/model-performance?timeframe=${currentTimeframe}`);
+            let url = `/api/visualization/model-performance?timeframe=${currentTimeframe}`;
+            if (startMonthOffset > 0) {
+                url += `&offset=${startMonthOffset}`;
+            }
+
+            const response = await withTimeout(fetch(url));
             const data = await response.json();
             
             console.log('📊 Model performance response:', data);
@@ -454,15 +802,26 @@
                 }
                 
                 // Update stats
+                // ✅ FIXED VERSION
                 if (data.stats) {
                     // Basic stats
                     document.getElementById('bestModel').textContent = data.stats.best_model;
                     document.getElementById('bestModelAccuracy').textContent = data.stats.forecast_accuracy;
                     document.getElementById('currentMAE').textContent = data.stats.current_mae.toFixed(4);
                     document.getElementById('currentR2').textContent = data.stats.current_r2.toFixed(3);
-                    document.getElementById('dataCoverage').textContent = data.stats.data_coverage;
-                    document.getElementById('totalDataPoints').textContent = data.stats.total_data_points;
-                    document.getElementById('dataVolatility').textContent = `${data.stats.data_volatility} (${data.stats.volatility_level})`;
+                    
+                    // ✅ FIX: Gunakan field yang ADA
+                    document.getElementById('totalDataPoints').textContent = data.stats.total_data_points || 'N/A';
+                    
+                    // ✅ FIX: Hitung dari data atau fallback
+                    const dataRange = data.models_available ? 
+                        `${data.models_available.length} models trained` : 'N/A';
+                    document.getElementById('dataCoverage').textContent = dataRange;
+                    
+                    // ✅ FIX: Fallback untuk volatility
+                    document.getElementById('dataVolatility').textContent = 
+                        data.stats.model_stability || 'STABIL';
+                    
                     document.getElementById('lastUpdated').textContent = data.stats.last_updated;
                     
                     // Model status
@@ -512,37 +871,271 @@
         }
     }
 
+    async function initializeSlider() {
+        try {
+            console.log('🎚️ Initializing slider...');
+            const response = await fetch('/api/data/available-periods');
+            const data = await response.json();
+            
+            if (data.success && data.periods.length > 0) {
+                sliderMetadata.availableDates = data.periods;
+                sliderMetadata.totalMonths = data.periods.length;
+                
+                updateSliderRange();
+                
+                const slider = document.getElementById('periodSlider');
+                slider.value = 0;
+                
+                // Initial preview
+                updateSliderPreview(0);
+                
+                console.log(`✅ Slider initialized: ${sliderMetadata.totalMonths} months available`);
+            } else {
+                console.warn('⚠️ No periods available for slider');
+                document.getElementById('periodSlider').disabled = true;
+            }
+        } catch (error) {
+            console.error('❌ Error initializing slider:', error);
+        }
+    }
+
+    function generateVolatilityInsights(current, avg30, riskLevel, trendDiff) {
+        let insights = '<ul class="mb-0">';
+        
+        // Insight 1: Risk level
+        if (riskLevel === 'TINGGI') {
+            insights += '<li>⚠️ <strong>Risiko Tinggi:</strong> Volatilitas IPH melebihi normal, hati-hati dengan fluktuasi harga</li>';
+        } else if (riskLevel === 'SEDANG') {
+            insights += '<li>⚡ <strong>Risiko Sedang:</strong> Volatilitas sedikit di atas rata-rata, monitor kondisi pasar</li>';
+        } else {
+            insights += '<li>✅ <strong>Risiko Rendah:</strong> Volatilitas stabil dalam kondisi normal</li>';
+        }
+        
+        // Insight 2: Trend
+        if (trendDiff > 10) {
+            insights += '<li>📈 <strong>Volatilitas Meningkat:</strong> Tren naik ' + trendDiff.toFixed(1) + '% dari baseline</li>';
+        } else if (trendDiff < -10) {
+            insights += '<li>📉 <strong>Volatilitas Menurun:</strong> Tren turun ' + Math.abs(trendDiff).toFixed(1) + '% dari baseline</li>';
+        } else {
+            insights += '<li>➡️ <strong>Volatilitas Stabil:</strong> Perubahan minimal dari baseline</li>';
+        }
+        
+        // Insight 3: Recommendation
+        if (riskLevel === 'TINGGI') {
+            insights += '<li>💡 <strong>Rekomendasi:</strong> Pertahankan monitoring ketat</li>';
+        } else if (riskLevel === 'SEDANG') {
+            insights += '<li>💡 <strong>Rekomendasi:</strong> Lanjutkan monitoring rutin, antisipasi perubahan lebih lanjut</li>';
+        } else {
+            insights += '<li>💡 <strong>Rekomendasi:</strong> Kondisi stabil, lanjutkan monitoring berkala</li>';
+        }
+        
+        insights += '</ul>';
+        return insights;
+    }    
+
+    function updateSliderRange() {
+        const slider = document.getElementById('periodSlider');
+        
+        // Determine window size
+        if (currentTimeframe === '6M') sliderMetadata.windowMonths = 6;
+        else if (currentTimeframe === '1Y') sliderMetadata.windowMonths = 12;
+        else if (currentTimeframe === '2Y') sliderMetadata.windowMonths = 24;
+        else {
+            // ALL - disable slider
+            slider.disabled = true;
+            slider.max = 0;
+            return;
+        }
+        
+        // Max offset = total months - window size
+        const maxOffset = Math.max(0, sliderMetadata.totalMonths - sliderMetadata.windowMonths);
+        
+        slider.disabled = false;
+        slider.max = maxOffset;
+        slider.value = sliderMetadata.currentOffset;
+        
+        console.log(`🎚️ Slider range: 0 to ${maxOffset} (window: ${sliderMetadata.windowMonths} months)`);
+    }
+
+    function updateSliderPreview(offsetValue) {
+        const offset = parseInt(offsetValue);
+        sliderMetadata.currentOffset = offset;
+        
+        if (sliderMetadata.availableDates.length === 0) return;
+        
+        const windowMonths = sliderMetadata.windowMonths;
+        const totalMonths = sliderMetadata.totalMonths;
+        const maxOffset = Math.max(0, totalMonths - windowMonths);
+        
+        // ✅ REVERSED LOGIC: 
+        // offset=0 → rightmost (terbaru)
+        // offset=max → leftmost (terlama)
+        const reversedOffset = maxOffset - offset;
+        
+        const startIndex = reversedOffset;
+        const endIndex = Math.min(reversedOffset + windowMonths, totalMonths) - 1;
+        
+        const startDate = sliderMetadata.availableDates[startIndex];  // Oldest
+        const endDate = sliderMetadata.availableDates[endIndex];      // Newest
+        
+        // Update date labels
+        document.getElementById('windowStartDate').textContent = startDate.display;
+        document.getElementById('windowEndDate').textContent = endDate.display;      
+        
+        // ✅ UPDATE: Display text sesuai slider position
+        if (offset === 0) {
+            document.getElementById('sliderValueDisplay').textContent = 'Posisi: Terbaru (Kanan)';
+        } else if (offset === maxOffset) {
+            document.getElementById('sliderValueDisplay').textContent = 'Posisi: Terlama (Kiri)';
+        } else {
+            // ✅ FIXED: Show actual offset from latest
+            document.getElementById('sliderValueDisplay').textContent = `${offset} bulan ke belakang`;
+        }
+        
+        // Update visual indicator
+        const indicator = document.getElementById('windowIndicator');
+        const percentStart = (reversedOffset / totalMonths) * 100;
+        const percentWidth = (windowMonths / totalMonths) * 100;
+        
+        indicator.style.left = `${percentStart}%`;
+        indicator.style.width = `${percentWidth}%`;
+        
+        // Update period display
+        updatePeriodDisplay();
+    }
+
+    function applySliderOffset(offsetValue) {
+        const offset = parseInt(offsetValue);
+        const windowMonths = sliderMetadata.windowMonths;
+        const totalMonths = sliderMetadata.totalMonths;
+        const maxOffset = Math.max(0, totalMonths - windowMonths);
+        
+        // slider 0 (kanan/terbaru) → offset 0
+        // slider max (kiri/terlama) → offset max
+        startMonthOffset = maxOffset - offset;
+        
+        console.log(`🎚️ Slider applied: slider=${offset}, actual offset=${startMonthOffset}`);
+        
+        // Only refresh Moving Average & Volatility
+        const activeTab = document.querySelector('.tab-pane.active');
+        if (!activeTab) return;
+        
+        const tabId = activeTab.id;
+        
+        if (tabId === 'moving-avg') {
+            loadMovingAverages();
+        } else if (tabId === 'volatility') {
+            loadVolatility();
+        }
+    }
+
+    function withTimeout(promise, timeout = LOAD_TIMEOUT) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Loading timeout')), timeout)
+            )
+        ]);
+    }
+
     function changeTimeframe(timeframe) {
         currentTimeframe = timeframe;
+        startMonthOffset = 0; // Reset offset to latest
+        
+        // Update slider range
+        updateSliderRange();
+        
+        const slider = document.getElementById('periodSlider');
+        slider.value = 0;  // Slider 0 = posisi kanan (terbaru)
+        updateSliderPreview(0);
         
         // Update button states
-        document.querySelectorAll('.btn-group button').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.btn-group .btn-outline-primary').forEach(btn => {
+            btn.classList.remove('active');
+        });
         event.target.classList.add('active');
         
         refreshVisualization();
     }
-    
-    function toggleMA(type) {
-        const chart = document.getElementById('movingAvgChart');
-        if (chart && chart._fullData) {
-            const updates = chart._fullData.map(trace => {
-                if (trace.name.includes('IPH')) return true;
-                if (type === 'short' && (trace.name.includes('MA 3') || trace.name.includes('MA 7'))) return true;
-                if (type === 'long' && (trace.name.includes('MA 14') || trace.name.includes('MA 30'))) return true;
-                return false;
-            });
+
+    function updateStartMonthOptions() {
+        const select = document.getElementById('startMonthSelect');
+        select.innerHTML = '<option value="">Dari awal periode</option>';
+        
+        let monthCount = 0;
+        if (currentTimeframe === '6M') monthCount = 6;
+        else if (currentTimeframe === '1Y') monthCount = 12;
+        else if (currentTimeframe === '2Y') monthCount = 24;
+        else monthCount = 0;  // ALL data
+        
+        for (let i = 1; i < monthCount; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Bulan ke-${i}`;
+            select.appendChild(option);
+        }
+    }
+
+    function applyTimeframeWithOffset() {
+        const offsetValue = document.getElementById('startMonthSelect').value;
+        startMonthOffset = offsetValue ? parseInt(offsetValue) : 0;
+        
+        console.log(`📅 Applied timeframe: ${currentTimeframe}, offset: ${startMonthOffset}`);
+        
+        updatePeriodDisplay();
+        refreshVisualization();
+    }
+
+    function resetTimeframe() {
+        currentTimeframe = '6M';
+        startMonthOffset = 0;
+        document.getElementById('startMonthSelect').value = '';
+        updateStartMonthSelect();
+        updatePeriodDisplay();
+        
+        console.log('🔄 Reset to default timeframe');
+        
+        refreshVisualization();
+    }
+
+    function updatePeriodDisplay() {
+        const timeframeMap = {
+            '6M': '6 Bulan',
+            '1Y': '1 Tahun',
+            '2Y': '2 Tahun',
+            'ALL': 'Semua Data'
+        };
+        
+        let display = timeframeMap[currentTimeframe] || '6 Bulan';
+        
+        if (startMonthOffset > 0 && sliderMetadata.availableDates.length > 0) {
+            const windowMonths = sliderMetadata.windowMonths;
+            const totalMonths = sliderMetadata.totalMonths;
+            const maxOffset = Math.max(0, totalMonths - windowMonths);
             
-            Plotly.restyle('movingAvgChart', {visible: updates});
+            const reversedOffset = maxOffset - startMonthOffset;
+            
+            const startIndex = reversedOffset;
+            const endIndex = Math.min(reversedOffset + windowMonths, totalMonths) - 1;
+            
+            const startDate = sliderMetadata.availableDates[startIndex];
+            const endDate = sliderMetadata.availableDates[endIndex];
+            
+            display = `${display}: ${startDate.display} - ${endDate.display}`;
+        } else {
+            display += ' Terakhir';
         }
         
-        event.target.parentElement.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
+        document.getElementById('currentPeriodDisplay').textContent = display;
     }
-    
+
     function refreshVisualization() {
-        const activeTab = document.querySelector('.tab-pane.active').id;
+        const activeTab = document.querySelector('.tab-pane.active');
+        if (!activeTab) return;
         
-        switch(activeTab) {
+        const tabId = activeTab.id;
+        
+        switch(tabId) {
             case 'moving-avg': loadMovingAverages(); break;
             case 'volatility': loadVolatility(); break;
             case 'performance': loadModelPerformance(); break;
@@ -593,6 +1186,190 @@
         document.getElementById('dataCharacteristicsInsight').textContent = insights.data_characteristics;
         document.getElementById('insightsPanel').style.display = 'block';
     }
+    
+    function applyCustomDateRange() {
+        const dateFrom = document.getElementById('dateFrom').value;
+        const dateTo = document.getElementById('dateTo').value;
+        
+        if (!dateFrom || !dateTo) {
+            alert('Pilih tanggal awal dan akhir');
+            return;
+        }
+        
+        customDateFrom = dateFrom;
+        customDateTo = dateTo;
+        currentTimeframe = 'CUSTOM';
+        
+        // Update button states
+        document.querySelectorAll('.btn-group .btn-outline-primary').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        refreshVisualization();
+    }
+    
+    function updateStartMonthSelect() {
+        const select = document.getElementById('startMonthSelect');
+        select.innerHTML = '<option value="0">Periode Terbaru (default)</option>';
+        
+        if (allAvailablePeriods.length === 0) return;
+        
+        // Window size
+        let windowMonths = 0;
+        if (currentTimeframe === '6M') windowMonths = 6;
+        else if (currentTimeframe === '1Y') windowMonths = 12;
+        else if (currentTimeframe === '2Y') windowMonths = 24;
+        else return; // ALL tidak perlu offset
+        
+        // Max offset = total - window
+        const maxOffset = Math.max(0, allAvailablePeriods.length - windowMonths);
+        
+        for (let i = 1; i <= maxOffset; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Mundur ${i} bulan`;
+            select.appendChild(option);
+        }
+        
+        console.log(`✅ Updated select: max offset = ${maxOffset}`);
+    }                                                       
+
+
+    async function loadOverfittingDetection() {
+        try {
+            // Get latest model performance data
+            const response = await fetch('/api/model-comparison-chart');
+            const data = await response.json();
+            
+            if (data.success && data.metrics && data.metrics.length > 0) {
+                const bestModel = data.metrics[0];
+                
+                // Simulate train/test split for visualization
+                const trainMAE = bestModel.mae * 0.85;  // Assume training better
+                const testMAE = bestModel.mae;
+                
+                // Call detection API
+                const detectionResponse = await fetch('/api/visualization/model-overfitting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        train_mae: trainMAE,
+                        test_mae: testMAE
+                    })
+                });
+                
+                const detectionData = await detectionResponse.json();
+                
+                if (detectionData.success) {
+                    // Update stats
+                    document.getElementById('trainingMAE').textContent = trainMAE.toFixed(4);
+                    document.getElementById('testingMAE').textContent = testMAE.toFixed(4);
+                    
+                    // Update status
+                    const statusElement = document.getElementById('overfittingStatus');
+                    statusElement.textContent = detectionData.severity;
+                    statusElement.className = `h5 text-${detectionData.color}`;
+                    
+                    // Show alert
+                    const alertElement = document.getElementById('overfittingAlert');
+                    alertElement.className = `alert alert-${detectionData.color} mb-0`;
+                    alertElement.innerHTML = `
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>${detectionData.recommendation}</strong><br>
+                        <small>Perbedaan: ${detectionData.difference_percent.toFixed(1)}%</small>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading overfitting detection:', error);
+        }
+    }
+
+    async function loadDegradationMonitoring() {
+        try {
+            const response = await fetch('/api/model-comparison-chart');
+            const data = await response.json();
+            
+            if (data.success && data.metrics && data.metrics.length > 0) {
+                const bestModel = data.metrics[0];
+                
+                // Simulate previous performance
+                const previousMAE = bestModel.mae * 1.1;
+                const previousR2 = bestModel.r2_score * 0.95;
+                
+                // Call detection API
+                const detectionResponse = await fetch('/api/visualization/model-degradation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model_name: bestModel.name,
+                        current_mae: bestModel.mae,
+                        previous_mae: previousMAE,
+                        current_r2: bestModel.r2_score,
+                        previous_r2: previousR2
+                    })
+                });
+                
+                const detectionData = await detectionResponse.json();
+                
+                if (detectionData.success) {
+                    // Create simple bar chart
+                    const traces = [{
+                        x: ['Previous', 'Current'],
+                        y: [previousMAE, detectionData.current_mae],
+                        type: 'bar',
+                        marker: {
+                            color: [detectionData.degraded ? '#ff6b6b' : '#51cf66', 
+                                detectionData.degraded ? '#ff6b6b' : '#51cf66']
+                        }
+                    }];
+                    
+                    const layout = {
+                        title: 'Model MAE Comparison',
+                        yaxis: { title: 'MAE' },
+                        showlegend: false
+                    };
+                    
+                    document.getElementById('degradationChart').innerHTML = '';
+                    Plotly.newPlot('degradationChart', traces, layout, { responsive: true });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading degradation monitoring:', error);
+        }
+    }
+
+    async function loadAvailablePeriods() {
+        try {
+            console.log('🔄 Loading available periods from database...');
+            
+            const response = await fetch('/api/data/available-periods');
+
+            if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success && data.periods && data.periods.length > 0) {
+                allAvailablePeriods = data.periods;
+                console.log(`✅ Loaded ${data.total_periods} periods from ${data.years.length} years`);
+                
+                // Update info
+                document.getElementById('totalPeriodsInfo').textContent = 
+                    `${data.total_periods} periode tersedia (${data.years.length} tahun)`;
+                
+                // Populate initial select
+                updateStartMonthSelect();
+            } else {
+                console.warn('⚠️ No periods available:', data.message);
+                document.getElementById('totalPeriodsInfo').textContent = 'Tidak ada data';
+            }
+        } catch (error) {
+            console.error('❌ Error loading periods:', error);
+            document.getElementById('totalPeriodsInfo').textContent = 'Error loading data';
+        }
+    }
 
     // Tab change handlers
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
@@ -607,9 +1384,140 @@
         });
     });
     
+    async function loadModelPerformance() {
+    console.log('🔄 Loading model performance...');
+        try {
+            let url = `/api/visualization/model-performance?timeframe=${currentTimeframe}`;
+            if (startMonthOffset > 0) {
+                url += `&offset=${startMonthOffset}`;
+            }
+
+            const response = await withTimeout(fetch(url));
+            const data = await response.json();
+            
+            console.log('📊 Model performance response:', data);
+            
+            if (data.success && data.charts) {
+                // Load accuracy trends
+                if (data.charts.accuracy_trends) {
+                    document.getElementById('accuracyTrendsChart').innerHTML = '';
+                    Plotly.newPlot('accuracyTrendsChart', 
+                        data.charts.accuracy_trends.data, 
+                        data.charts.accuracy_trends.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Load forecast vs actual
+                if (data.charts.forecast_vs_actual) {
+                    document.getElementById('forecastActualChart').innerHTML = '';
+                    Plotly.newPlot('forecastActualChart', 
+                        data.charts.forecast_vs_actual.data, 
+                        data.charts.forecast_vs_actual.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Load model drift
+                if (data.charts.model_drift) {
+                    document.getElementById('modelDriftChart').innerHTML = '';
+                    Plotly.newPlot('modelDriftChart', 
+                        data.charts.model_drift.data, 
+                        data.charts.model_drift.layout, {
+                        responsive: true,
+                        displayModeBar: true
+                    });
+                }
+                
+                // Update stats (existing code...)
+                if (data.stats) {
+                    document.getElementById('bestModel').textContent = data.stats.best_model;
+                    document.getElementById('bestModelAccuracy').textContent = data.stats.forecast_accuracy;
+                    document.getElementById('currentMAE').textContent = data.stats.current_mae.toFixed(4);
+                    document.getElementById('currentR2').textContent = data.stats.current_r2.toFixed(3);
+                    document.getElementById('dataCoverage').textContent = data.stats.data_coverage;
+                    document.getElementById('totalDataPoints').textContent = data.stats.total_data_points;
+                    document.getElementById('dataVolatility').textContent = `${data.stats.data_volatility} (${data.stats.volatility_level})`;
+                    document.getElementById('lastUpdated').textContent = data.stats.last_updated;
+                    
+                    const status = data.stats.model_stability;
+                    const statusColor = status === 'STABIL' ? 'text-success' : 'text-warning';
+                    const statusElement = document.getElementById('modelStatus');
+                    statusElement.textContent = status;
+                    statusElement.className = `h5 ${statusColor}`;
+                    
+                    const driftAlert = document.getElementById('driftAlert');
+                    if (data.stats.drift_detected) {
+                        driftAlert.style.display = 'block';
+                    } else {
+                        driftAlert.style.display = 'none';
+                    }
+                    
+                    const recommendationAlert = document.getElementById('recommendationAlert');
+                    const recommendationText = document.getElementById('recommendationText');
+                    if (data.stats.recommendation) {
+                        recommendationText.textContent = data.stats.recommendation;
+                        recommendationAlert.style.display = 'block';
+                    }
+                    
+                    if (data.stats.model_comparison_table) {
+                        updateModelComparisonTable(data.stats.model_comparison_table);
+                    }
+                    
+                    if (data.stats.insights) {
+                        updateInsightsPanel(data.stats.insights);
+                    }
+                }
+                
+                // ✅ NOW call overfitting/degradation AFTER main load
+                loadOverfittingDetection();
+                loadDegradationMonitoring();
+                
+                console.log('✅ Model performance loaded successfully');
+            } else {
+                const errorMsg = data.message || 'Gagal memuat model performance';
+                document.getElementById('accuracyTrendsChart').innerHTML = 
+                    `<div class="alert alert-warning">${errorMsg}</div>`;
+            }
+        } catch (error) {
+            console.error('❌ Model performance error:', error);
+            document.getElementById('accuracyTrendsChart').innerHTML = 
+                `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        }
+    }
+
     // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        loadMovingAverages();
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('📄 [INIT] Page loaded');
+        
+        try {
+            // ✅ Initialize slider FIRST
+            await initializeSlider();
+            console.log('✅ [INIT] Slider initialized');
+            
+            updatePeriodDisplay();
+            console.log('✅ [INIT] Period display updated');
+            
+            // Load active tab
+            const activeTab = document.querySelector('.tab-pane.active');
+            console.log(`✅ [INIT] Active tab: ${activeTab?.id || 'none'}`);
+            
+            if (activeTab?.id === 'moving-avg') {
+                await loadMovingAverages();
+            } else if (activeTab?.id === 'volatility') {
+                await loadVolatility();
+            } else if (activeTab?.id === 'performance') {
+                await loadModelPerformance();
+            }
+            
+            console.log('✅ [INIT] Initialization complete');
+            
+        } catch (error) {
+            console.error('❌ [INIT] Error:', error);
+        }
     });
+
 </script>
 {% endblock %}

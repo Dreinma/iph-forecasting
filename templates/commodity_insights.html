@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Commodity Insights - IPH Forecasting{% endblock %}
+{% block title %}Insight Komoditas - Peramalan IPH{% endblock %}
 
 {% block content %}
 <!-- Page Header dengan status indicator -->
@@ -8,7 +8,7 @@
     <div>
         <h1 class="h2 text-gradient mb-1">
             <i class="fas fa-wheat-awn me-2"></i>
-            Commodity Insights
+            Insight Komoditas
             <span class="badge bg-success ms-2" id="dataStatus">
                 <i class="fas fa-spinner fa-spin"></i> Loading...
             </span>
@@ -74,21 +74,29 @@
                     Analisis Bulanan
                     <span class="badge bg-info text-white ms-2" id="monthlyStatus">Ready</span>
                 </h5>
-                <select class="form-select form-select-sm" id="monthSelector" style="width: auto;">
-                    <option value="">Bulan Terkini</option>
-                    <option value="januari">Januari</option>
-                    <option value="februari">Februari</option>
-                    <option value="maret">Maret</option>
-                    <option value="april">April</option>
-                    <option value="mei">Mei</option>
-                    <option value="juni">Juni</option>
-                    <option value="juli">Juli</option>
-                    <option value="agustus">Agustus</option>
-                    <option value="september">September</option>
-                    <option value="oktober">Oktober</option>
-                    <option value="november">November</option>
-                    <option value="desember">Desember</option>
-                </select>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="monthSelector" style="width: auto;">
+                        <option value="">Bulan Terkini</option>
+                        <option value="januari">Januari</option>
+                        <option value="februari">Februari</option>
+                        <option value="maret">Maret</option>
+                        <option value="april">April</option>
+                        <option value="mei">Mei</option>
+                        <option value="juni">Juni</option>
+                        <option value="juli">Juli</option>
+                        <option value="agustus">Agustus</option>
+                        <option value="september">September</option>
+                        <option value="oktober">Oktober</option>
+                        <option value="november">November</option>
+                        <option value="desember">Desember</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="yearSelector" style="width: auto;">
+                        <option value="">Tahun Terkini</option>
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2023">2023</option>
+                    </select>
+                </div>
             </div>
             <div class="card-body">
                 <div id="monthlyAnalysis">
@@ -113,9 +121,10 @@
                     <span class="badge bg-success text-white ms-2" id="trendsStatus">Ready</span>
                 </h5>
                 <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary active" onclick="changeTrendPeriod(4)">4W</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(8)">8W</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(12)">12W</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(4)">1M</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(12)">3M</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(24)">6M</button>
+                    <button type="button" class="btn btn-outline-secondary active" onclick="changeTrendPeriod(52)">1Y</button>
                 </div>
             </div>
             <div class="card-body">
@@ -132,29 +141,30 @@
     </div>
 </div>
 
-<!-- Enhanced Volatility Alerts dengan severity levels -->
+<!-- Ranking Komoditas Volatilitas -->
 <div class="row g-4 mb-4">
     <div class="col-12">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Peringatan Volatilitas Komoditas
-                    <span class="badge bg-danger text-white ms-2" id="alertCount">0</span>
+                    <i class="fas fa-chart-bar me-2"></i>
+                    Ranking Komoditas Paling Volatil
+                    <span class="badge bg-light text-info ms-2" id="volatilityRankingCount">0</span>
                 </h5>
                 <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-dark active" onclick="changeAlertThreshold(0.05)">5%</button>
-                    <button type="button" class="btn btn-outline-dark" onclick="changeAlertThreshold(0.08)">8%</button>
-                    <button type="button" class="btn btn-outline-dark" onclick="changeAlertThreshold(0.10)">10%</button>
+                    <button type="button" class="btn btn-outline-light active" onclick="changeVolatilityPeriod('all')">Keseluruhan</button>
+                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2023')">Tahun 2023</button>
+                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2024')">Tahun 2024</button>
+                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2025')">Tahun 2025</button>
                 </div>
             </div>
             <div class="card-body">
-                <div id="volatilityAlerts">
+                <div id="volatilityRanking">
                     <div class="text-center py-4">
-                        <div class="spinner-border text-warning" role="status">
+                        <div class="spinner-border text-info" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-2 text-muted">Menganalisis volatilitas komoditas...</p>
+                        <p class="mt-2 text-muted">Menganalisis ranking volatilitas komoditas...</p>
                     </div>
                 </div>
             </div>
@@ -162,35 +172,6 @@
     </div>
 </div>
 
-<!-- Enhanced Seasonal Patterns -->
-<div class="row g-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-calendar-alt text-purple me-2"></i>
-                    Pola Seasonal Komoditas
-                    <span class="badge bg-secondary text-white ms-2" id="seasonalStatus">Ready</span>
-                </h5>
-                <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary active" onclick="changeSeasonalView('overview')">Overview</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeSeasonalView('category')">By Category</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeSeasonalView('heatmap')">Heatmap</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="seasonalPatterns">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-purple" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2 text-muted">Menganalisis pola seasonal...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Enhanced Upload Modal -->
 <div class="modal fade" id="uploadCommodityModal" tabindex="-1">
@@ -453,7 +434,6 @@ function renderEnhancedCurrentWeekInsights(data) {
                                     <div class="list-group-item border-0 px-0 py-2">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div class="d-flex align-items-center">
-                                                <span class="me-2">${c.category_icon || '📦'}</span>
                                                 <div>
                                                     <div class="fw-medium">${c.name}</div>
                                                     <small class="text-muted">${c.category}</small>
@@ -479,7 +459,6 @@ function renderEnhancedCurrentWeekInsights(data) {
                                     <div class="list-group-item border-0 px-0 py-2">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div class="d-flex align-items-center">
-                                                <span class="me-2">${c.category_icon || '📦'}</span>
                                                 <div>
                                                     <div class="fw-medium">${c.name}</div>
                                                     <small class="text-muted">${c.category}</small>
@@ -666,7 +645,6 @@ function renderEnhancedCommodityTrends(data, periods) {
                 const volatility = info.volatility || 0;
                 const trend_coefficient = info.trend_coefficient || 0;
                 const category = info.category || 'LAINNYA';
-                const category_icon = info.category_icon || '📦';
                 
                 const trendConfig = getTrendConfig(trend, trend_strength);
                 const impactConfig = getImpactConfig(total_impact);
@@ -735,7 +713,6 @@ function renderEnhancedCommodityTrends(data, periods) {
                                 <!-- Period Activity -->
                                 <div class="mt-2">
                                     <div class="d-flex align-items-center">
-                                        <span class="me-2">${category_icon}</span>
                                         <small class="text-muted">
                                             Aktif dalam ${appearances} periode
                                         </small>
@@ -1243,19 +1220,18 @@ function analyzeCategorySeasonalPatterns(patterns) {
     
     // Predefined category info (should match backend)
     const categoryInfo = {
-        'PROTEIN': { icon: '🥩', description: 'Sumber protein hewani dan nabati' },
-        'SAYURAN_BUMBU': { icon: '🌶️', description: 'Sayuran dan bumbu dapur' },
-        'KARBOHIDRAT': { icon: '🌾', description: 'Sumber karbohidrat utama' },
-        'LEMAK_MINYAK': { icon: '🛢️', description: 'Minyak dan lemak' },
-        'PEMANIS': { icon: '🍯', description: 'Pemanis dan gula' },
-        'BUAH': { icon: '🍌', description: 'Buah-buahan' },
-        'LAINNYA': { icon: '📦', description: 'Komoditas lainnya' }
+        'PROTEIN': { description: 'Sumber protein hewani dan nabati' },
+        'SAYURAN_BUMBU': { description: 'Sayuran dan bumbu dapur' },
+        'KARBOHIDRAT': { description: 'Sumber karbohidrat utama' },
+        'LEMAK_MINYAK': { description: 'Minyak dan lemak' },
+        'PEMANIS': { description: 'Pemanis dan gula' },
+        'BUAH': { description: 'Buah-buahan' },
+        'LAINNYA': { description: 'Komoditas lainnya' }
     };
     
     // Initialize categories
     Object.keys(categoryInfo).forEach(category => {
         categoryData[category] = {
-            icon: categoryInfo[category].icon,
             description: categoryInfo[category].description,
             monthly_impacts: {},
             total_months: 0,
@@ -1404,7 +1380,6 @@ function renderSeasonalHeatmap(patterns, insights) {
                             ${heatmapData.categories.map(category => `
                                 <tr>
                                     <td>
-                                        <span class="me-2">${category.icon}</span>
                                         <strong class="small">${category.name}</strong>
                                     </td>
                                     ${category.monthly_values.map(monthValue => `
@@ -1486,7 +1461,6 @@ function prepareSimpleHeatmapData(patterns) {
         
         return {
             name: category,
-            icon: categoryInfo[category] || '📦',
             monthly_values,
             avg_impact
         };
@@ -1844,7 +1818,6 @@ function renderEnhancedVolatilityAlerts(data, threshold) {
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <span class="me-2">${alert.category_icon || '📦'}</span>
                                         <div>
                                             <div class="fw-medium">${alert.commodity}</div>
                                             <small class="text-muted">${alert.standardized_name}</small>
@@ -2157,21 +2130,6 @@ function showUploadCommodityModal() {
     modal.show();
 }
 
-function downloadSampleCommodityData() {
-    const sampleData = `Bulan,Minggu ke-,Kab/Kota,Indikator Perubahan Harga (%),Komoditas Andil Perubahan Harga,Komoditas Fluktuasi Harga Tertinggi,Fluktuasi Harga
-Januari '24,M1,BATU,1.25,"BERAS(0.5);CABAI RAWIT(0.3);MINYAK GORENG(0.2)",CABAI RAWIT,0.08
-Januari '24,M2,BATU,-0.85,"TELUR AYAM RAS(-0.4);DAGING AYAM RAS(-0.3);GULA PASIR(-0.15)",TELUR AYAM RAS,0.06`;
-    
-    const blob = new Blob([sampleData], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_commodity_data.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-}
 
 function showAlert(message, type) {
     const alertHTML = `

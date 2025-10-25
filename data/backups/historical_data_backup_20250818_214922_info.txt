@@ -1,3 +1,0 @@
-Backup created: 2025-08-18T21:49:22.167662
-Original file: data/historical_data.csv
-File size: 15193 bytes

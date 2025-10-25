@@ -291,17 +291,9 @@ body {
 }
 
 /* Animation Classes */
-.fade-in {
-    animation: fadeIn 0.5s ease-in;
-}
-
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
-}
-
-.slide-in-right {
-    animation: slideInRight 0.5s ease-out;
 }
 
 @keyframes slideInRight {
@@ -320,7 +312,6 @@ body {
 
 .shadow-sm { box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
 .shadow { box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }
-.shadow-lg { box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175); }
 
 /* Print Styles */
 @media print {
@@ -488,15 +479,6 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Circular Progress Styles */
-.circular-progress {
-    transform: rotate(-90deg);
-}
-
-.circular-progress circle {
-    transition: stroke-dashoffset 0.5s ease;
-}
-
 /* Model Card Hover Effects */
 .card:hover {
     transform: translateY(-2px);
@@ -520,10 +502,6 @@ body {
     transition: width 0.6s ease;
 }
 
-.progress-ring {
-    transition: stroke-dashoffset 0.5s ease-in-out;
-}
-
 .card .position-absolute .fa-crown {
     animation: pulse 2s infinite;
 }
@@ -532,4 +510,60 @@ body {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
+}
+
+
+.card-body h6,
+.card-body strong,
+.card-body .text-dark {
+    color: #000000 !important;
+}
+
+.card-body small.text-muted {
+    color: #6c757d !important;
+}
+
+.card .text-white {
+    color: #000000 !important;
+}
+
+/* ✅ GRADIENT HEADERS */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.bg-gradient-secondary {
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+}
+
+/* ✅ CARD HOVER EFFECT */
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+}
+
+/* ✅ TABLE STYLING */
+#modelComparisonTable tbody tr:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+
+#modelComparisonTable .table-success {
+    background-color: #d1f2eb !important;
 }

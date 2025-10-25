@@ -30,80 +30,127 @@
 
 
 
-<!-- Upload Data File Section -->
+<!-- Upload Data Section - Unified IPH & Commodity -->
 <div class="row g-4 mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-cloud-upload-alt text-primary me-2"></i>
-                    Upload Data File
+                    Upload Data IPH & Komoditas
                 </h5>
             </div>
             <div class="card-body">
-                <!-- Upload Form -->
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <!-- Drag & Drop Area -->
-                    <div class="upload-area mb-4" id="uploadArea">
+                <!-- Upload Method Selection -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-csv fa-3x text-primary mb-3"></i>
+                                <h6 class="card-title">Upload File Massal</h6>
+                                <p class="card-text small text-muted">Upload file CSV dengan data IPH dan komoditas sekaligus</p>
+                                <button type="button" class="btn btn-primary" onclick="showFileUpload()">
+                                    <i class="fas fa-upload me-1"></i>
+                                    Upload File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-body text-center">
+                                <i class="fas fa-plus-circle fa-3x text-success mb-3"></i>
+                                <h6 class="card-title">Input Manual</h6>
+                                <p class="card-text small text-muted">Tambah data IPH dan komoditas per minggu secara manual</p>
+                                <button type="button" class="btn btn-success" onclick="showManualInput()">
+                                    <i class="fas fa-keyboard me-1"></i>
+                                    Input Manual
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Template Download -->
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-download me-2"></i>Template File CSV</h6>
+                    <p class="mb-2">Download template untuk format data yang benar:</p>
+                    <a href="/download/template_iph_komoditas.csv" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-download me-1"></i>
+                        Download Template CSV
+                    </a>
+                    <small class="text-muted ms-2">Format: Bulan, Minggu ke-, Kab/Kota, Indikator Perubahan Harga (%), Komoditas Andil, Komoditas Fluktuasi, Fluktuasi Harga</small>
+                </div>
+
+                <!-- File Upload Form (Hidden by default) -->
+                <div id="fileUploadSection" style="display: none;">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <!-- Drag & Drop Area -->
+                        <div class="upload-area mb-4" id="uploadArea">
+                            <div class="text-center">
+                                <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                                <h5>Drag & Drop file CSV di sini</h5>
+                                <p class="text-muted mb-3">atau klik untuk memilih file</p>
+                                <button type="button" class="btn btn-primary" id="browseBtn">
+                                    <i class="fas fa-folder-open me-2"></i>
+                                    Pilih File
+                                </button>
+                            </div>
+                            <input type="file" id="fileInput" name="file" accept=".csv,.xlsx" style="display: none;">
+                        </div>
+                        
+                        <!-- Upload Options -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="forecastWeeks" class="form-label">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Minggu Peramalan Setelah Upload
+                                    </label>
+                                    <select class="form-select" id="forecastWeeks" name="forecast_weeks">
+                                        <option value="4">4 minggu</option>
+                                        <option value="6">6 minggu</option>
+                                        <option value="8" selected>8 minggu</option>
+                                        <option value="10">10 minggu</option>
+                                        <option value="12">12 minggu</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-cog me-1"></i>
+                                        Opsi Pemrosesan
+                                    </label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="autoRetrain" checked>
+                                        <label class="form-check-label" for="autoRetrain">
+                                            Auto-retrain model setelah upload
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="generateForecast" checked>
+                                        <label class="form-check-label" for="generateForecast">
+                                            Generate peramalan langsung
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Upload Button -->
                         <div class="text-center">
-                            <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
-                            <h5>Drag & Drop your file here</h5>
-                            <p class="text-muted mb-3">or click to browse files</p>
-                            <button type="button" class="btn btn-primary" id="browseBtn">
-                                <i class="fas fa-folder-open me-2"></i>
-                                Choose File
+                            <button type="submit" class="btn btn-success btn-lg" id="uploadBtn" disabled>
+                                <i class="fas fa-upload me-2"></i>
+                                Upload dan Proses Data
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="hideFileUpload()">
+                                <i class="fas fa-times me-1"></i>
+                                Batal
                             </button>
                         </div>
-                        <input type="file" id="fileInput" name="file" accept=".csv,.xlsx" style="display: none;">
-                    </div>
-                    
-                    <!-- Upload Options -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="forecastWeeks" class="form-label">
-                                    <i class="fas fa-calendar-alt me-1"></i>
-                                    Forecast Weeks After Upload
-                                </label>
-                                <select class="form-select" id="forecastWeeks" name="forecast_weeks">
-                                    <option value="4">4 weeks</option>
-                                    <option value="6">6 weeks</option>
-                                    <option value="8" selected>8 weeks</option>
-                                    <option value="10">10 weeks</option>
-                                    <option value="12">12 weeks</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">
-                                    <i class="fas fa-cog me-1"></i>
-                                    Processing Options
-                                </label>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="autoRetrain" checked>
-                                    <label class="form-check-label" for="autoRetrain">
-                                        Auto-retrain models after upload
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="generateForecast" checked>
-                                    <label class="form-check-label" for="generateForecast">
-                                        Generate forecast immediately
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Upload Button -->
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-success btn-lg" id="uploadBtn" disabled>
-                            <i class="fas fa-upload me-2"></i>
-                            Upload and Process Data
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -182,6 +229,131 @@
     </div>
 </div>
 
+<!-- Manual Input Modal -->
+<div class="modal fade" id="manualInputModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-keyboard me-2"></i>Input Manual Data IPH & Komoditas
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualInputForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualBulan" class="form-label">
+                                    <i class="fas fa-calendar me-1"></i>Bulan
+                                </label>
+                                <select class="form-select" id="manualBulan" required>
+                                    <option value="">Pilih Bulan</option>
+                                    <option value="Januari">Januari</option>
+                                    <option value="Februari">Februari</option>
+                                    <option value="Maret">Maret</option>
+                                    <option value="April">April</option>
+                                    <option value="Mei">Mei</option>
+                                    <option value="Juni">Juni</option>
+                                    <option value="Juli">Juli</option>
+                                    <option value="Agustus">Agustus</option>
+                                    <option value="September">September</option>
+                                    <option value="Oktober">Oktober</option>
+                                    <option value="November">November</option>
+                                    <option value="Desember">Desember</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualMinggu" class="form-label">
+                                    <i class="fas fa-calendar-week me-1"></i>Minggu ke-
+                                </label>
+                                <select class="form-select" id="manualMinggu" required>
+                                    <option value="">Pilih Minggu</option>
+                                    <option value="M1">M1</option>
+                                    <option value="M2">M2</option>
+                                    <option value="M3">M3</option>
+                                    <option value="M4">M4</option>
+                                    <option value="M5">M5</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualTahun" class="form-label">
+                                    <i class="fas fa-calendar-alt me-1"></i>Tahun
+                                </label>
+                                <input type="number" class="form-control" id="manualTahun" 
+                                       value="2024" min="2020" max="2030" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualKabKota" class="form-label">
+                                    <i class="fas fa-map-marker-alt me-1"></i>Kab/Kota
+                                </label>
+                                <input type="text" class="form-control" id="manualKabKota" 
+                                       value="BATU" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="manualIPH" class="form-label">
+                            <i class="fas fa-chart-line me-1"></i>Indikator Perubahan Harga (%)
+                        </label>
+                        <input type="number" step="0.001" class="form-control" id="manualIPH" 
+                               placeholder="e.g., 1.25 atau -0.85" required>
+                        <div class="form-text">Masukkan nilai IPH dalam persen (positif untuk inflasi, negatif untuk deflasi)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="manualKomoditasAndil" class="form-label">
+                            <i class="fas fa-seedling me-1"></i>Komoditas Andil Perubahan Harga
+                        </label>
+                        <input type="text" class="form-control" id="manualKomoditasAndil" 
+                               placeholder="e.g., BERAS(0.5);CABAI(0.3);MINYAK GORENG(0.2)">
+                        <div class="form-text">Format: KOMODITAS(nilai);KOMODITAS(nilai)</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualKomoditasFluktuasi" class="form-label">
+                                    <i class="fas fa-chart-bar me-1"></i>Komoditas Fluktuasi Tertinggi
+                                </label>
+                                <input type="text" class="form-control" id="manualKomoditasFluktuasi" 
+                                       placeholder="e.g., CABAI RAWIT">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manualNilaiFluktuasi" class="form-label">
+                                    <i class="fas fa-percentage me-1"></i>Nilai Fluktuasi
+                                </label>
+                                <input type="number" step="0.0001" class="form-control" id="manualNilaiFluktuasi" 
+                                       placeholder="e.g., 0.0553">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Batal
+                </button>
+                <button type="button" class="btn btn-success" onclick="addManualRecord()">
+                    <i class="fas fa-plus me-1"></i>Tambah Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Results Area -->
 <div id="uploadResults"></div>
 <div id="actionResults"></div>
@@ -189,7 +361,81 @@
 
 {% block scripts %}
 <script>
-// Add single record modal
+// Show/hide file upload section
+function showFileUpload() {
+    document.getElementById('fileUploadSection').style.display = 'block';
+}
+
+function hideFileUpload() {
+    document.getElementById('fileUploadSection').style.display = 'none';
+}
+
+// Show manual input modal
+function showManualInput() {
+    const modal = new bootstrap.Modal(document.getElementById('manualInputModal'));
+    modal.show();
+}
+
+// Add manual record
+async function addManualRecord() {
+    const formData = {
+        bulan: document.getElementById('manualBulan').value,
+        minggu: document.getElementById('manualMinggu').value,
+        tahun: parseInt(document.getElementById('manualTahun').value),
+        kab_kota: document.getElementById('manualKabKota').value,
+        iph_value: parseFloat(document.getElementById('manualIPH').value),
+        komoditas_andil: document.getElementById('manualKomoditasAndil').value,
+        komoditas_fluktuasi: document.getElementById('manualKomoditasFluktuasi').value,
+        nilai_fluktuasi: parseFloat(document.getElementById('manualNilaiFluktuasi').value) || 0
+    };
+    
+    // Validate required fields
+    if (!formData.bulan || !formData.minggu || !formData.iph_value) {
+        showAlert('Mohon isi semua field yang wajib diisi', 'warning');
+        return;
+    }
+    
+    try {
+        showLoading('Menambahkan data manual...');
+        
+        const response = await fetch('/api/add-manual-record', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Data berhasil ditambahkan!', 'success');
+            
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('manualInputModal'));
+            modal.hide();
+            
+            // Clear form
+            document.getElementById('manualInputForm').reset();
+            document.getElementById('manualTahun').value = '2024';
+            document.getElementById('manualKabKota').value = 'BATU';
+            
+            // Refresh page after 2 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            showAlert(`Error: ${result.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        showAlert(`Error menambahkan data: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Add single record modal (legacy - keep for compatibility)
 function showAddRecordModal() {
     const modalHTML = `
         <div class="modal fade" id="addRecordModal" tabindex="-1">
@@ -303,19 +549,39 @@ async function retrainModels() {
         showLoading('Retraining models...');
         
         const response = await fetch('/api/retrain-models', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('❌ Non-JSON response:', text);
+            throw new Error('Server returned non-JSON response');
+        }
         
         const result = await response.json();
         
         if (result.success) {
-            showAlert('Models retrained successfully!', 'success');
+            showAlert(`✅ Models retrained successfully!\nBest model: ${result.best_model}`, 'success');
+            
+            // Reload page after 3 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
         } else {
-            showAlert(`Error: ${result.message}`, 'danger');
+            showAlert(`❌ Error: ${result.message || result.error}`, 'danger');
         }
         
     } catch (error) {
-        showAlert(`Retrain failed: ${error.message}`, 'danger');
+        console.error('❌ Retrain error:', error);
+        showAlert(`❌ Retrain failed: ${error.message}`, 'danger');
     } finally {
         hideLoading();
     }

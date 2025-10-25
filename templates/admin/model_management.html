@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Model Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="h2 mb-4">
+        <i class="fas fa-microchip me-2"></i>
+        Manajemen Model
+    </h1>
+
+    <div class="row g-4">
+        <!-- Active Models -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">Model Aktif</h5>
+                </div>
+                <div class="card-body">
+                    <div id="modelList" class="list-group">
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backups -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">Backup Model</h5>
+                </div>
+                <div class="card-body">
+                    <div id="backupList" class="list-group">
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadModels() {
+    try {
+        const response = await fetch('/api/admin/models/list');
+        const data = await response.json();
+        
+        if (data.success) {
+            const html = data.models.map(model => `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${model.name}</h6>
+                        <small class="text-muted">${model.size_mb.toFixed(2)} MB</small>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="deleteModel('${model.name}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            document.getElementById('modelList').innerHTML = html || '<p class="text-muted">Tidak ada model</p>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadBackups() {
+    try {
+        const response = await fetch('/api/admin/models/backups');
+        const data = await response.json();
+        
+        if (data.success) {
+            const html = data.backups.map(backup => `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${backup.filename}</h6>
+                        <small class="text-muted">${new Date(backup.created).toLocaleString()}</small>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="restoreModel('${backup.filename}')">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            document.getElementById('backupList').innerHTML = html || '<p class="text-muted">Tidak ada backup</p>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function deleteModel(modelName) {
+    if (!confirm(`Hapus model ${modelName}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/admin/models/delete/${modelName}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Model dihapus');
+            loadModels();
+            loadBackups();
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+async function restoreModel(backupFile) {
+    if (!confirm(`Restore model dari ${backupFile}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/admin/models/restore/${backupFile}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Model di-restore');
+            loadModels();
+            loadBackups();
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadModels();
+    loadBackups();
+});
+</script>
+{% endblock %}

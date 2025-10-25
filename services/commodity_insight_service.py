@@ -15,6 +15,7 @@ class CommodityInsightService:
         self.commodity_cache = None
         self.last_cache_time = None
         self.cache_duration = 300  # 5 minutes cache
+        self.use_database = True  # Use database instead of CSV
         
         # Enhanced commodity mapping dengan lebih banyak variasi
         self.commodity_mapping = {
@@ -73,6 +74,70 @@ class CommodityInsightService:
     def load_commodity_data(self):
         """Enhanced commodity data loading dengan better error handling"""
         try:
+            if self.use_database:
+                return self._load_from_database()
+            else:
+                return self._load_from_csv()
+                
+        except Exception as e:
+            print(f"Critical error loading commodity data: {str(e)}")
+            return pd.DataFrame()
+    
+    def _load_from_database(self):
+        """Load commodity data from database"""
+        try:
+            from database import CommodityData, db
+            
+            # Check cache first
+            current_time = datetime.now()
+            if (self.commodity_cache is not None and 
+                self.last_cache_time is not None and 
+                (current_time - self.last_cache_time).seconds < self.cache_duration):
+                print("📋 Using cached commodity data from database")
+                return self.commodity_cache.copy()
+            
+            print("Loading fresh commodity data from database...")
+            
+            # Query all commodity data
+            commodity_records = CommodityData.query.all()
+            
+            if not commodity_records:
+                print("⚠️ No commodity data found in database")
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            data = []
+            for record in commodity_records:
+                data.append({
+                    'Tanggal': record.tanggal.strftime('%Y-%m-%d'),
+                    'Bulan': record.bulan,
+                    'Minggu ke-': record.minggu,
+                    'Kab/Kota': record.kab_kota,
+                    ' Indikator Perubahan Harga (%)': record.iph_value,
+                    'Komoditas Andil Perubahan Harga ': record.komoditas_andil,
+                    'Komoditas Fluktuasi Harga Tertinggi': record.komoditas_fluktuasi,
+                    'Fluktuasi Harga': record.nilai_fluktuasi
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Process the dataframe
+            df = self._process_commodity_dataframe(df)
+            
+            # Cache the successful result
+            self.commodity_cache = df.copy()
+            self.last_cache_time = current_time
+            
+            print(f"✅ Commodity data loaded from database: {len(df)} records")
+            return df
+                
+        except Exception as e:
+            print(f"Error loading from database: {str(e)}")
+            return pd.DataFrame()
+    
+    def _load_from_csv(self):
+        """Load commodity data from CSV (fallback)"""
+        try:
             if not os.path.exists(self.commodity_data_path):
                 print(f"⚠️ Commodity data not found at {self.commodity_data_path}")
                 return pd.DataFrame()
@@ -82,10 +147,10 @@ class CommodityInsightService:
             if (self.commodity_cache is not None and 
                 self.last_cache_time is not None and 
                 (current_time - self.last_cache_time).seconds < self.cache_duration):
-                print("📋 Using cached commodity data")
+                print("📋 Using cached commodity data from CSV")
                 return self.commodity_cache.copy()
             
-            print("📂 Loading fresh commodity data...")
+            print("Loading fresh commodity data from CSV...")
             
             # Enhanced CSV reading
             df = None
@@ -99,7 +164,7 @@ class CommodityInsightService:
                 except UnicodeDecodeError:
                     continue
                 except Exception as e:
-                    print(f"❌ Error with {encoding}: {str(e)}")
+                    print(f"Error with {encoding}: {str(e)}")
                     continue
             
             if df is None:
@@ -112,11 +177,11 @@ class CommodityInsightService:
             self.commodity_cache = df.copy()
             self.last_cache_time = current_time
             
-            print(f"✅ Commodity data loaded successfully: {len(df)} records")
+            print(f"✅ Commodity data loaded from CSV: {len(df)} records")
             return df
             
         except Exception as e:
-            print(f"❌ Critical error loading commodity data: {str(e)}")
+            print(f"Error loading from CSV: {str(e)}")
             return pd.DataFrame()
 
     def _process_commodity_dataframe(self, df):
@@ -222,7 +287,7 @@ class CommodityInsightService:
             return pd.Timestamp(year, month, day)
                 
         except Exception as e:
-            print(f"❌ Date creation error: {str(e)}")
+            print(f"Date creation error: {str(e)}")
             return pd.Timestamp.now().normalize()
 
     def parse_commodity_impacts(self, commodity_string):
@@ -287,7 +352,7 @@ class CommodityInsightService:
             return commodities
             
         except Exception as e:
-            print(f"❌ Critical error in commodity parsing: {str(e)}")
+            print(f"Critical error in commodity parsing: {str(e)}")
             return []
     
     def _standardize_commodity_name(self, name):
@@ -322,7 +387,7 @@ class CommodityInsightService:
     def get_current_week_insights(self):
         """Enhanced current week insights dengan detailed category analysis"""
         try:
-            print("🔍 Starting enhanced current week insights analysis...")
+            print("Starting enhanced current week insights analysis...")
             
             df = self.load_commodity_data()
             
@@ -443,7 +508,7 @@ class CommodityInsightService:
             return insights
             
         except Exception as e:
-            print(f"❌ Critical error, using fallback data: {str(e)}")
+            print(f"Critical error, using fallback data: {str(e)}")
             
             # Return fallback data untuk testing
             return {
@@ -589,7 +654,7 @@ class CommodityInsightService:
     def get_monthly_analysis(self, month=None):
         """Enhanced monthly analysis dengan better error handling"""
         try:
-            print(f"📊 Enhanced monthly analysis for month: '{month}'")
+            print(f"Enhanced monthly analysis for month: '{month}'")
             
             df = self.load_commodity_data()
             
@@ -644,7 +709,7 @@ class CommodityInsightService:
                 df_month = df[df['Bulan'] == latest_month]
                 selected_month = latest_month
             
-            print(f"📊 Analyzing {len(df_month)} records for month: {selected_month}")
+            print(f"Analyzing {len(df_month)} records for month: {selected_month}")
             
             # Enhanced commodity aggregation
             all_commodities = defaultdict(lambda: {
@@ -741,7 +806,7 @@ class CommodityInsightService:
             return result
             
         except Exception as e:
-            print(f"❌ Error in enhanced monthly analysis: {str(e)}")
+            print(f"Error in enhanced monthly analysis: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -841,7 +906,7 @@ class CommodityInsightService:
             avg_iph = df_month['IPH'].mean() if 'IPH' in df_month.columns else 0
             weeks_count = len(df_month)
             
-            summary = f"📊 **Analisis Lengkap {month}**\n\n"
+            summary = f"Analisis Lengkap {month}\n\n"
             
             # IPH Analysis
             if avg_iph > 2:
@@ -856,9 +921,9 @@ class CommodityInsightService:
             # Top commodities impact
             if commodity_stats:
                 top_3 = commodity_stats[:3]
-                summary += f"\n📈 **Komoditas Paling Berpengaruh**:\n"
+                summary += f"\nKomoditas Paling Berpengaruh:\n"
                 for i, comm in enumerate(top_3, 1):
-                    direction = "📈" if comm['total_impact'] > 0 else "📉"
+                    direction = "+" if comm['total_impact'] > 0 else "-"
                     summary += f"{i}. {comm['name']} {direction} {abs(comm['total_impact']):.3f}% ({comm['frequency']}x)\n"
             
             # Category dominance
@@ -872,7 +937,7 @@ class CommodityInsightService:
             if abs(avg_iph) > 2:
                 summary += f"\n⚠️ **Perhatian**: {month} menunjukkan pergerakan harga signifikan!"
             elif abs(avg_iph) > 1:
-                summary += f"\n📊 **Catatan**: {month} menunjukkan pergerakan harga moderat"
+                summary += f"\nCatatan: {month} menunjukkan pergerakan harga moderat"
             else:
                 summary += f"\n✅ **Positif**: {month} menunjukkan stabilitas harga yang baik"
             
@@ -1053,7 +1118,7 @@ class CommodityInsightService:
             }
             
         except Exception as e:
-            print(f"❌ Error in enhanced seasonal analysis: {str(e)}")
+            print(f"Error in enhanced seasonal analysis: {str(e)}")
             return {
                 'success': False,
                 'message': f'Error analyzing seasonal patterns: {str(e)}'
@@ -1152,7 +1217,7 @@ class CommodityInsightService:
         total_months = len(patterns)
         avg_iph_all = np.mean([data['avg_iph'] for data in patterns.values()])
         
-        summary += f"📊 **Overview**: {total_months} bulan dianalisis, rata-rata IPH tahunan: {avg_iph_all:.2f}%\n\n"
+        summary += f"Overview: {total_months} bulan dianalisis, rata-rata IPH tahunan: {avg_iph_all:.2f}%\n\n"
         
         # Peak periods
         if insights['peak_inflation_months']:
@@ -1278,7 +1343,7 @@ class CommodityInsightService:
             }
             
         except Exception as e:
-            print(f"❌ Error in enhanced alert analysis: {str(e)}")
+            print(f"Error in enhanced alert analysis: {str(e)}")
             return {
                 'success': False,
                 'message': f'Error analyzing alerts: {str(e)}'
@@ -1479,7 +1544,7 @@ class CommodityInsightService:
             }
             
         except Exception as e:
-            print(f"❌ Error in commodity trends: {str(e)}")
+            print(f"Error in commodity trends: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -1502,23 +1567,23 @@ class CommodityInsightService:
         most_volatile = max(trends.items(), key=lambda x: x[1].get('volatility', 0)) if trends else None
         most_consistent = max(trends.items(), key=lambda x: x[1]['appearances']) if trends else None
         
-        summary = "📈 **Analisis Trend Komoditas:**\n\n"
+        summary = "Analisis Trend Komoditas:\n\n"
         
         if strong_increasing:
-            summary += f"🔴 **Dampak meningkat kuat**: {', '.join(strong_increasing[:3])}\n"
+            summary += f"Dampak meningkat kuat: {', '.join(strong_increasing[:3])}\n"
         
         if strong_decreasing:
-            summary += f"🔵 **Dampak menurun kuat**: {', '.join(strong_decreasing[:3])}\n"
+            summary += f"Dampak menurun kuat: {', '.join(strong_decreasing[:3])}\n"
         
         if most_volatile:
-            summary += f"⚡ **Paling volatile**: {most_volatile[0]} (volatility: {most_volatile[1]['volatility']:.3f})\n"
+            summary += f"Paling volatile: {most_volatile[0]} (volatility: {most_volatile[1]['volatility']:.3f})\n"
         
         if most_consistent:
-            summary += f"🎯 **Paling konsisten**: {most_consistent[0]} ({most_consistent[1]['appearances']} kali muncul)"
+            summary += f"Paling konsisten: {most_consistent[0]} ({most_consistent[1]['appearances']} kali muncul)"
         
         return summary
 
-    def _analyze_category_trends(trends):
+    def _analyze_category_trends(self, trends):
         """Analyze trends by commodity category"""
         category_trends = defaultdict(lambda: {
             'commodities': 0,
@@ -1623,7 +1688,7 @@ class CommodityInsightService:
         most_volatile = max(trends.items(), key=lambda x: x[1].get('volatility', 0)) if trends else None
         most_consistent = max(trends.items(), key=lambda x: x[1]['appearances']) if trends else None
         
-        summary = "📈 **Analisis Trend Komoditas:**\n\n"
+        summary = "Analisis Trend Komoditas:\n\n"
         
         if strong_increasing:
             summary += f"🔴 **Dampak meningkat kuat**: {', '.join(strong_increasing[:3])}\n"
@@ -1781,7 +1846,7 @@ class CommodityInsightService:
             }
             
         except Exception as e:
-            print(f"❌ Error in commodity trends: {str(e)}")
+            print(f"Error in commodity trends: {str(e)}")
             import traceback
             traceback.print_exc()
             

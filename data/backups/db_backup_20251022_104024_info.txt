@@ -1,0 +1,3 @@
+Database backup created: 2025-10-22T10:40:24.897464
+Records backed up: 75
+Date range: 2024-01-01 00:00:00 to 2025-06-22 00:00:00

@@ -1,12 +1,15 @@
+# models/model_manager.py - Database-Enabled Model Manager
 import os
 import json
 import pandas as pd
 import numpy as np  
 from datetime import datetime
+from database import db, ModelPerformance
+from sqlalchemy import and_, func
 from .forecasting_engine import ForecastingEngine
 
 class ModelDriftDetector:
-    """Detect when models need retraining"""
+    """Detect when models need retraining (same as before)"""
     
     def __init__(self, drift_threshold=0.05):
         self.drift_threshold = drift_threshold
@@ -30,32 +33,30 @@ class ModelDriftDetector:
         
         drift_signals = []
         
-        # 1. Statistical drift detection
+        # Statistical drift detection
         new_stats = {
             'mean': np.mean(X_new, axis=0),
             'std': np.std(X_new, axis=0)
         }
         
-        # Check mean shift
         mean_shift = np.abs(new_stats['mean'] - self.reference_data['mean'])
-        mean_threshold = self.reference_data['std'] * 2  # 2-sigma threshold
+        mean_threshold = self.reference_data['std'] * 2
         
         if np.any(mean_shift > mean_threshold):
             drift_signals.append('mean_shift')
         
-        # Check variance change
         std_ratio = new_stats['std'] / (self.reference_data['std'] + 1e-8)
         if np.any((std_ratio > 2) | (std_ratio < 0.5)):
             drift_signals.append('variance_change')
         
-        # 2. Performance degradation
+        # Performance degradation
         if self.reference_performance and current_performance:
             current_mae = current_performance.get('mae', float('inf'))
             reference_mae = self.reference_performance.get('mae', 0)
             
             performance_degradation = (current_mae - reference_mae) / (reference_mae + 1e-8)
             
-            if performance_degradation > 0.2:  # 20% performance drop
+            if performance_degradation > 0.2:
                 drift_signals.append('performance_degradation')
         
         drift_detected = len(drift_signals) > 0
@@ -63,135 +64,177 @@ class ModelDriftDetector:
         return {
             'drift_detected': drift_detected,
             'drift_signals': drift_signals,
-            'drift_score': len(drift_signals) / 3,  # Normalize to 0-1
+            'drift_score': len(drift_signals) / 3,
             'recommendation': 'retrain' if drift_detected else 'monitor'
         }
 
+
 class ModelManager:
-    """Manager for handling model training, comparison, and selection"""
+    """🆕 Database-enabled model manager"""
     
     def __init__(self, data_path='data/historical_data.csv', models_path='data/models/'):
         self.engine = ForecastingEngine(data_path, models_path)
-        self.performance_history_path = os.path.join(models_path, 'performance_history.json')
-        self.model_metadata_path = os.path.join(models_path, 'model_metadata.json')
+        self.models_path = models_path
         
-        # Ensure models directory exists
         os.makedirs(models_path, exist_ok=True)
+        
+        print("ModelManager initialized (Database Mode)")
     
     def save_performance_history(self, results):
-        """Save model performance to history file - ENHANCED"""
-        print("📝 Saving performance history...")
+        """🆕 Save model performance to database"""
+        print("Saving performance history to database...")
         
-        history = self.load_performance_history()
-        
-        # Add new results with timestamp
-        timestamp = datetime.now().isoformat()
-        batch_id = f"training_{timestamp.replace(':', '-').replace('.', '-')}"
-        
-        for model_name, performance in results.items():
-            history_entry = {
-                'batch_id': batch_id,
-                'timestamp': timestamp,
-                'model_name': model_name,
-                'mae': float(performance['mae']),
-                'rmse': float(performance.get('rmse', 0.0)),  
-                'r2_score': float(performance['r2_score']),
-                'cv_score': float(performance.get('cv_score', 0.0)),
-                'mape': float(performance.get('mape', 0)),
-                'training_time': float(performance['training_time']),
-                'data_size': int(performance['data_size']),
-                'test_size': int(performance.get('test_size', 0)),
-                'is_best': bool(performance.get('is_best', False)),
-                'feature_importance': [float(x) if x is not None else None for x in performance.get('feature_importance', [])] if performance.get('feature_importance') else None
-            }
-            history.append(history_entry)
-        
-        # Keep only last 100 entries per model to avoid file bloat
-        model_counts = {}
-        filtered_history = []
-        
-        # Sort by timestamp (newest first)
-        history.sort(key=lambda x: x['timestamp'], reverse=True)
-        
-        for entry in history:
-            model_name = entry['model_name']
-            model_counts[model_name] = model_counts.get(model_name, 0) + 1
-            
-            if model_counts[model_name] <= 50:  # Keep last 50 entries per model
-                filtered_history.append(entry)
-        
-        # Sort back to chronological order
-        filtered_history.sort(key=lambda x: x['timestamp'])
-        
-        # Save to file
         try:
-            with open(self.performance_history_path, 'w') as f:
-                json.dump(filtered_history, f, indent=2, default=str)
-            print(f"✅ Performance history saved ({len(filtered_history)} entries)")
+            timestamp = datetime.utcnow()
+            batch_id = f"training_{timestamp.strftime('%Y%m%d_%H%M%S')}"
+            
+            saved_count = 0
+            
+            for model_name, performance in results.items():
+                # Prepare feature importance as JSON
+                feature_importance_json = None
+                if performance.get('feature_importance'):
+                    feature_importance_json = json.dumps([
+                        float(x) if x is not None else None 
+                        for x in performance['feature_importance']
+                    ])
+                
+                # Create new performance record
+                perf_record = ModelPerformance(
+                    model_name=model_name,
+                    batch_id=batch_id,
+                    mae=float(performance['mae']),
+                    rmse=float(performance.get('rmse', 0.0)),
+                    r2_score=float(performance['r2_score']),
+                    cv_score=float(performance.get('cv_score', 0.0)),
+                    mape=float(performance.get('mape', 0)),
+                    training_time=float(performance['training_time']),
+                    data_size=int(performance['data_size']),
+                    test_size=int(performance.get('test_size', 0)),
+                    is_best=bool(performance.get('is_best', False)),
+                    feature_importance=feature_importance_json,
+                    trained_at=timestamp
+                )
+                
+                db.session.add(perf_record)
+                saved_count += 1
+            
+            # Commit all records
+            db.session.commit()
+            
+            print(f"Saved {saved_count} performance records to database")
+            
+            # Cleanup old records (keep last 50 per model)
+            self._cleanup_old_performance_records()
+            
         except Exception as e:
-            print(f"❌ Error saving performance history: {str(e)}")
-                        
+            db.session.rollback()
+            print(f"Error saving performance history: {str(e)}")
+    
+    def _cleanup_old_performance_records(self):
+        """🆕 Keep only last N records per model"""
+        try:
+            # Get all model names
+            model_names = db.session.query(ModelPerformance.model_name).distinct().all()
+            
+            for (model_name,) in model_names:
+                # Get record count for this model
+                record_count = ModelPerformance.query.filter_by(model_name=model_name).count()
+                
+                if record_count > 50:
+                    # Get records to delete (keep last 50)
+                    records_to_delete = ModelPerformance.query.filter_by(
+                        model_name=model_name
+                    ).order_by(
+                        ModelPerformance.trained_at.desc()
+                    ).offset(50).all()
+                    
+                    for record in records_to_delete:
+                        db.session.delete(record)
+                    
+                    print(f"   Cleaned up {len(records_to_delete)} old records for {model_name}")
+            
+            db.session.commit()
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error during cleanup: {str(e)}")
+    
     def load_performance_history(self):
-        """Load performance history from file"""
-        if os.path.exists(self.performance_history_path):
-            try:
-                with open(self.performance_history_path, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"⚠️ Error loading performance history: {str(e)}")
-                return []
-        return []
+        """🆕 Load performance history from database"""
+        try:
+            # Query all performance records ordered by trained_at
+            records = ModelPerformance.query.order_by(
+                ModelPerformance.trained_at.asc()
+            ).all()
+            
+            # Convert to list of dicts
+            history = [record.to_dict() for record in records]
+            
+            return history
+            
+        except Exception as e:
+            print(f"Error loading performance history: {str(e)}")
+            return []
     
     def get_current_best_model(self):
-        """Get the current best performing model"""
-        history = self.load_performance_history()
-        if not history:
+        """🆕 Get current best model from database"""
+        try:
+            # Get latest best model for each model type
+            
+            subquery = db.session.query(
+                ModelPerformance.model_name,
+                func.max(ModelPerformance.trained_at).label('max_trained_at')
+            ).group_by(ModelPerformance.model_name).subquery()
+            
+            latest_models = db.session.query(ModelPerformance).join(
+                subquery,
+                and_(
+                    ModelPerformance.model_name == subquery.c.model_name,
+                    ModelPerformance.trained_at == subquery.c.max_trained_at
+                )
+            ).all()
+            
+            if not latest_models:
+                print("No trained models found in database")
+                return None
+            
+            # Filter valid models
+            valid_models = []
+            for model in latest_models:
+                if (model.mae is not None and 
+                    not np.isnan(model.mae) and 
+                    not np.isinf(model.mae) and 
+                    model.mae < 100.0):
+                    valid_models.append(model)
+            
+            if not valid_models:
+                print("No valid model results found")
+                return None
+            
+            # Find best model (lowest MAE)
+            best_model = min(valid_models, key=lambda x: x.mae)
+            
+            print(f"Current best model: {best_model.model_name} (MAE: {best_model.mae:.4f})")
+            
+            return best_model.to_dict()
+            
+        except Exception as e:
+            print(f"Error getting best model: {str(e)}")
             return None
-        
-        # Get latest results for each model
-        latest_results = {}
-        for entry in history:
-            model_name = entry['model_name']
-            if model_name not in latest_results or entry['timestamp'] > latest_results[model_name]['timestamp']:
-                latest_results[model_name] = entry
-        
-        if not latest_results:
-            return None
-        
-        # Filter out invalid results (NaN, Inf, or extremely high MAE)
-        valid_results = {}
-        for model_name, result in latest_results.items():
-            mae = result.get('mae', float('inf'))
-            if (isinstance(mae, (int, float)) and 
-                not np.isnan(mae) and 
-                not np.isinf(mae) and 
-                mae < 100.0):  # Reasonable MAE threshold
-                valid_results[model_name] = result
-        
-        if not valid_results:
-            print("⚠️ No valid model results found")
-            return None
-        
-        # Find best model (lowest MAE)
-        best_model = min(valid_results.values(), key=lambda x: x['mae'])
-        
-        print(f"✅ Current best model: {best_model['model_name']} (MAE: {best_model['mae']:.4f})")
-        
-        return best_model
-        
+    
     def compare_with_previous_best(self, new_results):
-        """Compare new results with previous best model"""
-        print("⚖️ Comparing with previous best model...")
+        """Compare new results with previous best model (same logic as before)"""
+        print("Comparing with previous best model...")
         
         current_best = self.get_current_best_model()
         
-        # Find best from new results
         best_new_model_name = min(new_results.keys(), key=lambda x: new_results[x]['mae'])
         best_new_model = new_results[best_new_model_name].copy()
         best_new_model['model_name'] = best_new_model_name
         
         if not current_best:
-            print("🆕 No previous model found. Setting new best model.")
+            print("No previous model found. Setting new best model.")
             return {
                 'is_improvement': True,
                 'new_best_model': best_new_model,
@@ -204,25 +247,19 @@ class ModelManager:
                 }
             }
         
-        # Safe division with zero checking
         def safe_percentage_change(old_val, new_val):
-            """Calculate percentage change with safe division"""
             if old_val == 0 or np.isnan(old_val) or np.isinf(old_val):
                 if new_val == 0 or np.isnan(new_val) or np.isinf(new_val):
-                    return 0.0  # Both are zero/invalid
+                    return 0.0
                 else:
-                    return 100.0 if new_val > 0 else -100.0  # Arbitrary large change
+                    return 100.0 if new_val > 0 else -100.0
             
             change = (old_val - new_val) / abs(old_val) * 100
-            
-            # Clamp to reasonable range
             return max(-1000.0, min(1000.0, change))
         
-        # Calculate improvements with safe division
         mae_improvement = safe_percentage_change(current_best['mae'], best_new_model['mae'])
         rmse_improvement = safe_percentage_change(current_best['rmse'], best_new_model['rmse'])
         
-        # Handle R² change separately (higher is better)
         if abs(current_best['r2_score']) > 1e-8:
             r2_improvement = (best_new_model['r2_score'] - current_best['r2_score']) / abs(current_best['r2_score']) * 100
             r2_improvement = max(-1000.0, min(1000.0, r2_improvement))
@@ -240,40 +277,33 @@ class ModelManager:
                 'mae_change': float(mae_improvement),
                 'rmse_change': float(rmse_improvement),
                 'r2_change': float(r2_improvement),
-                'significant_improvement': abs(mae_improvement) > 5  # 5% threshold
+                'significant_improvement': abs(mae_improvement) > 5
             }
         }
         
         if is_improvement:
             if abs(mae_improvement) > 10:
-                print(f"🎉 Significant improvement! {best_new_model_name} improved MAE by {mae_improvement:.2f}%")
+                print(f" Significant improvement! {best_new_model_name} improved MAE by {mae_improvement:.2f}%")
             else:
-                print(f"✅ Modest improvement. {best_new_model_name} improved MAE by {mae_improvement:.2f}%")
+                print(f" Modest improvement. {best_new_model_name} improved MAE by {mae_improvement:.2f}%")
         else:
-            print(f"📊 Previous model still better. Current best: {current_best['model_name']} (MAE: {current_best['mae']:.4f})")
-            print(f"   New model MAE: {best_new_model['mae']:.4f} (worse by {abs(mae_improvement):.2f}%)")
+            print(f" Previous model still better. Current best: {current_best['model_name']} (MAE: {current_best['mae']:.4f})")
         
         return comparison
-        
+    
     def train_and_compare_models(self, df):
-        """Train models and compare with previous best"""
+        """Train models and compare with previous best (same as before)"""
         print("🚀 Starting comprehensive model training and comparison...")
         
         try:
-            # Train new models
             results, trained_models = self.engine.train_and_evaluate_models(df)
             
-            # Compare with previous best
             comparison = self.compare_with_previous_best(results)
             
-            # Save models to disk
             saved_models = self.engine.save_models(trained_models, results)
             
-            # Save performance history
+            # 🆕 Save to database instead of JSON
             self.save_performance_history(results)
-            
-            # Save model metadata
-            self._save_model_metadata(results, saved_models)
             
             training_summary = {
                 'total_models_trained': len(results),
@@ -283,9 +313,9 @@ class ModelManager:
                 'is_improvement': comparison['is_improvement']
             }
             
-            print(f"✅ Training completed successfully!")
+            print(f" Training completed successfully!")
             print(f"   🏆 Best model: {training_summary['best_model']}")
-            print(f"   📊 Models trained: {training_summary['total_models_trained']}")
+            print(f"    Models trained: {training_summary['total_models_trained']}")
             print(f"   📈 Improvement: {'Yes' if training_summary['is_improvement'] else 'No'}")
             
             return {
@@ -300,137 +330,81 @@ class ModelManager:
             print(f"❌ Error in training and comparison: {str(e)}")
             raise
     
-    def _save_model_metadata(self, results, saved_models):
-        """Save model metadata for quick access"""
-        try:
-            metadata = {
-                'last_updated': datetime.now().isoformat(),
-                'models': {}
-            }
-            
-            for model_name, result in results.items():
-                metadata['models'][model_name] = {
-                    'mae': result['mae'],
-                    'rmse': result['rmse'],
-                    'r2_score': result['r2_score'],
-                    'is_best': result.get('is_best', False),
-                    'trained_at': result['trained_at'],
-                    'data_size': result['data_size']
-                }
-            
-            with open(self.model_metadata_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
-                
-        except Exception as e:
-            print(f"⚠️ Error saving model metadata: {str(e)}")
-    
     def get_model_performance_summary(self):
-        """Get comprehensive summary of all model performances"""
-        history = self.load_performance_history()
-        if not history:
-            return {}
-        
-        # Group by model name
-        model_summary = {}
-        for entry in history:
-            model_name = entry['model_name']
-            if model_name not in model_summary:
+        """🆕 Get performance summary from database"""
+        try:
+            # Get all model names
+            model_names = db.session.query(ModelPerformance.model_name).distinct().all()
+            
+            model_summary = {}
+            
+            for (model_name,) in model_names:
+                # Get all performances for this model
+                performances = ModelPerformance.query.filter_by(
+                    model_name=model_name
+                ).order_by(ModelPerformance.trained_at.asc()).all()
+                
+                if not performances:
+                    continue
+                
+                latest = performances[-1]
+                
                 model_summary[model_name] = {
                     'name': model_name,
-                    'performances': [],
-                    'best_mae': float('inf'),
-                    'latest_mae': None,
-                    'latest_r2': None,
-                    'training_count': 0,
-                    'avg_training_time': 0,
+                    'performances': [p.to_dict() for p in performances],
+                    'best_mae': min(p.mae for p in performances),
+                    'latest_mae': latest.mae,
+                    'latest_r2': latest.r2_score,
+                    'training_count': len(performances),
+                    'avg_training_time': np.mean([p.training_time for p in performances]),
                     'improvement_trend': []
                 }
-            
-            model_summary[model_name]['performances'].append(entry)
-            model_summary[model_name]['training_count'] += 1
-            model_summary[model_name]['latest_mae'] = entry['mae']
-            model_summary[model_name]['latest_r2'] = entry['r2_score']
-            
-            if entry['mae'] < model_summary[model_name]['best_mae']:
-                model_summary[model_name]['best_mae'] = entry['mae']
-        
-        # Calculate averages and trends
-        for model_name, summary in model_summary.items():
-            performances = summary['performances']
-            summary['avg_training_time'] = np.mean([p['training_time'] for p in performances])
-            
-            # Calculate improvement trend (last 5 trainings)
-            recent_maes = [p['mae'] for p in performances[-5:]]
-            if len(recent_maes) > 1:
-                trend = np.polyfit(range(len(recent_maes)), recent_maes, 1)[0]
-                summary['trend_direction'] = 'improving' if trend < 0 else 'declining'
-            else:
-                summary['trend_direction'] = 'stable'
-        
-        return model_summary
-    
-    def get_training_history_chart_data(self):
-        """Get data for training history visualization"""
-        history = self.load_performance_history()
-        if not history:
-            return {}
-        
-        # Group by model and prepare time series data
-        chart_data = {}
-        for entry in history:
-            model_name = entry['model_name']
-            if model_name not in chart_data:
-                chart_data[model_name] = {
-                    'timestamps': [],
-                    'mae_values': [],
-                    'r2_values': []
-                }
-            
-            chart_data[model_name]['timestamps'].append(entry['timestamp'])
-            chart_data[model_name]['mae_values'].append(entry['mae'])
-            chart_data[model_name]['r2_values'].append(entry['r2_score'])
-        
-        return chart_data
-    
-    def cleanup_old_models(self, keep_last_n=10):
-        """Clean up old model files to save disk space"""
-        print(f"🧹 Cleaning up old models (keeping last {keep_last_n})...")
-        
-        try:
-            history = self.load_performance_history()
-            if not history:
-                return
-            
-            # Group by model name and get timestamps
-            model_timestamps = {}
-            for entry in history:
-                model_name = entry['model_name']
-                if model_name not in model_timestamps:
-                    model_timestamps[model_name] = []
-                model_timestamps[model_name].append(entry['timestamp'])
-            
-            # For each model, keep only the latest versions
-            for model_name, timestamps in model_timestamps.items():
-                timestamps.sort(reverse=True)  # Newest first
                 
-                if len(timestamps) > keep_last_n:
-                    old_timestamps = timestamps[keep_last_n:]
-                    # In a real implementation, you might want to delete old model files
-                    # based on these timestamps
-                    print(f"   📦 {model_name}: {len(old_timestamps)} old versions identified")
+                # Calculate trend
+                recent_maes = [p.mae for p in performances[-5:]]
+                if len(recent_maes) > 1:
+                    trend = np.polyfit(range(len(recent_maes)), recent_maes, 1)[0]
+                    model_summary[model_name]['trend_direction'] = 'improving' if trend < 0 else 'declining'
+                else:
+                    model_summary[model_name]['trend_direction'] = 'stable'
             
-            print("✅ Model cleanup completed")
+            return model_summary
             
         except Exception as e:
-            print(f"❌ Error during model cleanup: {str(e)}")
-
+            print(f"❌ Error getting model summary: {str(e)}")
+            return {}
+    
+    def get_training_history_chart_data(self):
+        """🆕 Get training history from database"""
+        try:
+            history = self.load_performance_history()
+            
+            chart_data = {}
+            for entry in history:
+                model_name = entry['model_name']
+                if model_name not in chart_data:
+                    chart_data[model_name] = {
+                        'timestamps': [],
+                        'mae_values': [],
+                        'r2_values': []
+                    }
+                
+                chart_data[model_name]['timestamps'].append(entry['trained_at'])
+                chart_data[model_name]['mae_values'].append(entry['mae'])
+                chart_data[model_name]['r2_values'].append(entry['r2_score'])
+            
+            return chart_data
+            
+        except Exception as e:
+            print(f"❌ Error getting training history: {str(e)}")
+            return {}
+    
     def check_model_health(self, new_data_df):
-        """Check if models need retraining"""
+        """Check if models need retraining (same as before)"""
         if not hasattr(self, 'drift_detector'):
             self.drift_detector = ModelDriftDetector()
         
         try:
-            # Prepare features from new data
             df_features = self.engine.prepare_features(new_data_df)
             
             if df_features.empty:
@@ -438,7 +412,6 @@ class ModelManager:
             
             X_new = df_features[self.engine.feature_cols].values
             
-            # Get current best model performance
             best_model = self.get_current_best_model()
             
             if best_model:
@@ -446,8 +419,7 @@ class ModelManager:
                 
                 if drift_result['drift_detected']:
                     print(f"🚨 DRIFT DETECTED: {drift_result['drift_signals']}")
-                    print(f"📊 Drift score: {drift_result['drift_score']:.2f}")
-                    print(f"💡 Recommendation: {drift_result['recommendation']}")
+                    print(f" Drift score: {drift_result['drift_score']:.2f}")
                 
                 return drift_result
             
@@ -457,36 +429,9 @@ class ModelManager:
             print(f"⚠️ Error in drift detection: {str(e)}")
             return {'drift_detected': False, 'reason': f'Error: {str(e)}'}
 
-def create_ensemble_model(self, trained_models, results):
-    """Create ensemble from top performing models"""
-    
-    # Select top 3 models by MAE
-    model_scores = [(name, results[name]['mae']) for name in trained_models.keys()]
-    model_scores.sort(key=lambda x: x[1])
-    top_models = model_scores[:3]
-    
-    print(f"🏆 Creating ensemble from top 3 models: {[m[0] for m in top_models]}")
-    
-    # Calculate weights (inverse MAE)
-    weights = []
-    models = []
-    
-    for name, mae in top_models:
-        weight = 1.0 / (mae + 0.001)  # Avoid division by zero
-        weights.append(weight)
-        models.append(trained_models[name])
-    
-    # Normalize weights
-    total_weight = sum(weights)
-    weights = [w / total_weight for w in weights]
-    
-    # Create ensemble wrapper
-    ensemble = EnsembleModel(models, weights, [m[0] for m in top_models])
-    
-    return ensemble, weights
 
 class EnsembleModel:
-    """Ensemble model wrapper"""
+    """Ensemble model wrapper (same as before)"""
     
     def __init__(self, models, weights, model_names):
         self.models = models
@@ -494,19 +439,16 @@ class EnsembleModel:
         self.model_names = model_names
     
     def predict(self, X):
-        """Weighted average prediction"""
         predictions = []
         
         for model in self.models:
             pred = model.predict(X)
             predictions.append(pred)
         
-        # Weighted average
         ensemble_pred = np.average(predictions, weights=self.weights, axis=0)
         return ensemble_pred
     
     def get_feature_importance(self):
-        """Weighted average feature importance"""
         importances = []
         
         for model, weight in zip(self.models, self.weights):

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}PRISMA – Price Indicator Smart Monitoring & Analytics{% endblock %}
+{% block title %}PRISMA – Indikator Harga Pintar Monitoring & Analitik{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -40,7 +40,7 @@
                 </div>                
             </div>
             <div class="card-body p-0">
-                <div id="forecastChart" style="height: 500px;">
+                <div id="forecastChart" data-chart-id="historicalChart" style="height: 500px;">
                     <div class="d-flex justify-content-center align-items-center h-100">
                         <div class="text-center text-muted">
                             <div class="loading-spinner mb-3"></div>
@@ -84,7 +84,7 @@
             <div class="card-header bg-info text-white py-3">
                 <h6 class="card-title mb-0">
                     <i class="fas fa-chart-bar me-2"></i>
-                    Statistical Alerts
+                    Peringatan Statistik
                 </h6>
             </div>
             <div class="card-body" id="statisticalAlertsContainer">
@@ -105,7 +105,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div id="modelMetricsContainer">
+                <div id="modelMetricsContainer" data-metrics-id="modelPerformanceGrid">
                     <div class="text-center py-4">
                         <div class="loading-spinner mb-3"></div>
                         <p class="mb-0">Memuat metrik model...</p>
@@ -121,7 +121,6 @@
 <div id="forecastResults"></div>
 
 <!-- Forecast Data Table -->
-{% if data and data.current_forecast and data.current_forecast.data %}
 <div class="row g-4">
     <div class="col-12">
         <div class="card shadow-sm">
@@ -130,25 +129,23 @@
                     <i class="fas fa-table text-success me-2"></i>
                     Tabel Data Peramalan
                 </h5>
-                <div>
+                <div id="forecastTableBadges">
+                    {% if data and data.current_forecast %}
                     <span class="badge bg-success">
-                        {% if data and data.current_forecast %}
-                            {{ data.current_forecast.model_name.replace('_', ' ') }}
-                        {% else %}
-                            Tidak Ada Model
-                        {% endif %}
+                        {{ data.current_forecast.model_name.replace('_', ' ') }}
                     </span>
                     <span class="badge bg-info">
-                        {% if data and data.current_forecast %}
-                            {{ data.current_forecast.weeks_forecasted }} minggu
-                        {% else %}
-                            0 minggu
-                        {% endif %}
+                        {{ data.current_forecast.weeks_forecasted }} minggu
                     </span>
-                </div>                
+                    {% else %}
+                    <span class="badge bg-secondary">Tidak Ada Data</span>
+                    {% endif %}
+                </div>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <!-- ✅ ADD: Dynamic table container with ID -->
+                <div id="forecastTable" class="table-responsive">
+                    {% if data and data.current_forecast and data.current_forecast.data %}
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
@@ -183,16 +180,90 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-table text-muted fa-3x mb-3"></i>
+                        <p class="text-muted">Tidak ada data peramalan. Silakan buat peramalan terlebih dahulu.</p>
+                        <button class="btn btn-primary" onclick="showForecastModal()">
+                            <i class="fas fa-plus me-2"></i>Buat Peramalan
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
+
+<!-- Forecast Modal -->
+<div class="modal fade" id="forecastModal" tabindex="-1" aria-labelledby="forecastModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="forecastModalLabel">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Buat Peramalan IPH
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="forecastForm">
+                    <div class="row g-3">
+                        <!-- Model Selection - SIMPLIFIED -->
+                        <div class="col-md-6">
+                            <label for="forecastModel" class="form-label fw-bold">
+                                <i class="fas fa-robot me-2 text-primary"></i>
+                                Pilih Model
+                            </label>
+                            <select class="form-select" id="forecastModel" required>
+                                <option value="Random_Forest">Random Forest</option>
+                                <option value="XGBoost_Advanced">XGBoost Advanced</option>
+                                <option value="LightGBM">LightGBM</option>
+                                <option value="KNN">K-Nearest Neighbors</option>
+                            </select>
+                            <small class="form-text text-muted d-block mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Pilih model machine learning untuk peramalan
+                            </small>
+                        </div>
+                        
+                        <!-- Forecast Period - SIMPLIFIED -->
+                        <div class="col-md-6">
+                            <label for="forecastWeeks" class="form-label fw-bold">
+                                <i class="fas fa-calendar-alt me-2 text-info"></i>
+                                Jangka Waktu
+                            </label>
+                            <select class="form-select" id="forecastWeeks" required>
+                                <option value="4">4 Minggu (1 Bulan)</option>
+                                <option value="8" selected>8 Minggu (2 Bulan)</option>
+                                <option value="12">12 Minggu (3 Bulan)</option>
+                            </select>
+                            <small class="form-text text-muted d-block mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Durasi peramalan yang diinginkan
+                            </small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>
+                    Batal
+                </button>
+                <button type="button" class="btn btn-primary" onclick="generateForecast()">
+                    <i class="fas fa-play me-1"></i>
+                    Buat Peramalan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script>generateForecast
 
 function refreshForecastChart() {
     console.log('🔄 Refreshing forecast chart...');
@@ -347,6 +418,7 @@ async function loadForecastChart() {
             
             // Forecast data trace (if available)
             if (data.forecast && data.forecast.length > 0) {
+                console.log(`✅ Found ${data.forecast.length} forecast points`);
                 traces.push({
                     x: data.forecast.map(item => item.date),
                     y: data.forecast.map(item => item.prediction),
@@ -386,12 +458,15 @@ async function loadForecastChart() {
                         hoverinfo: 'skip'
                     });
                 }
+            } else {
+                console.log('No forecast data available');
             }
+
             
             // Chart layout
             const layout = {
                 title: {
-                    text: '📊 IPH Forecast & Historical Data',
+                    text: 'IPH Forecast & Historical Data',
                     x: 0.5,
                     font: {size: 16, color: '#2D3748'}
                 },
@@ -770,5 +845,222 @@ function exportDataToCSV() {
     }
 }
 
+// Forecast Modal Functions
+function showForecastModal() {
+    const modal = new bootstrap.Modal(document.getElementById('forecastModal'));
+    loadAvailableModels();
+    modal.show();
+}
+
+function loadAvailableModels() {
+    const modelSelect = document.getElementById('forecastModel');
+    modelSelect.innerHTML = '<option value="">Loading models...</option>';
+    
+    fetch('/api/available-models')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.models) {
+                modelSelect.innerHTML = '<option value="">Pilih model...</option>';
+                data.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.name;
+                    option.textContent = `${model.name} (MAE: ${model.mae.toFixed(4)})`;
+                    if (model.is_best) {
+                        option.textContent += ' - TERBAIK';
+                        option.selected = true;
+                    }
+                    modelSelect.appendChild(option);
+                });
+            } else {
+                modelSelect.innerHTML = '<option value="">Tidak ada model tersedia</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading models:', error);
+            modelSelect.innerHTML = '<option value="">Error loading models</option>';
+        });
+}
+
+function generateForecast() {
+    const model = document.getElementById('forecastModel').value;
+    const weeks = document.getElementById('forecastWeeks').value;
+    
+    if (!model || !weeks) {
+        alert('Silakan pilih model dan jangka waktu peramalan');
+        return;
+    }
+    
+    const generateBtn = document.querySelector('#forecastModal .btn-primary');
+    const originalText = generateBtn.innerHTML;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Memproses...';
+    generateBtn.disabled = true;
+    
+    const forecastData = {
+        model_name: model,
+        weeks: parseInt(weeks),
+    };
+    
+    fetch('/api/generate-forecast', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(forecastData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('forecastModal'));
+            modal.hide();
+            
+            // Show success message
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>✅ Peramalan Berhasil!</strong>
+                    <br>
+                    <small>Model: <strong>${forecastData.model_name || 'Best'}</strong> | Minggu: <strong>${weeks}</strong></small>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            const resultsContainer = document.getElementById('forecastResults');
+
+            if (resultsContainer) {
+                resultsContainer.innerHTML = alertHtml;
+            }
+
+            //  REFRESH CHART DENGAN DELAY
+            console.log('⏳ Waiting 1 second before refreshing chart...');
+            setTimeout(() => {
+                console.log('🔄 Refreshing forecast chart...');
+                loadForecastChart();
+            }, 1000);
+            
+            //  REFRESH MODEL METRICS
+            setTimeout(() => {
+                console.log('🔄 Refreshing model metrics...');
+                loadModelMetrics();
+            }, 1500);
+            
+        } else {
+            alert('Error: ' + (data.message || 'Gagal membuat peramalan'));
+        }
+    })
+    .catch(error => {
+        console.error('Error generating forecast:', error);
+        alert('Error: ' + error.message);
+    })
+    .finally(() => {
+        generateBtn.innerHTML = originalText;
+        generateBtn.disabled = false;
+    });
+}
+
+// Make functions globally available
+window.showForecastModal = showForecastModal;
+window.generateForecast = generateForecast;
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 Setting up ID compatibility layer...');
+    
+    // Map historicalChart → forecastChart
+    const forecastChart = document.getElementById('forecastChart');
+    if (forecastChart && !document.getElementById('historicalChart')) {
+        forecastChart.id = 'historicalChart';
+        console.log('   ✅ Mapped forecastChart → historicalChart');
+    }
+    
+    // Map modelPerformanceGrid → modelMetricsContainer
+    const modelMetrics = document.getElementById('modelMetricsContainer');
+    if (modelMetrics && !document.getElementById('modelPerformanceGrid')) {
+        modelMetrics.id = 'modelPerformanceGrid';
+        console.log('   ✅ Mapped modelMetricsContainer → modelPerformanceGrid');
+    }
+    
+    // Ensure forecastTable exists
+    const forecastTable = document.getElementById('forecastTable');
+    if (forecastTable) {
+        console.log('   ✅ forecastTable found');
+    } else {
+        console.warn('   ⚠️ forecastTable not found');
+    }
+    
+    // Map statisticalAlerts
+    const statsAlerts = document.getElementById('statisticalAlertsContainer');
+    if (statsAlerts && !document.getElementById('statisticalAlerts')) {
+        statsAlerts.id = 'statisticalAlerts';
+        console.log('   ✅ Mapped statisticalAlertsContainer → statisticalAlerts');
+    }
+    
+    console.log('✅ Compatibility layer setup complete');
+});
+
+// ✅ GLOBAL FUNCTIONS for sidebar links
+function showForecastModal() {
+    const modal = new bootstrap.Modal(document.getElementById('forecastModal'));
+    modal.show();
+}
+
+function generateForecast() {
+    const model = document.getElementById('forecastModel').value;
+    const weeks = document.getElementById('forecastWeeks').value;
+    
+    console.log('🔮 Generating forecast:', { model, weeks });
+    
+    // Show loading
+    const btn = event.target;
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
+    
+    fetch('/api/generate-forecast', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model_name: model,
+            weeks: parseInt(weeks)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('✅ Forecast response:', data);
+        
+        if (data.success) {
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('forecastModal')).hide();
+            
+            // Show success message
+            alert('✅ Peramalan berhasil dibuat! Dashboard akan diperbarui...');
+            
+            // Reload page to show new forecast
+            window.location.reload();
+        } else {
+            alert('❌ Error: ' + (data.error || 'Gagal membuat peramalan'));
+        }
+    })
+    .catch(error => {
+        console.error('❌ Forecast error:', error);
+        alert('❌ Terjadi kesalahan: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+
+function exportDataToCSV() {
+    console.log('📥 Exporting data to CSV...');
+    window.location.href = '/api/export-data';
+}
+
+function refreshAlerts() {
+    console.log('🔄 Refreshing alerts...');
+    window.location.reload();
+}
 </script>
 {% endblock %}

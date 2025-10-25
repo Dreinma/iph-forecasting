@@ -171,6 +171,7 @@ class ForecastingDashboard {
             }
             
             if (data.success && data.models) {
+                const filteredModels = data.models.filter(m => m.name !== 'Ensemble');
                 let performanceHtml = '';
                 
                 data.models.forEach(model => {
@@ -320,27 +321,6 @@ class ForecastingDashboard {
     }
 }
 
-async function quickRetrain() {
-    if (confirm('Retrain all models? This will take a few minutes.')) {
-        showLoading('Retraining models...');
-        try {
-            const response = await fetch('/api/retrain-models', { method: 'POST' });
-            const result = await response.json();
-            
-            if (result.success) {
-                showAlert('Models retrained successfully!', 'success');
-                updateDataControlMetrics();
-            } else {
-                showAlert('Retrain failed: ' + result.message, 'danger');
-            }
-        } catch (error) {
-            showAlert('Error: ' + error.message, 'danger');
-        } finally {
-            hideLoading();
-        }
-    }
-}
-
 async function validateData() {
     showLoading('Validating data quality...');
     try {
@@ -358,21 +338,6 @@ async function validateData() {
     }
 }
 
-async function createBackup() {
-    showLoading('Creating backup...');
-    try {
-        const response = await fetch('/api/create-backup', { method: 'POST' });
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('Backup created successfully!', 'success');
-        }
-    } catch (error) {
-        showAlert('Backup failed: ' + error.message, 'danger');
-    } finally {
-        hideLoading();
-    }
-}
 
 function safeGetElement(id) {
     const element = document.getElementById(id);

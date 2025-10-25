@@ -19,13 +19,13 @@ class XGBoostAdvanced(BaseEstimator, RegressorMixin):
     def __init__(self):
         self.params = {
             'n_estimators': 150,          # Reduced to prevent overfitting
-            'learning_rate': 0.08,        # Slightly higher for faster convergence
-            'max_depth': 3,               # Shallower trees
-            'min_child_weight': 5,        # Higher regularization
-            'subsample': 0.9,             # More data per tree
-            'colsample_bytree': 0.9,      # More features per tree
-            'reg_alpha': 0.05,            # L1 regularization
-            'reg_lambda': 0.1,            # L2 regularization
+            'learning_rate': 0.05,        # Slightly higher for faster convergence
+            'max_depth': 4,               # Shallower trees
+            'min_child_weight': 3,        # Higher regularization
+            'subsample': 0.85,             # More data per tree
+            'colsample_bytree': 0.85,      # More features per tree
+            'reg_alpha': 0.1,            # L1 regularization
+            'reg_lambda': 0.15,            # L2 regularization
             'random_state': 42,
             'verbosity': 0,
             'objective': 'reg:squarederror',
@@ -45,7 +45,7 @@ class XGBoostAdvanced(BaseEstimator, RegressorMixin):
             self.model.fit(
                 X_train, y_train,
                 eval_set=[(X_val, y_val)],
-                early_stopping_rounds=10,
+                early_stopping_rounds=15,
                 verbose=False
             )
         else:
@@ -75,18 +75,19 @@ class ModelOptimizer:
     def optimize_random_forest(self, X, y):
         """Optimize Random Forest"""
         best_params = {
-            'n_estimators': 100,
-            'max_depth': 4,
-            'min_samples_leaf': 3,
-            'min_samples_split': 5,
+            'n_estimators': 200,          # ✅ INCREASED
+            'max_depth': 6,               # ✅ INCREASED
+            'min_samples_leaf': 2,        # ✅ REDUCED
+            'min_samples_split': 3,       # ✅ REDUCED
+            'max_features': 'sqrt',       # ✅ ADDED feature sampling
             'random_state': 42
         }
         
         # Quick grid search for critical parameters
         param_grid = {
-            'max_depth': [3, 4, 5],
-            'min_samples_leaf': [2, 3, 5],
-            'n_estimators': [50, 100, 150]
+            'max_depth': [5, 6, 7],
+            'min_samples_leaf': [1, 2, 3],
+            'n_estimators': [150, 200, 250]
         }
         
         best_score = float('inf')
@@ -98,7 +99,8 @@ class ModelOptimizer:
                         'n_estimators': n_estimators,
                         'max_depth': max_depth,
                         'min_samples_leaf': min_samples_leaf,
-                        'min_samples_split': 5,
+                        'min_samples_split': 3,
+                        'max_features': 'sqrt',
                         'random_state': 42,
                         'n_jobs': -1
                     }
@@ -116,19 +118,20 @@ class ModelOptimizer:
     def optimize_lightgbm(self, X, y):
         """Optimize LightGBM"""
         param_grid = {
-            'n_estimators': [100, 150, 200],
-            'learning_rate': [0.05, 0.08, 0.1],
-            'max_depth': [3, 4, 5],
-            'num_leaves': [15, 31, 50]
+            'n_estimators': [150, 200, 250],
+            'learning_rate': [0.03, 0.05, 0.08],
+            'max_depth': [4, 5, 6],
+            'num_leaves': [20, 31, 50]
         }
         
         best_params = {
-            'n_estimators': 100,
-            'learning_rate': 0.05,
-            'max_depth': 3,
-            'num_leaves': 15,
+            'n_estimators': 200,          # ✅ INCREASED
+            'learning_rate': 0.05,        # ✅ OPTIMIZED
+            'max_depth': 5,               # ✅ INCREASED
+            'num_leaves': 31,             # ✅ INCREASED
             'reg_alpha': 0.1,
-            'reg_lambda': 0.1,
+            'reg_lambda': 0.2,            # ✅ INCREASED
+            'min_data_in_leaf': 5,        # ✅ ADDED
             'random_state': 42,
             'verbose': -1,
             'force_col_wise': True
@@ -139,15 +142,21 @@ class ModelOptimizer:
         # Simplified optimization (avoid overfitting on small data)
         for lr in param_grid['learning_rate']:
             for depth in param_grid['max_depth']:
-                params = best_params.copy()
-                params.update({'learning_rate': lr, 'max_depth': depth})
-                
-                score = self._evaluate_params(LGBMRegressor(**params), X, y)
-                
-                if score < best_score:
-                    best_score = score
-                    best_params = params
-        
+                for leaves in param_grid['num_leaves']:
+
+                    params = best_params.copy()
+                    params.update({
+                        'learning_rate': lr, 
+                        'max_depth': depth,
+                        'num_leaves': leaves
+                    })
+                    
+                    score = self._evaluate_params(LGBMRegressor(**params), X, y)
+                    
+                    if score < best_score:
+                        best_score = score
+                        best_params = params
+
         print(f"✅ LightGBM optimized: MAE improved to {best_score:.4f}")
         return best_params
     
@@ -168,45 +177,6 @@ class ModelOptimizer:
         except:
             return float('inf')
 
-class EnsembleModel:
-    """Ensemble model wrapper"""
-    
-    def __init__(self, models, weights, model_names):
-        self.models = models
-        self.weights = weights
-        self.model_names = model_names
-    
-    def predict(self, X):
-        """Weighted average prediction"""
-        predictions = []
-        
-        for model in self.models:
-            pred = model.predict(X)
-            predictions.append(pred)
-        
-        # Weighted average
-        ensemble_pred = np.average(predictions, weights=self.weights, axis=0)
-        return ensemble_pred
-    
-    def get_feature_importance(self):
-        """Weighted average feature importance"""
-        importances = []
-        
-        for model, weight in zip(self.models, self.weights):
-            if hasattr(model, 'feature_importances_'):
-                imp = model.feature_importances_ * weight
-                importances.append(imp)
-            elif hasattr(model, 'get_feature_importance') and model.get_feature_importance() is not None:
-                imp = np.array(model.get_feature_importance()) * weight
-                importances.append(imp)
-        
-        if importances:
-            return np.sum(importances, axis=0).tolist()
-        return None
-    
-    def fit(self, X, y):
-        """Ensemble is already fitted"""
-        pass  
 
 class ForecastingEngine:
     """Main forecasting engine for IPH prediction"""
@@ -222,23 +192,42 @@ class ForecastingEngine:
         
         self.models = {
             'Random_Forest': RandomForestRegressor(
-                random_state=42,  
-                n_estimators=100,
-                n_jobs=1  
+                n_estimators=200,         # ✅ INCREASED
+                max_depth=6,              # ✅ INCREASED
+                min_samples_leaf=2,       # ✅ OPTIMIZED
+                min_samples_split=3,      # ✅ OPTIMIZED
+                max_features='sqrt',      # ✅ ADDED
+                random_state=42,
+                n_jobs=1
             ),
             'XGBoost_Advanced': XGBRegressor(
+                n_estimators=200,         # ✅ INCREASED
+                learning_rate=0.05,       # ✅ LOWERED
+                max_depth=4,              # ✅ INCREASED
+                subsample=0.85,           # ✅ ADDED
+                colsample_bytree=0.85,    # ✅ ADDED
+                reg_alpha=0.1,            # ✅ ADDED
+                reg_lambda=0.2,           # ✅ ADDED
                 random_state=42,
                 objective='reg:squarederror',
-                n_jobs=1  
+                n_jobs=1
             ),
             'LightGBM': LGBMRegressor(
-                random_state=42,  
+                n_estimators=200,         # ✅ INCREASED
+                learning_rate=0.05,       # ✅ OPTIMIZED
+                max_depth=5,              # ✅ INCREASED
+                num_leaves=31,            # ✅ INCREASED
+                reg_alpha=0.1,
+                reg_lambda=0.2,           # ✅ INCREASED
+                min_data_in_leaf=5,       # ✅ ADDED
+                random_state=42,
                 verbose=-1,
-                n_jobs=1,
-                force_col_wise=True
+                force_col_wise=True,
+                n_jobs=1
             ),
             'KNN': KNeighborsRegressor(
                 n_neighbors=5,
+                weights='distance',
                 n_jobs=1
             )
         }
@@ -307,6 +296,8 @@ class ForecastingEngine:
         df_copy['MA_3'] = df_copy['Indikator_Harga'].rolling(window=3, min_periods=1).mean()
         df_copy['MA_7'] = df_copy['Indikator_Harga'].rolling(window=7, min_periods=1).mean()
         
+        self.feature_cols = ['Lag_1', 'Lag_2', 'Lag_3', 'Lag_4', 'MA_3', 'MA_7']
+
         # Remove rows with NaN values in required features
         df_clean = df_copy.dropna(subset=self.feature_cols)
         
@@ -603,51 +594,13 @@ class ForecastingEngine:
         print(f"📊 Train: {len(X_train)}, Test: {len(X_test)}")
         
         self._initialize_default_models()
-        
-        if len(X_train) > 20:
-            best_features = self.select_best_features(X_train, y_train)
-            X_train = X_train[:, best_features]
-            X_test = X_test[:, best_features]
-            print(f"🎯 Using {len(best_features)} selected features")
+        print(f"🎯 Using all {X_train.shape[1]} features (feature selection disabled)")
         
         if len(X_train) > 30:
             self._optimize_models_for_data(X_train, y_train)
         
         # Train models
         results, trained_models = self._train_with_regular_split(X_train, X_test, y_train, y_test)
-        
-        if len(trained_models) >= 2:
-            try:
-                ensemble_model, ensemble_weights = self.create_ensemble_model(trained_models, results)
-                
-                # Evaluate ensemble
-                ensemble_pred = ensemble_model.predict(X_test)
-                ensemble_mae = mean_absolute_error(y_test, ensemble_pred)
-                
-                # Add ensemble to results if it's better
-                best_individual_mae = min(results[name]['mae'] for name in results.keys())
-                
-                if ensemble_mae < best_individual_mae:
-                    results['Ensemble'] = {
-                        'model': ensemble_model,
-                        'mae': float(ensemble_mae),
-                        'rmse': float(np.sqrt(mean_squared_error(y_test, ensemble_pred))),
-                        'r2_score': float(r2_score(y_test, ensemble_pred)),
-                        'mape': self._calculate_mape(y_test, ensemble_pred),
-                        'training_time': 0.0,
-                        'data_size': len(X_train),
-                        'test_size': len(X_test),
-                        'trained_at': datetime.now().isoformat(),
-                        'feature_importance': ensemble_model.get_feature_importance(),
-                        'is_ensemble': True,
-                        'ensemble_weights': ensemble_weights,
-                        'ensemble_models': ensemble_model.model_names
-                    }
-                    
-                    trained_models['Ensemble'] = ensemble_model
-                    print(f"🎉 Ensemble improved MAE: {ensemble_mae:.4f} vs {best_individual_mae:.4f}")
-            except Exception as e:
-                print(f"⚠️ Ensemble creation failed: {str(e)}")
         
         # Update best model flag
         best_model_name = min(results.keys(), key=lambda x: results[x]['mae'])
@@ -979,7 +932,7 @@ class ForecastingEngine:
         print(f"   🤖 Requested model: '{model_name}'")
         print(f"   📊 Requested weeks: {forecast_weeks}")
         
-        # ✅ PERBAIKAN 1: Set seed untuk konsistensi
+        # Set seed untuk konsistensi
         np.random.seed(42)
         
         # Validate forecast weeks
@@ -992,7 +945,7 @@ class ForecastingEngine:
         
         df = pd.read_csv(self.data_path)
         df['Tanggal'] = pd.to_datetime(df['Tanggal'])
-        df = df.sort_values('Tanggal').reset_index(drop=True)  # ✅ PERBAIKAN: Konsisten sorting
+        df = df.sort_values('Tanggal').reset_index(drop=True)  # Konsisten sorting
         
         # Prepare features
         df_features = self.prepare_features(df)
@@ -1001,7 +954,9 @@ class ForecastingEngine:
             raise ValueError("❌ No valid data for forecasting")
         
         print(f"   📋 Available models in self.models: {list(self.models.keys())}")
-        
+        print(f"   📊 Feature columns: {self.feature_cols}")
+        print(f"   📊 Expected feature count: {len(self.feature_cols)}")
+    
         # Load model
         model_data = self.load_model(model_name)
         if not model_data:
@@ -1052,9 +1007,31 @@ class ForecastingEngine:
         # Get last features for forecasting
         last_features = df_features[self.feature_cols].iloc[-1].values
         
+        print(f"   🔍 Feature validation:")
+        print(f"      - Expected features: {len(self.feature_cols)}")
+        print(f"      - Got features: {len(last_features)}")
+        print(f"      - Feature values: {last_features}")
+
+        if len(last_features) != len(self.feature_cols):
+            print(f"   ⚠️ MISMATCH DETECTED! Attempting to fix...")
+        
+            # FIX: Trim atau pad features
+            if len(last_features) > len(self.feature_cols):
+                print(f"   ✅ Trimming from {len(last_features)} to {len(self.feature_cols)}")
+                last_features = last_features[:len(self.feature_cols)]
+            else:
+                print(f"   ✅ Padding from {len(last_features)} to {len(self.feature_cols)}")
+                last_features = np.pad(
+                    last_features, 
+                    (0, len(self.feature_cols) - len(last_features)), 
+                    mode='constant'
+                )
+            
+            print(f"   ✅ Features fixed: {len(last_features)} -> {last_features}")
+        
         print(f"   📊 Using features from last data point: {df_features['Tanggal'].iloc[-1].strftime('%Y-%m-%d')}")
         print(f"   🔮 Generating {forecast_weeks} weeks forecast with model: '{model_name}'")
-        
+
         # ✅ PERBAIKAN 2: Generate deterministic forecast
         forecast_result = self.forecast_multistep_deterministic(model, last_features, forecast_weeks)
         
@@ -1170,47 +1147,90 @@ class ForecastingEngine:
         return best_features
 
     def forecast_multistep_deterministic(self, model, last_features, n_steps):
-        """DETERMINISTIC forecasting for consistent results"""
+        """DETERMINISTIC forecasting - 6 FEATURES"""
         print(f"🔮 Generating {n_steps}-step DETERMINISTIC forecast...")
         
-        # ✅ PERBAIKAN: Set seed untuk konsistensi
+        expected_features = 6  # ✅ Lag_1-4, MA_3, MA_7
+        
+        print(f"   🔍 Input validation:")
+        print(f"      - Expected features: {expected_features}")
+        print(f"      - Got: {len(last_features)}")
+        print(f"      - Values: {last_features}")
+        
+        # Fix mismatch
+        if len(last_features) != expected_features:
+            print(f"      ⚠️ Mismatch detected, fixing...")
+            
+            if len(last_features) > expected_features:
+                last_features = last_features[:expected_features]
+                print(f"      ✅ Trimmed to {expected_features}")
+            else:
+                last_features = np.pad(
+                    last_features,
+                    (0, expected_features - len(last_features)),
+                    mode='constant'
+                )
+                print(f"      ✅ Padded to {expected_features}")
+        
+        # Set seed untuk konsistensi
         np.random.seed(42)
         
         predictions = []
         current_features = last_features.copy()
         
-        # Calculate historical volatility for confidence intervals
+        # Calculate historical volatility
         historical_volatility = np.std(last_features[:4])
+        print(f"   📊 Historical volatility: {historical_volatility:.6f}")
         
-        # ✅ PERBAIKAN: Deterministic prediction dengan fixed uncertainty
+        # Generate predictions step by step
         for step in range(n_steps):
-            # Make deterministic prediction
-            pred = model.predict(current_features.reshape(1, -1))[0]
-            predictions.append(pred)
+            print(f"\n   📍 Step {step + 1}/{n_steps}:")
+            print(f"      - Current features shape: {current_features.shape}")
+            print(f"      - Current features: {current_features}")
             
-            # Update features deterministically
-            current_features = self._update_features_deterministic(current_features, pred, predictions, step)
+            # Reshape untuk prediction
+            X_pred = current_features.reshape(1, -1)
+            print(f"      - X_pred shape: {X_pred.shape}")
+            
+            try:
+                # Make prediction
+                pred = float(model.predict(X_pred)[0])
+                print(f"      ✅ Prediction: {pred:.6f}")
+                predictions.append(pred)
+            except Exception as e:
+                print(f"      ❌ Prediction error: {str(e)}")
+                print(f"      ❌ X_pred shape: {X_pred.shape}")
+                print(f"      ❌ X_pred: {X_pred}")
+                raise
+            
+            # Update features untuk step berikutnya
+            current_features = self._update_features_deterministic(
+                current_features, pred, predictions, step
+            )
         
-        # ✅ PERBAIKAN: Fixed confidence intervals (tidak random)
+        # Calculate confidence intervals
         predictions_array = np.array(predictions)
         
-        # Calculate confidence intervals based on step distance and historical volatility
         confidence_widths = []
         for step in range(n_steps):
-            # Confidence increases with forecast horizon
-            base_uncertainty = historical_volatility * 0.1  # Base 10% of historical volatility
-            step_multiplier = np.sqrt(step + 1) * 0.05  # Increases with step
+            base_uncertainty = historical_volatility * 0.1
+            step_multiplier = np.sqrt(step + 1) * 0.05
             confidence_width = base_uncertainty + step_multiplier
             confidence_widths.append(confidence_width)
         
         confidence_widths = np.array(confidence_widths)
         
-        # 95% confidence interval (fixed multiplier)
+        # 95% confidence interval (1.96 standard deviations)
         confidence_multiplier = 1.96
         lower_bounds = predictions_array - (confidence_widths * confidence_multiplier)
         upper_bounds = predictions_array + (confidence_widths * confidence_multiplier)
         
-        print(f"✅ Deterministic forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(confidence_widths):.3f}")
+        print(f"\n✅ Deterministic forecast completed:")
+        print(f"   - Predictions shape: {predictions_array.shape}")
+        print(f"   - Avg prediction: {np.mean(predictions):.6f}")
+        print(f"   - Avg uncertainty: {np.mean(confidence_widths):.6f}")
+        print(f"   - Min prediction: {np.min(predictions):.6f}")
+        print(f"   - Max prediction: {np.max(predictions):.6f}")
         
         return {
             'predictions': predictions_array,
@@ -1222,27 +1242,81 @@ class ForecastingEngine:
         }
 
     def _update_features_deterministic(self, current_features, new_pred, all_predictions, step):
-        """Deterministic feature updating for consistent results"""
-        new_features = np.zeros_like(current_features)
+        """Deterministic feature updating - 6 FEATURES (Lag_1-4, MA_3, MA_7)"""
         
-        # Update lag features (deterministic)
-        new_features[0] = new_pred  # Lag_1
-        for i in range(1, min(4, len(current_features))):
-            new_features[i] = current_features[i-1]  # Shift previous lags
+        expected_features = 6  # ✅ Lag_1, Lag_2, Lag_3, Lag_4, MA_3, MA_7
         
-        # Update moving averages (deterministic)
-        if step == 0:
-            # First step: use current + historical
-            new_features[4] = np.mean([new_pred, current_features[0], current_features[1]])  # MA_3
-            new_features[5] = np.mean(current_features[:4])  # MA_7
-        else:
-            # Later steps: use recent predictions (no randomness)
-            recent_preds = all_predictions[-min(3, len(all_predictions)):]
-            new_features[4] = np.mean(recent_preds)  # Simple MA_3
+        print(f"   🔍 Feature update (step {step}):")
+        print(f"      - Expected: {expected_features}")
+        print(f"      - Got: {len(current_features)}")
+        
+        # Fix mismatch jika ada
+        if len(current_features) != expected_features:
+            print(f"      ⚠️ Mismatch detected, fixing...")
             
-            # MA_7 with longer history
-            recent_preds_7 = all_predictions[-min(7, len(all_predictions)):]
-            new_features[5] = np.mean(recent_preds_7)
+            if len(current_features) > expected_features:
+                current_features = current_features[:expected_features]
+                print(f"      ✅ Trimmed to {expected_features}")
+            else:
+                current_features = np.pad(
+                    current_features,
+                    (0, expected_features - len(current_features)),
+                    mode='constant'
+                )
+                print(f"      ✅ Padded to {expected_features}")
+        
+        new_features = np.zeros(expected_features, dtype=np.float64)
+        
+        # Update Lag features (indices 0-3)
+        new_features[0] = float(new_pred)  # Lag_1 = new prediction
+        
+        # Shift previous lags
+        for i in range(1, 4):  # Lag_2, Lag_3, Lag_4
+            if i < len(current_features):
+                new_features[i] = float(current_features[i-1])
+            else:
+                new_features[i] = 0.0
+        
+        # Update Moving Averages (indices 4-5)
+        if step == 0:
+            # First step: use current prediction + historical
+            ma3_values = [
+                float(new_pred),
+                float(current_features[0]) if len(current_features) > 0 else 0.0,
+                float(current_features[1]) if len(current_features) > 1 else 0.0
+            ]
+            new_features[4] = float(np.mean(ma3_values))  # MA_3
+            
+            # MA_7 dari historical lags
+            ma7_values = [float(f) for f in current_features[:4]]
+            new_features[5] = float(np.mean(ma7_values)) if ma7_values else 0.0  # MA_7
+            
+            print(f"      - Lag_1: {new_features[0]:.6f}")
+            print(f"      - Lag_2: {new_features[1]:.6f}")
+            print(f"      - Lag_3: {new_features[2]:.6f}")
+            print(f"      - Lag_4: {new_features[3]:.6f}")
+            print(f"      - MA_3: {new_features[4]:.6f}")
+            print(f"      - MA_7: {new_features[5]:.6f}")
+        else:
+            # Later steps: use recent predictions
+            if len(all_predictions) > 0:
+                # MA_3: mean of last 3 predictions
+                recent_preds_3 = all_predictions[-min(3, len(all_predictions)):]
+                new_features[4] = float(np.mean(recent_preds_3))
+                
+                # MA_7: mean of last 7 predictions
+                recent_preds_7 = all_predictions[-min(7, len(all_predictions)):]
+                new_features[5] = float(np.mean(recent_preds_7))
+                
+                print(f"      - MA_3 (from {len(recent_preds_3)} preds): {new_features[4]:.6f}")
+                print(f"      - MA_7 (from {len(recent_preds_7)} preds): {new_features[5]:.6f}")
+            else:
+                new_features[4] = 0.0
+                new_features[5] = 0.0
+        
+        # Final validation
+        if len(new_features) != expected_features:
+            raise ValueError(f"Feature mismatch: expected {expected_features}, got {len(new_features)}")
         
         return new_features
 
