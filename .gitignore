@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+app.log
+data/debug.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/prisma.db
+data/historical_data.db
+
+# Model files (binary)
+*.pkl
+data/models/*.pkl
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data backups (uncomment jika tidak ingin backup di git)
+# data/backups/
+# data/db_backups/
+
+# Forecast cache
+data/latest_forecast.json
+
+# Uploads
+static/uploads/*
+!static/uploads/.gitkeep
+

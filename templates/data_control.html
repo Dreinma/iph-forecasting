@@ -8,22 +8,26 @@
     <div>
         <h1 class="h2 text-gradient mb-1">
             <i class="fas fa-database me-2"></i>
-            Data Control
+            Kontrol Data
         </h1>
-        <p class="text-muted mb-0">Manage your IPH data and model training</p>
+        <p class="text-muted mb-0">Kelola data IPH dan pelatihan model</p>
     </div>
     <div class="btn-toolbar">
         <button type="button" class="btn btn-success me-2" onclick="showAddRecordModal()">
             <i class="fas fa-plus me-1"></i>
-            Add Single Record
+            Tambah Data Manual
         </button>
         <button type="button" class="btn btn-warning me-2" onclick="retrainModels()">
             <i class="fas fa-sync-alt me-1"></i>
-            Retrain Models
+            Latih Ulang Model
+        </button>
+        <button type="button" class="btn btn-info me-2" onclick="exportDataToCSV()">
+            <i class="fas fa-download me-1"></i>
+            Export ke CSV
         </button>
         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>
-            Back to Dashboard
+            Kembali ke Dashboard
         </a>
     </div>
 </div>
@@ -220,8 +224,8 @@
                 {% else %}
                 <div class="text-center text-muted py-5">
                     <i class="fas fa-database fa-3x mb-3 opacity-25"></i>
-                    <p class="mb-2">No historical data available</p>
-                    <small>Upload a CSV file or add records manually to get started</small>
+                    <p class="mb-2">Tidak ada data historis tersedia</p>
+                    <small>Unggah file CSV atau tambahkan data secara manual untuk memulai</small>
                 </div>
                 {% endif %}
             </div>
@@ -288,7 +292,7 @@
                                     <i class="fas fa-calendar-alt me-1"></i>Tahun
                                 </label>
                                 <input type="number" class="form-control" id="manualTahun" 
-                                       value="2024" min="2020" max="2030" required>
+                                       value="2024" min="2020" max="2100" required>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -364,6 +368,10 @@
 // Show/hide file upload section
 function showFileUpload() {
     document.getElementById('fileUploadSection').style.display = 'block';
+    // Setup event listeners after showing the section
+    if (window.dataControlHandler) {
+        window.dataControlHandler.setupFileUploadListeners();
+    }
 }
 
 function hideFileUpload() {
@@ -498,12 +506,12 @@ async function addSingleRecord() {
     const iph = document.getElementById('recordIPH').value;
     
     if (!date || !iph) {
-        alert('Please fill in all fields');
+        alert('Harap isi semua kolom');
         return;
     }
     
     try {
-        showLoading('Adding record...');
+        showLoading('Menambahkan data...');
         
         const response = await fetch('/api/add-single-record', {
             method: 'POST',
@@ -581,7 +589,7 @@ async function retrainModels() {
         
     } catch (error) {
         console.error('❌ Retrain error:', error);
-        showAlert(`❌ Retrain failed: ${error.message}`, 'danger');
+                showAlert(`❌ Retrain gagal: ${error.message}`, 'danger');
     } finally {
         hideLoading();
     }
@@ -603,6 +611,11 @@ class DataControlHandler {
     }
     
     setupEventListeners() {
+        // Initial setup - will be called on page load
+        this.setupFileUploadListeners();
+    }
+    
+    setupFileUploadListeners() {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const uploadForm = document.getElementById('uploadForm');
@@ -610,46 +623,63 @@ class DataControlHandler {
         
         if (!uploadArea || !fileInput || !uploadForm) return;
         
-        // Drag and drop events
-        uploadArea.addEventListener('dragover', (e) => {
+        // Remove existing listeners to avoid duplicates
+        uploadArea.removeEventListener('dragover', this.handleDragOver);
+        uploadArea.removeEventListener('dragleave', this.handleDragLeave);
+        uploadArea.removeEventListener('drop', this.handleDrop);
+        if (browseBtn) {
+            browseBtn.removeEventListener('click', this.handleBrowseClick);
+        }
+        fileInput.removeEventListener('change', this.handleFileChange);
+        uploadForm.removeEventListener('submit', this.handleFormSubmit);
+        
+        // Bind methods to preserve context
+        this.handleDragOver = (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
-        });
+        };
         
-        uploadArea.addEventListener('dragleave', () => {
+        this.handleDragLeave = () => {
             uploadArea.classList.remove('dragover');
-        });
+        };
         
-        uploadArea.addEventListener('drop', (e) => {
+        this.handleDrop = (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 this.handleFileSelection(files[0]);
             }
-        });
+        };
         
-        // Browse button
-        if (browseBtn) {
-            browseBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                fileInput.click();
-            });
-        }
+        this.handleBrowseClick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        };
         
-        // File input change
-        fileInput.addEventListener('change', (e) => {
+        this.handleFileChange = (e) => {
             if (e.target.files.length > 0) {
                 this.handleFileSelection(e.target.files[0]);
             }
-        });
+        };
         
-        // Form submission
-        uploadForm.addEventListener('submit', (e) => {
+        this.handleFormSubmit = (e) => {
             e.preventDefault();
             this.handleUpload();
-        });
+        };
+        
+        // Add event listeners
+        uploadArea.addEventListener('dragover', this.handleDragOver);
+        uploadArea.addEventListener('dragleave', this.handleDragLeave);
+        uploadArea.addEventListener('drop', this.handleDrop);
+        
+        if (browseBtn) {
+            browseBtn.addEventListener('click', this.handleBrowseClick);
+        }
+        
+        fileInput.addEventListener('change', this.handleFileChange);
+        uploadForm.addEventListener('submit', this.handleFormSubmit);
     }
     
     handleFileSelection(file) {
@@ -663,12 +693,12 @@ class DataControlHandler {
     
     async handleUpload() {
         if (!this.selectedFile) {
-            alert('Please select a file first');
+            alert('Harap pilih file terlebih dahulu');
             return;
         }
         
         try {
-            showLoading('Uploading and processing data...');
+            showLoading('Mengunggah dan memproses data...');
             
             const formData = new FormData();
             formData.append('file', this.selectedFile);
@@ -682,14 +712,14 @@ class DataControlHandler {
             const result = await response.json();
             
             if (result.success) {
-                showAlert('Data uploaded and processed successfully!', 'success');
+                showAlert('Data berhasil diunggah dan diproses!', 'success');
                 setTimeout(() => location.reload(), 3000);
             } else {
-                showAlert(`Upload failed: ${result.error || result.message}`, 'danger');
+                showAlert(`Upload gagal: ${result.error || result.message}`, 'danger');
             }
             
         } catch (error) {
-            showAlert(`Upload failed: ${error.message}`, 'danger');
+            showAlert(`Upload gagal: ${error.message}`, 'danger');
         } finally {
             hideLoading();
         }
@@ -850,7 +880,9 @@ function showLoading(message) {
         <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
              style="background-color: rgba(0,0,0,0.7); z-index: 9999;">
             <div class="text-center text-white">
-                <div class="loading-spinner mb-3" style="width: 3rem; height: 3rem; border-width: 4px;"></div>
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Memuat...</span>
+                </div>
                 <h5>${message}</h5>
             </div>
         </div>
@@ -886,6 +918,12 @@ function showAlert(message, type) {
             }
         });
     }, 5000);
+}
+
+// Export CSV function
+function exportDataToCSV() {
+    console.log('📥 Exporting data to CSV...');
+    window.location.href = '/api/export-data';
 }
 
 // Initialize

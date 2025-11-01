@@ -75,11 +75,11 @@ class ModelOptimizer:
     def optimize_random_forest(self, X, y):
         """Optimize Random Forest"""
         best_params = {
-            'n_estimators': 200,          # ✅ INCREASED
-            'max_depth': 6,               # ✅ INCREASED
-            'min_samples_leaf': 2,        # ✅ REDUCED
-            'min_samples_split': 3,       # ✅ REDUCED
-            'max_features': 'sqrt',       # ✅ ADDED feature sampling
+            'n_estimators': 200,          #  INCREASED
+            'max_depth': 6,               #  INCREASED
+            'min_samples_leaf': 2,        #  REDUCED
+            'min_samples_split': 3,       #  REDUCED
+            'max_features': 'sqrt',       #  ADDED feature sampling
             'random_state': 42
         }
         
@@ -112,7 +112,7 @@ class ModelOptimizer:
                         best_score = score
                         best_params = params
         
-        print(f"✅ RF optimized: MAE improved to {best_score:.4f}")
+        print(f" RF optimized: MAE improved to {best_score:.4f}")
         return best_params
     
     def optimize_lightgbm(self, X, y):
@@ -125,13 +125,13 @@ class ModelOptimizer:
         }
         
         best_params = {
-            'n_estimators': 200,          # ✅ INCREASED
-            'learning_rate': 0.05,        # ✅ OPTIMIZED
-            'max_depth': 5,               # ✅ INCREASED
-            'num_leaves': 31,             # ✅ INCREASED
+            'n_estimators': 200,          #  INCREASED
+            'learning_rate': 0.05,        #  OPTIMIZED
+            'max_depth': 5,               #  INCREASED
+            'num_leaves': 31,             #  INCREASED
             'reg_alpha': 0.1,
-            'reg_lambda': 0.2,            # ✅ INCREASED
-            'min_data_in_leaf': 5,        # ✅ ADDED
+            'reg_lambda': 0.2,            #  INCREASED
+            'min_data_in_leaf': 5,        #  ADDED
             'random_state': 42,
             'verbose': -1,
             'force_col_wise': True
@@ -157,7 +157,7 @@ class ModelOptimizer:
                         best_score = score
                         best_params = params
 
-        print(f"✅ LightGBM optimized: MAE improved to {best_score:.4f}")
+        print(f" LightGBM optimized: MAE improved to {best_score:.4f}")
         return best_params
     
     def _evaluate_params(self, model, X, y):
@@ -192,34 +192,34 @@ class ForecastingEngine:
         
         self.models = {
             'Random_Forest': RandomForestRegressor(
-                n_estimators=200,         # ✅ INCREASED
-                max_depth=6,              # ✅ INCREASED
-                min_samples_leaf=2,       # ✅ OPTIMIZED
-                min_samples_split=3,      # ✅ OPTIMIZED
-                max_features='sqrt',      # ✅ ADDED
+                n_estimators=200,         #  INCREASED
+                max_depth=6,              #  INCREASED
+                min_samples_leaf=2,       #  OPTIMIZED
+                min_samples_split=3,      #  OPTIMIZED
+                max_features='sqrt',      #  ADDED
                 random_state=42,
                 n_jobs=1
             ),
             'XGBoost_Advanced': XGBRegressor(
-                n_estimators=200,         # ✅ INCREASED
-                learning_rate=0.05,       # ✅ LOWERED
-                max_depth=4,              # ✅ INCREASED
-                subsample=0.85,           # ✅ ADDED
-                colsample_bytree=0.85,    # ✅ ADDED
-                reg_alpha=0.1,            # ✅ ADDED
-                reg_lambda=0.2,           # ✅ ADDED
+                n_estimators=200,         #  INCREASED
+                learning_rate=0.05,       #  LOWERED
+                max_depth=4,              #  INCREASED
+                subsample=0.85,           #  ADDED
+                colsample_bytree=0.85,    #  ADDED
+                reg_alpha=0.1,            #  ADDED
+                reg_lambda=0.2,           #  ADDED
                 random_state=42,
                 objective='reg:squarederror',
                 n_jobs=1
             ),
             'LightGBM': LGBMRegressor(
-                n_estimators=200,         # ✅ INCREASED
-                learning_rate=0.05,       # ✅ OPTIMIZED
-                max_depth=5,              # ✅ INCREASED
-                num_leaves=31,            # ✅ INCREASED
+                n_estimators=200,         #  INCREASED
+                learning_rate=0.05,       #  OPTIMIZED
+                max_depth=5,              #  INCREASED
+                num_leaves=31,            #  INCREASED
                 reg_alpha=0.1,
-                reg_lambda=0.2,           # ✅ INCREASED
-                min_data_in_leaf=5,       # ✅ ADDED
+                reg_lambda=0.2,           #  INCREASED
+                min_data_in_leaf=5,       #  ADDED
                 random_state=42,
                 verbose=-1,
                 force_col_wise=True,
@@ -263,7 +263,7 @@ class ForecastingEngine:
 
     def _optimize_models_for_data(self, X, y):
         """Optimize models based on current data"""
-        print("🔧 Optimizing models for current dataset...")
+        print(" Optimizing models for current dataset...")
         
         # Optimize Random Forest
         rf_params = self.optimizer.optimize_random_forest(X, y)
@@ -273,11 +273,11 @@ class ForecastingEngine:
         lgb_params = self.optimizer.optimize_lightgbm(X, y)
         self.models['LightGBM'] = LGBMRegressor(**lgb_params)
         
-        print("✅ Model optimization completed")
+        print(" Model optimization completed")
 
     def prepare_features(self, df):
         """Prepare lag and moving average features for time series"""
-        print("🔧 Preparing features...")
+        print(" Preparing features...")
         
         df_copy = df.copy()
         
@@ -301,7 +301,7 @@ class ForecastingEngine:
         # Remove rows with NaN values in required features
         df_clean = df_copy.dropna(subset=self.feature_cols)
         
-        print(f"✅ Features prepared: {len(df_clean)} samples ready for training")
+        print(f" Features prepared: {len(df_clean)} samples ready for training")
         return df_clean
 
     def prepare_features_safe(self, df, split_index=None):
@@ -410,7 +410,7 @@ class ForecastingEngine:
             if model is None:  # Skip uninitialized models
                 continue
                 
-            print(f"🤖 Training {name} with {len(splits)}-fold time series CV...")
+            print(f" Training {name} with {len(splits)}-fold time series CV...")
             
             cv_scores = []
             cv_rmse_scores = []
@@ -451,15 +451,15 @@ class ForecastingEngine:
             
             # Use CV scores for evaluation
             mae = np.mean(cv_scores) if cv_scores else float('inf')
-            rmse = np.mean(cv_rmse_scores) if cv_rmse_scores else float('inf')  # ✅ PERBAIKAN: Proper RMSE
-            cv_score = -mae if cv_scores else 0.0  # ✅ PERBAIKAN: CV Score as negative MAE
+            rmse = np.mean(cv_rmse_scores) if cv_rmse_scores else float('inf')  #  PERBAIKAN: Proper RMSE
+            cv_score = -mae if cv_scores else 0.0  #  PERBAIKAN: CV Score as negative MAE
             
             results[name] = {
                 'model': model,
                 'mae': float(mae),
-                'rmse': float(rmse),  # ✅ PERBAIKAN: Ensure RMSE is stored
+                'rmse': float(rmse),  #  PERBAIKAN: Ensure RMSE is stored
                 'r2_score': 0.0,
-                'cv_score': float(cv_score),  # ✅ PERBAIKAN: Add CV Score
+                'cv_score': float(cv_score),  #  PERBAIKAN: Add CV Score
                 'mape': 0.0,
                 'training_time': 1.0,
                 'data_size': len(X_full),
@@ -473,10 +473,10 @@ class ForecastingEngine:
             
             trained_models[name] = model
             
-            print(f"✅ {name}: MAE={mae:.4f}, RMSE={rmse:.4f}, CV={cv_score:.4f}")
+            print(f" {name}: MAE={mae:.4f}, RMSE={rmse:.4f}, CV={cv_score:.4f}")
         
         if not results:
-            raise ValueError("❌ No models were successfully trained")
+            raise ValueError(" No models were successfully trained")
         
         # Determine best model
         best_model_name = min(results.keys(), key=lambda x: results[x]['mae'])
@@ -524,7 +524,7 @@ class ForecastingEngine:
         model_scores.sort(key=lambda x: x[1])
         top_models = model_scores[:3]
         
-        print(f"🏆 Creating ensemble from top 3 models: {[m[0] for m in top_models]}")
+        print(f" Creating ensemble from top 3 models: {[m[0] for m in top_models]}")
         
         # Calculate weights (inverse MAE)
         weights = []
@@ -571,13 +571,13 @@ class ForecastingEngine:
 
     def train_and_evaluate_models(self, df):
         """ENHANCED training with all fixes"""
-        print("🚀 Starting ENHANCED model training with all fixes...")
+        print(" Starting ENHANCED model training with all fixes...")
         
         # Sort by date
         df = df.sort_values('Tanggal').reset_index(drop=True)
         
         if len(df) < 15:
-            print("⚠️ Small dataset: Using time series CV")
+            print(" Small dataset: Using time series CV")
             return self._train_with_time_series_cv_fixed(df)
         
         # Time-based split
@@ -591,10 +591,10 @@ class ForecastingEngine:
         X_test = test_df[self.feature_cols].values
         y_test = test_df['Indikator_Harga'].values
         
-        print(f"📊 Train: {len(X_train)}, Test: {len(X_test)}")
+        print(f" Train: {len(X_train)}, Test: {len(X_test)}")
         
         self._initialize_default_models()
-        print(f"🎯 Using all {X_train.shape[1]} features (feature selection disabled)")
+        print(f"Using all {X_train.shape[1]} features (feature selection disabled)")
         
         if len(X_train) > 30:
             self._optimize_models_for_data(X_train, y_train)
@@ -616,7 +616,7 @@ class ForecastingEngine:
         
         for name, model in self.models.items():
             try:
-                print(f"🤖 Training {name}...")
+                print(f" Training {name}...")
                 start_time = datetime.now()
                 
                 # Train model
@@ -630,20 +630,20 @@ class ForecastingEngine:
                 mae = mean_absolute_error(y_test, y_pred)
                 rmse = np.sqrt(mean_squared_error(y_test, y_pred))
                 
-                # ✅ PERBAIKAN: Calculate CV Score
+                #  PERBAIKAN: Calculate CV Score
                 cv_score = self._calculate_cv_score(model, X_train, y_train)
                 
-                # Better R² calculation with variance check
+                # Better R calculation with variance check
                 y_test_var = np.var(y_test)
                 if len(y_test) > 1 and y_test_var > 1e-8:
                     r2 = r2_score(y_test, y_pred)
-                    # Clamp R² to reasonable range
+                    # Clamp R to reasonable range
                     r2 = max(-10.0, min(1.0, r2))
                 else:
-                    print(f"   ⚠️ {name}: Low variance in test set, R² may be unreliable")
+                    print(f"    {name}: Low variance in test set, R may be unreliable")
                     r2 = 0.0
                 
-                # Handle NaN/Inf in R²
+                # Handle NaN/Inf in R
                 if np.isnan(r2) or np.isinf(r2):
                     r2 = 0.0
 
@@ -663,7 +663,7 @@ class ForecastingEngine:
                     'mae': float(mae),
                     'rmse': float(rmse),
                     'r2_score': float(r2),
-                    'mape': float(mape),  # ✅ Pastikan MAPE disimpan
+                    'mape': float(mape),  #  Pastikan MAPE disimpan
                     'training_time': float(training_time),
                     'data_size': int(len(X_train)),
                     'test_size': int(len(X_test)),
@@ -672,21 +672,21 @@ class ForecastingEngine:
                 }
                 
                 trained_models[name] = model
-                print(f"✅ {name}: MAE={mae:.4f}, RMSE={rmse:.4f}, R²={r2:.4f}, MAPE={mape:.4f}")
+                print(f" {name}: MAE={mae:.4f}, RMSE={rmse:.4f}, R={r2:.4f}, MAPE={mape:.4f}")
 
             except Exception as e:
-                print(f"❌ Error training {name}: {str(e)}")
+                print(f" Error training {name}: {str(e)}")
                 continue
         
         if not results:
-            raise ValueError("❌ No models were successfully trained")
+            raise ValueError(" No models were successfully trained")
         
         # Determine best model (lowest MAE)
         best_model_name = min(results.keys(), key=lambda x: results[x]['mae'])
         for model_name in results:
             results[model_name]['is_best'] = bool(model_name == best_model_name)
         
-        print(f"🏆 Best model: {best_model_name} (MAE: {results[best_model_name]['mae']:.4f})")
+        print(f" Best model: {best_model_name} (MAE: {results[best_model_name]['mae']:.4f})")
         
         return results, trained_models
 
@@ -701,12 +701,12 @@ class ForecastingEngine:
         results = {}
         
         for name, model in self.models.items():
-            print(f"🤖 Training {name} with {len(splits)}-fold time series CV...")
+            print(f" Training {name} with {len(splits)}-fold time series CV...")
             
             cv_scores = []
             
             for train_end, test_start, test_end in splits:
-                # ✅ FIXED: Proper feature preparation per split
+                #  FIXED: Proper feature preparation per split
                 train_subset = df.iloc[:train_end]
                 test_subset = df.iloc[test_start:test_end]
                 
@@ -745,7 +745,7 @@ class ForecastingEngine:
                 'model': model,
                 'mae': float(mae),
                 'rmse': float(rmse),
-                'r2_score': 0.0,  # Don't trust R² in CV
+                'r2_score': 0.0,  # Don't trust R in CV
                 'cv_scores': cv_scores,
                 'cv_std': float(np.std(cv_scores)) if cv_scores else 0.0,
                 'validation_method': 'time_series_cv_fixed'
@@ -782,12 +782,12 @@ class ForecastingEngine:
             else:
                 return None
         except Exception as e:
-            print(f"⚠️ Error getting feature importance: {e}")
+            print(f" Error getting feature importance: {e}")
             return None
    
     def save_models(self, trained_models, results):
         """Save trained models to disk"""
-        print("💾 Saving models to disk...")
+        print(" Saving models to disk...")
         
         saved_models = []
         
@@ -809,7 +809,7 @@ class ForecastingEngine:
                 with open(filepath, 'wb') as f:
                     pickle.dump(model_data, f, protocol=pickle.HIGHEST_PROTOCOL)
                 
-                print(f"✅ Saved {name} to {filepath}")
+                print(f" Saved {name} to {filepath}")
                 saved_models.append({
                     'name': name,
                     'filepath': filepath,
@@ -817,9 +817,9 @@ class ForecastingEngine:
                 })
                 
             except Exception as e:
-                print(f"❌ Error saving {name}: {str(e)}")
+                print(f" Error saving {name}: {str(e)}")
         
-        print(f"💾 Successfully saved {len(saved_models)} models")
+        print(f" Successfully saved {len(saved_models)} models")
         return saved_models
     
     def load_model(self, model_name):
@@ -831,19 +831,19 @@ class ForecastingEngine:
             with open(filepath, 'rb') as f:
                 model_data = pickle.load(f)
             
-            print(f"✅ Loaded {model_name} from {filepath}")
+            print(f" Loaded {model_name} from {filepath}")
             return model_data
             
         except FileNotFoundError:
-            print(f"❌ Model file not found: {filepath}")
+            print(f" Model file not found: {filepath}")
             return None
         except Exception as e:
-            print(f"❌ Error loading {model_name}: {str(e)}")
+            print(f" Error loading {model_name}: {str(e)}")
             return None
     
     def forecast_multistep(self, model, last_features, n_steps):
         """Enhanced forecasting with better uncertainty estimation"""
-        print(f"🔮 Generating {n_steps}-step forecast with enhanced uncertainty...")
+        print(f" Generating {n_steps}-step forecast with enhanced uncertainty...")
         
         predictions = []
         uncertainties = []
@@ -874,7 +874,7 @@ class ForecastingEngine:
             predictions.append(mean_pred)
             uncertainties.append(std_pred)
             
-            # ✅ FIXED: Call correct method name
+            #  FIXED: Call correct method name
             new_features = self._update_features_smartly(current_features, mean_pred, predictions, step)
             current_features = new_features
         
@@ -883,7 +883,7 @@ class ForecastingEngine:
         lower_bounds = [pred - conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
         upper_bounds = [pred + conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
         
-        print(f"✅ Enhanced forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(uncertainties):.3f}")
+        print(f" Enhanced forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(uncertainties):.3f}")
         
         return {
             'predictions': np.array(predictions),
@@ -928,9 +928,9 @@ class ForecastingEngine:
     def generate_forecast(self, model_name, forecast_weeks=8):
         """Generate forecast using specified model - FIXED VERSION"""
         print("=" * 100)
-        print(f"🎯 FORECASTING ENGINE - GENERATE FORECAST:")
-        print(f"   🤖 Requested model: '{model_name}'")
-        print(f"   📊 Requested weeks: {forecast_weeks}")
+        print(f"FORECASTING ENGINE - GENERATE FORECAST:")
+        print(f"    Requested model: '{model_name}'")
+        print(f"    Requested weeks: {forecast_weeks}")
         
         # Set seed untuk konsistensi
         np.random.seed(42)
@@ -941,7 +941,7 @@ class ForecastingEngine:
         
         # Load historical data
         if not os.path.exists(self.data_path):
-            raise ValueError("❌ No historical data found. Please upload data first.")
+            raise ValueError(" No historical data found. Please upload data first.")
         
         df = pd.read_csv(self.data_path)
         df['Tanggal'] = pd.to_datetime(df['Tanggal'])
@@ -951,25 +951,25 @@ class ForecastingEngine:
         df_features = self.prepare_features(df)
         
         if len(df_features) == 0:
-            raise ValueError("❌ No valid data for forecasting")
+            raise ValueError(" No valid data for forecasting")
         
-        print(f"   📋 Available models in self.models: {list(self.models.keys())}")
-        print(f"   📊 Feature columns: {self.feature_cols}")
-        print(f"   📊 Expected feature count: {len(self.feature_cols)}")
+        print(f"   Available models in self.models: {list(self.models.keys())}")
+        print(f"    Feature columns: {self.feature_cols}")
+        print(f"    Expected feature count: {len(self.feature_cols)}")
     
         # Load model
         model_data = self.load_model(model_name)
         if not model_data:
-            print(f"   ❌ Model '{model_name}' not found, trying to use from memory...")
+            print(f"    Model '{model_name}' not found, trying to use from memory...")
             # Try to use model from memory if available
             if model_name in self.models:
-                print(f"   ✅ Found '{model_name}' in memory models")
+                print(f"    Found '{model_name}' in memory models")
                 # Need to train the model first if not already trained
                 try:
                     # Quick check if model is trained
                     test_features = df_features[self.feature_cols].iloc[-1:].values
                     _ = self.models[model_name].predict(test_features)
-                    print(f"   ✅ Model '{model_name}' is ready to use")
+                    print(f"    Model '{model_name}' is ready to use")
                     model = self.models[model_name]
                     # Create dummy performance data
                     model_performance = {
@@ -980,14 +980,14 @@ class ForecastingEngine:
                         'trained_at': datetime.now().isoformat()
                     }
                 except:
-                    print(f"   🔄 Model '{model_name}' needs training...")
+                    print(f"    Model '{model_name}' needs training...")
                     # Train the specific model
                     X = df_features[self.feature_cols].values
                     y = df_features['Indikator_Harga'].values
                     
                     model = self.models[model_name]
                     model.fit(X, y)
-                    print(f"   ✅ Model '{model_name}' trained successfully")
+                    print(f"    Model '{model_name}' trained successfully")
                     
                     # Create basic performance metrics
                     model_performance = {
@@ -998,41 +998,41 @@ class ForecastingEngine:
                         'trained_at': datetime.now().isoformat()
                     }
             else:
-                raise ValueError(f"❌ Model '{model_name}' not found in available models: {list(self.models.keys())}")
+                raise ValueError(f" Model '{model_name}' not found in available models: {list(self.models.keys())}")
         else:
-            print(f"   ✅ Loaded model '{model_name}' from disk")
+            print(f"    Loaded model '{model_name}' from disk")
             model = model_data['model']
             model_performance = model_data['performance']
         
         # Get last features for forecasting
         last_features = df_features[self.feature_cols].iloc[-1].values
         
-        print(f"   🔍 Feature validation:")
+        print(f"   Feature validation:")
         print(f"      - Expected features: {len(self.feature_cols)}")
         print(f"      - Got features: {len(last_features)}")
         print(f"      - Feature values: {last_features}")
 
         if len(last_features) != len(self.feature_cols):
-            print(f"   ⚠️ MISMATCH DETECTED! Attempting to fix...")
+            print(f"    MISMATCH DETECTED! Attempting to fix...")
         
             # FIX: Trim atau pad features
             if len(last_features) > len(self.feature_cols):
-                print(f"   ✅ Trimming from {len(last_features)} to {len(self.feature_cols)}")
+                print(f"    Trimming from {len(last_features)} to {len(self.feature_cols)}")
                 last_features = last_features[:len(self.feature_cols)]
             else:
-                print(f"   ✅ Padding from {len(last_features)} to {len(self.feature_cols)}")
+                print(f"    Padding from {len(last_features)} to {len(self.feature_cols)}")
                 last_features = np.pad(
                     last_features, 
                     (0, len(self.feature_cols) - len(last_features)), 
                     mode='constant'
                 )
             
-            print(f"   ✅ Features fixed: {len(last_features)} -> {last_features}")
+            print(f"    Features fixed: {len(last_features)} -> {last_features}")
         
-        print(f"   📊 Using features from last data point: {df_features['Tanggal'].iloc[-1].strftime('%Y-%m-%d')}")
-        print(f"   🔮 Generating {forecast_weeks} weeks forecast with model: '{model_name}'")
+        print(f"    Using features from last data point: {df_features['Tanggal'].iloc[-1].strftime('%Y-%m-%d')}")
+        print(f"    Generating {forecast_weeks} weeks forecast with model: '{model_name}'")
 
-        # ✅ PERBAIKAN 2: Generate deterministic forecast
+        #  PERBAIKAN 2: Generate deterministic forecast
         forecast_result = self.forecast_multistep_deterministic(model, last_features, forecast_weeks)
         
         # Create forecast dates (weekly intervals)
@@ -1043,7 +1043,7 @@ class ForecastingEngine:
             freq='W'
         )
         
-        # ✅ PERBAIKAN 3: Prepare forecast dataframe WITHOUT % symbols
+        #  PERBAIKAN 3: Prepare forecast dataframe WITHOUT % symbols
         forecast_df = pd.DataFrame({
             'Tanggal': [date.strftime('%Y-%m-%d') for date in forecast_dates],
             'Prediksi': [float(pred) for pred in forecast_result['predictions']],
@@ -1054,7 +1054,7 @@ class ForecastingEngine:
             'Generated_At': datetime.now().isoformat()
         })
         
-        # ✅ PERBAIKAN 4: Add forecast metadata WITHOUT % symbols
+        #  PERBAIKAN 4: Add forecast metadata WITHOUT % symbols
         forecast_summary = {
             'avg_prediction': float(forecast_result['predictions'].mean()),
             'trend': 'Naik' if forecast_result['predictions'][-1] > forecast_result['predictions'][0] else 'Turun',
@@ -1064,10 +1064,10 @@ class ForecastingEngine:
             'max_prediction': float(forecast_result['predictions'].max())
         }
         
-        print(f"   ✅ Forecast generated successfully!")
+        print(f"    Forecast generated successfully!")
         print(f"      - Model used: '{model_name}'")
         print(f"      - Forecast weeks: {forecast_weeks}")
-        print(f"      - Average prediction: {forecast_summary['avg_prediction']:.3f}")  # ✅ HAPUS %
+        print(f"      - Average prediction: {forecast_summary['avg_prediction']:.3f}")  #  HAPUS %
         print(f"      - Trend: {forecast_summary['trend']}")
         print("=" * 100)
         
@@ -1143,34 +1143,34 @@ class ForecastingEngine:
                 best_score = avg_score
                 best_features = selector.get_support(indices=True).tolist()
         
-        print(f"✅ Selected {len(best_features)} best features: {best_features}")
+        print(f" Selected {len(best_features)} best features: {best_features}")
         return best_features
 
     def forecast_multistep_deterministic(self, model, last_features, n_steps):
         """DETERMINISTIC forecasting - 6 FEATURES"""
-        print(f"🔮 Generating {n_steps}-step DETERMINISTIC forecast...")
+        print(f" Generating {n_steps}-step DETERMINISTIC forecast...")
         
-        expected_features = 6  # ✅ Lag_1-4, MA_3, MA_7
+        expected_features = 6  #  Lag_1-4, MA_3, MA_7
         
-        print(f"   🔍 Input validation:")
+        print(f"   Input validation:")
         print(f"      - Expected features: {expected_features}")
         print(f"      - Got: {len(last_features)}")
         print(f"      - Values: {last_features}")
         
         # Fix mismatch
         if len(last_features) != expected_features:
-            print(f"      ⚠️ Mismatch detected, fixing...")
+            print(f"       Mismatch detected, fixing...")
             
             if len(last_features) > expected_features:
                 last_features = last_features[:expected_features]
-                print(f"      ✅ Trimmed to {expected_features}")
+                print(f"       Trimmed to {expected_features}")
             else:
                 last_features = np.pad(
                     last_features,
                     (0, expected_features - len(last_features)),
                     mode='constant'
                 )
-                print(f"      ✅ Padded to {expected_features}")
+                print(f"       Padded to {expected_features}")
         
         # Set seed untuk konsistensi
         np.random.seed(42)
@@ -1180,11 +1180,11 @@ class ForecastingEngine:
         
         # Calculate historical volatility
         historical_volatility = np.std(last_features[:4])
-        print(f"   📊 Historical volatility: {historical_volatility:.6f}")
+        print(f"    Historical volatility: {historical_volatility:.6f}")
         
         # Generate predictions step by step
         for step in range(n_steps):
-            print(f"\n   📍 Step {step + 1}/{n_steps}:")
+            print(f"\n    Step {step + 1}/{n_steps}:")
             print(f"      - Current features shape: {current_features.shape}")
             print(f"      - Current features: {current_features}")
             
@@ -1195,12 +1195,12 @@ class ForecastingEngine:
             try:
                 # Make prediction
                 pred = float(model.predict(X_pred)[0])
-                print(f"      ✅ Prediction: {pred:.6f}")
+                print(f"       Prediction: {pred:.6f}")
                 predictions.append(pred)
             except Exception as e:
-                print(f"      ❌ Prediction error: {str(e)}")
-                print(f"      ❌ X_pred shape: {X_pred.shape}")
-                print(f"      ❌ X_pred: {X_pred}")
+                print(f"       Prediction error: {str(e)}")
+                print(f"       X_pred shape: {X_pred.shape}")
+                print(f"       X_pred: {X_pred}")
                 raise
             
             # Update features untuk step berikutnya
@@ -1225,7 +1225,7 @@ class ForecastingEngine:
         lower_bounds = predictions_array - (confidence_widths * confidence_multiplier)
         upper_bounds = predictions_array + (confidence_widths * confidence_multiplier)
         
-        print(f"\n✅ Deterministic forecast completed:")
+        print(f"\n Deterministic forecast completed:")
         print(f"   - Predictions shape: {predictions_array.shape}")
         print(f"   - Avg prediction: {np.mean(predictions):.6f}")
         print(f"   - Avg uncertainty: {np.mean(confidence_widths):.6f}")
@@ -1244,26 +1244,26 @@ class ForecastingEngine:
     def _update_features_deterministic(self, current_features, new_pred, all_predictions, step):
         """Deterministic feature updating - 6 FEATURES (Lag_1-4, MA_3, MA_7)"""
         
-        expected_features = 6  # ✅ Lag_1, Lag_2, Lag_3, Lag_4, MA_3, MA_7
+        expected_features = 6  #  Lag_1, Lag_2, Lag_3, Lag_4, MA_3, MA_7
         
-        print(f"   🔍 Feature update (step {step}):")
+        print(f"   Feature update (step {step}):")
         print(f"      - Expected: {expected_features}")
         print(f"      - Got: {len(current_features)}")
         
         # Fix mismatch jika ada
         if len(current_features) != expected_features:
-            print(f"      ⚠️ Mismatch detected, fixing...")
+            print(f"       Mismatch detected, fixing...")
             
             if len(current_features) > expected_features:
                 current_features = current_features[:expected_features]
-                print(f"      ✅ Trimmed to {expected_features}")
+                print(f"       Trimmed to {expected_features}")
             else:
                 current_features = np.pad(
                     current_features,
                     (0, expected_features - len(current_features)),
                     mode='constant'
                 )
-                print(f"      ✅ Padded to {expected_features}")
+                print(f"       Padded to {expected_features}")
         
         new_features = np.zeros(expected_features, dtype=np.float64)
         

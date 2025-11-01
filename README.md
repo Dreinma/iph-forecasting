@@ -49,9 +49,10 @@ Didesain untuk **monitoring harga komoditas**, **deteksi anomali**, dan **perama
 ### 🎨 Dashboard & UI
 - **Responsive Design**: Bootstrap 5 + custom CSS dengan gradient themes
 - **Interactive Charts**: Plotly.js untuk visualisasi dinamis
-- **Real-time Updates**: Auto-refresh setiap 5 menit dengan error handling
-- **Indonesian Localization**: Interface lengkap dalam bahasa Indonesia
-- **Admin Panel**: Manajemen alert rules, riwayat peringatan, statistik
+- **Real-time Updates**: Auto-refresh dengan error handling
+- **Indonesian Localization**: Interface lengkap dalam bahasa Indonesia (semua teks, kecuali judul PRISMA)
+- **Public Access**: Semua pengunjung dapat mengakses dashboard, visualisasi, commodity insights, dan alerts
+- **Generate Forecast**: Tersedia untuk semua pengunjung (fitur utama - read-only operation)
 
 ### 🔔 Alert System
 - **Statistical Alerts**: 2-sigma (95%) & 3-sigma (99.7%) boundary detection
@@ -181,17 +182,14 @@ iph-forecasting-app/
 │   └── uploads/                      # File upload storage
 │
 ├── 📄 templates/
-│   ├── base.html                     # Base layout
-│   ├── dashboard.html                # Main dashboard
-│   ├── data_control.html             # Data management
-│   ├── visualization.html            # Advanced charts
-│   ├── commodity_insights.html       # Commodity analysis
-│   ├── alerts.html                   # Alert system
-│   └── admin/
+│   ├── base.html                     # Base layout dengan sidebar navigasi
+│   ├── dashboard.html                # Main dashboard (forecast chart, model performance, alerts)
+│   ├── data_control.html             # Data management (upload, manual input, retrain)
+│   ├── visualization.html             # Advanced charts (moving averages, volatility, model performance)
+│   ├── commodity_insights.html       # Commodity analysis (weekly, monthly, trends, seasonal)
+│   ├── alerts.html                   # Alert system (real-time alerts & history)
+│   └── admin/                        # Admin templates (dalam pengembangan)
 │       ├── dashboard.html            # Admin dashboard
-│       ├── alert_rules.html          # Rule management
-│       ├── current_alerts.html       # Active alerts
-│       ├── alert_history.html        # Alert history
 │       └── login.html                # Admin login
 │
 ├── 💾 data/
@@ -264,15 +262,22 @@ python app.py
 
 ### 5️⃣ Access Points
 
-| Fitur | URL | Deskripsi |
+#### 🟢 **Halaman Publik (Tidak Perlu Login)**
+| Halaman | URL | Deskripsi |
 | --- | --- | --- |
-| Dashboard Utama | `http://localhost:5001` | Main forecasting dashboard |
-| Data Control | `http://localhost:5001/data-control` | Upload & manage data |
-| Visualisasi | `http://localhost:5001/visualization` | Advanced charts & analysis |
-| Commodity Insights | `http://localhost:5001/commodity-insights` | Commodity impact analysis |
-| Alert System | `http://localhost:5001/alerts` | Real-time alerts & history |
-| Admin Login | `http://localhost:5001/admin/login` | Admin panel (user: admin, pass: admin123) |
-| Admin Dashboard | `http://localhost:5001/admin/dashboard` | Admin statistics & management |
+| Dashboard Utama | `http://localhost:5001` | Dashboard peramalan IPH dengan forecast chart, model performance, dan alerts |
+| Visualisasi | `http://localhost:5001/visualization` | Chart lanjutan: moving averages, volatilitas, dan performa model |
+| Commodity Insights | `http://localhost:5001/commodity-insights` | Analisis dampak komoditas: weekly, monthly, trends, dan seasonal patterns |
+| Alert System | `http://localhost:5001/alerts` | Sistem peringatan real-time dengan history |
+| Kontrol Data | `http://localhost:5001/data-control` | Upload data dan manajemen (Admin only - dalam rencana) |
+
+#### 🔐 **Halaman Admin (Perlu Login)**
+| Halaman | URL | Deskripsi | Status |
+| --- | --- | --- | --- |
+| Admin Login | `http://localhost:5001/admin/login` | Login admin | ✅ Tersedia |
+| Admin Dashboard | `http://localhost:5001/admin/dashboard` | Dashboard admin dengan statistik | ✅ Tersedia |
+
+**Catatan**: Sistem visitor/admin sedang dalam pengembangan. Saat ini semua halaman dapat diakses oleh publik, dengan rencana implementasi proteksi admin untuk halaman data control dan fungsi administratif lainnya.
 
 ***
 
@@ -288,11 +293,12 @@ python app.py
 
 ### 📁 Kontrol Data
 
-- **📤 Upload File Massal** - Drag & drop CSV/Excel
-- **✏️ Input Manual** - Tambah data per minggu
-- **📊 Historical Data Table** - Pagination, search, sort
-- **🔄 Model Retraining** - Retrain dengan data terbaru
-- **📥 Template Download** - CSV template untuk format yang benar
+- **📤 Upload File Massal** - Drag & drop CSV/Excel dengan validasi otomatis
+- **✏️ Input Manual** - Tambah data IPH dan komoditas per minggu
+- **📊 Historical Data Table** - Tampilan data historis dengan pagination
+- **🔄 Model Retraining** - Retrain semua model dengan data terbaru
+- **📥 Template Download** - Download template CSV untuk format yang benar
+- **✅ Data Validation** - Validasi komprehensif dengan error handling
 
 ### 📊 Visualisasi Data
 
@@ -302,11 +308,13 @@ python app.py
 
 ### 🌾 Commodity Insights
 
-- **📅 Current Week** - Dampak komoditas real-time
-- **📊 Monthly Analysis** - Analisis bulanan dengan filter tahun
-- **📈 Commodity Trends** - 1M, 3M, 6M, 1Y trend analysis
-- **🏆 Volatility Ranking** - Top volatile commodities
-- **⚠️ Volatility Alerts** - Multi-level threshold alerts
+- **📅 Current Week Insights** - Dampak komoditas minggu ini dengan kategori breakdown
+- **📊 Analisis Bulanan** - Analisis detail per bulan dengan filter tahun, top komoditas, dan statistik IPH
+- **📈 Commodity Trends** - Trend analisis untuk 1 bulan, 3 bulan, 6 bulan, dan 1 tahun
+- **🏆 Volatility Ranking** - Ranking komoditas paling volatile dengan threshold multi-level
+- **⚠️ Volatility Alerts** - Peringatan volatilitas dengan threshold yang dapat disesuaikan
+- **🌍 Seasonal Patterns** - Pola musiman per bulan dengan kategori dominan
+- **📊 Impact Ranking** - Ranking komoditas berdasarkan total impact dan frekuensi muncul
 
 ### 🔔 Alert System
 
@@ -606,21 +614,24 @@ Format: CSV + metadata JSON
 ### Current Limitations
 
 - ❌ Single-threaded (ML models use n_jobs=1)
-- ❌ No authentication untuk API endpoints
-- ❌ Admin credentials hardcoded
-- ❌ Debug mode enabled di default
-- ❌ No rate limiting
+- ❌ Admin authentication system belum sepenuhnya diimplementasi (rancangan sudah ada)
+- ❌ Debug mode enabled di default (production: set DEBUG=False)
+- ❌ No rate limiting untuk API endpoints
+- ❌ Visitor/admin access control masih dalam tahap pengembangan
 
 ### Planned Improvements (v2.1+)
 
-- ✅ API authentication & JWT tokens
+- ✅ **Visitor/Admin System** - Implementasi lengkap akses pengunjung dan admin
+  - Public pages: Dashboard, Visualization, Commodity Insights, Alerts (read-only)
+  - Admin pages: Data Control, Model Management, Alert Rules Management
+  - Generate Forecast tersedia untuk semua pengunjung (fitur utama)
 - ✅ Production-ready WSGI deployment (Gunicorn)
+- ✅ API authentication & rate limiting
 - ✅ Docker containerization
 - ✅ Redis caching layer
 - ✅ Advanced logging & monitoring
 - ✅ Unit & integration tests
-- ✅ API documentation (Swagger)
-- ✅ Multi-user support dengan proper auth
+- ✅ API documentation (Swagger/OpenAPI)
 
 ***
 
@@ -662,16 +673,18 @@ MIT License - See [LICENSE](LICENSE) file for details
 
 ## 📊 Version History
 
-### v2.0.0 (Current) - Database Integration & Admin System
+### v2.0.0 (Current) - Database Integration & Enhanced Features
 
-- ✅ SQLite database integration (6 tables)
-- ✅ Database-first data operations
-- ✅ Admin panel dengan alert management
-- ✅ Unlimited alert history dengan pagination
-- ✅ Commodity database integration
-- ✅ Enhanced forecasting engine
-- ✅ Real-time economic alerts
-- ✅ Admin dashboard & statistics
+- ✅ SQLite database integration (6 tables: IPHData, CommodityData, ModelPerformance, AlertHistory, AlertRule, AdminUser)
+- ✅ Database-first data operations dengan auto-backup
+- ✅ Commodity database integration dengan parsing otomatis
+- ✅ Enhanced forecasting engine dengan recursive features
+- ✅ Real-time economic alerts (2σ, 3σ boundaries)
+- ✅ Commodity insights lengkap (weekly, monthly, trends, seasonal)
+- ✅ Admin dashboard & login system (dasar)
+- ✅ **Indonesian Localization** - Semua interface dalam bahasa Indonesia
+- ✅ **Data Quality Improvements** - Filter tahun/bulan yang lebih ketat untuk menghindari pencampuran data
+- ✅ **Commodity Data Fix** - Perbaikan parsing dan matching data komoditas dengan IPH data
 
 ### v1.0.0 - Initial Release
 
@@ -683,6 +696,15 @@ MIT License - See [LICENSE](LICENSE) file for details
 
 ***
 
-**🎯 PRISMA v2.0** - Platform forecasting IPH terpadu dengan database, ML engine, dan admin system yang lengkap.
+**🎯 PRISMA v2.0** - Platform forecasting IPH terpadu dengan database, ML engine, dan dashboard interaktif.
 
-*Dibangun untuk akurasi tinggi, scalability, dan user experience yang optimal.*
+### ✨ Highlights
+
+- **🤖 4 Model ML** dengan Ensemble Learning untuk akurasi optimal
+- **📊 Database Terintegrasi** dengan 6 tabel untuk data, model, dan alerts
+- **🌾 Analisis Komoditas** lengkap dengan parsing otomatis dan kategori impact
+- **📈 Dashboard Interaktif** dengan visualisasi real-time menggunakan Plotly.js
+- **🇮🇩 Bahasa Indonesia** - Semua interface dalam bahasa Indonesia (kecuali judul PRISMA)
+- **👥 Akses Publik** - Semua pengunjung dapat mengakses fitur utama termasuk Generate Forecast
+
+*Dibangun untuk akurasi tinggi, kemudahan penggunaan, dan pengalaman pengguna yang optimal.*

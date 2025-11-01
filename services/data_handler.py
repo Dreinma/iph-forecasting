@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import os
 import shutil
-from datetime import datetime, timedelta
+import calendar
+from datetime import datetime, timedelta, date
 from database import db, IPHData, CommodityData
 from sqlalchemy import func, and_, or_
 import warnings
@@ -18,25 +19,36 @@ class DataHandler:
         print(f"DataHandler initialized (Database Mode)")
         print(f"   Backup path: {self.backup_path}")
     
+    def _anchor_date(self, d: date) -> date:
+        """Normalize a given date to nearest weekly anchor (1, 8, 15, 22, 29) within same month."""
+        try:
+            year, month, day = d.year, d.month, d.day
+            max_day = calendar.monthrange(year, month)[1]
+            anchors = [x for x in (1, 8, 15, 22, 29) if x <= max_day]
+            target = min(anchors, key=lambda a: (abs(a - day), a))
+            return date(year, month, target)
+        except Exception:
+            return d
+    
     def load_historical_data(self):
         """Load historical data from database"""
         try:
-            print(f"🔄 [DB] load_historical_data() called")
+            print(f"[DB] load_historical_data() called")
 
-            # ✅ Check database connection
-            print(f"🔄 [DB] Querying IPHData table...")
+            # Check database connection
+            print(f"[DB] Querying IPHData table...")
 
             # Query all IPH data ordered by date
             query = IPHData.query.order_by(IPHData.tanggal).all()
             
-            print(f"✅ [DB] Query executed: {len(query)} records found")
+            print(f"[DB] Query executed: {len(query)} records found")
 
             if not query:
-                print(f"❌ [DB] No records in database!")
+                print(f"[DB] No records in database!")
                 return pd.DataFrame()
                    
-            # ✅ Convert to DataFrame
-            print(f"🔄 [DB] Converting {len(query)} records to DataFrame...")
+            # Convert to DataFrame
+            print(f"[DB] Converting {len(query)} records to DataFrame...")
 
             # Convert to DataFrame with fields known to exist in schema
             data = []
@@ -62,26 +74,26 @@ class DataHandler:
                         print(f"   Record {i+1}: {row['Tanggal']} = {row['Indikator_Harga']}")
                         
                 except Exception as row_error:
-                    print(f"   ⚠️ Error processing record {i}: {str(row_error)}")
+                    print(f"   WARNING: Error processing record {i}: {str(row_error)}")
                     continue
             
-            print(f"✅ [DB] Converted {len(data)} records")
+            print(f"[DB] Converted {len(data)} records")
             
             df = pd.DataFrame(data)
-            print(f"✅ [DB] DataFrame shape: {df.shape}")
+            print(f"[DB] DataFrame shape: {df.shape}")
 
             # Ensure proper data types
             df['Tanggal'] = pd.to_datetime(df['Tanggal'])
             df['Indikator_Harga'] = pd.to_numeric(df['Indikator_Harga'], errors='coerce')
             
-            print(f"✅ [DB] Data types converted")
-            print(f"✅ [DB] Date range: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
-            print(f"✅ [DB] IPH range: {df['Indikator_Harga'].min():.4f} to {df['Indikator_Harga'].max():.4f}")            
+            print(f"[DB] Data types converted")
+            print(f"[DB] Date range: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
+            print(f"[DB] IPH range: {df['Indikator_Harga'].min():.4f} to {df['Indikator_Harga'].max():.4f}")            
             print(f"{'='*60}\n")
             return df
             
         except Exception as e:
-            print(f"❌ [DB] EXCEPTION: {str(e)}")
+            print(f"[DB] EXCEPTION: {str(e)}")
             import traceback
             traceback.print_exc()
             print(f"{'='*60}\n")
@@ -95,7 +107,7 @@ class DataHandler:
             raise ValueError(" Data is empty")
         
         print(f" Original shape: {df.shape}")
-        print(f"📋 Original columns: {list(df.columns)}")
+        print(f" Original columns: {list(df.columns)}")
         
         # Check for completely empty rows
         empty_rows = df.isnull().all(axis=1).sum()
@@ -187,8 +199,8 @@ class DataHandler:
         return df
 
     def merge_and_save_data(self, new_data_df):
-        """🆕 Merge new data with database and save - FIXED DUPLICATE DETECTION"""
-        print("🔄 Starting database merge process...")
+        """ Merge new data with database and save - FIXED DUPLICATE DETECTION"""
+        print("Starting database merge process...")
         
         # Validate new data
         validated_df = self.validate_new_data(new_data_df.copy())
@@ -199,27 +211,32 @@ class DataHandler:
         try:
             # Get existing data count
             existing_count = IPHData.query.count()
-            print(f"📊 Existing records in database: {existing_count}")
+            print(f"Existing records in database: {existing_count}")
             
             # Process and insert new records
             new_records = 0
             updated_records = 0
             duplicate_dates = []
             
-            # ✅ FIX: Use session.no_autoflush() to prevent premature flush
+            # FIX: Use session.no_autoflush() to prevent premature flush
             with db.session.no_autoflush:
                 for _, row in validated_df.iterrows():
                     date_value = row['Tanggal'].date()
+                    # Normalize to weekly anchor (1, 8, 15, 22, 29)
+                    anchored = self._anchor_date(date_value)
+                    if anchored != date_value:
+                        print(f"   Normalized date {date_value} -> {anchored}")
+                        date_value = anchored
                     bulan_val = str(row['Bulan']) if 'Bulan' in row and pd.notna(row['Bulan']) else None
                     minggu_val = str(row['Minggu']) if 'Minggu' in row and pd.notna(row['Minggu']) else None
                     kab_kota_val = str(row['Kab/Kota']) if 'Kab/Kota' in row and pd.notna(row['Kab/Kota']) else 'BATU'
 
-                    # ✅ FIX: Check by TANGGAL (unique key), not bulan+minggu
+                    # FIX: Check by TANGGAL (unique key), not bulan+minggu
                     existing_record = IPHData.query.filter_by(tanggal=date_value).first()
 
                     if existing_record:
                         # Update existing record
-                        print(f"   🔄 Updating existing record: {date_value}")
+                        print(f"   Updating existing record: {date_value}")
                         existing_record.indikator_harga = float(row['Indikator_Harga'])
                         existing_record.updated_at = datetime.utcnow()
                         
@@ -237,7 +254,7 @@ class DataHandler:
                         duplicate_dates.append(date_value)
                     else:
                         # Create new record
-                        print(f"   ➕ Adding new record: {date_value}")
+                        print(f"    Adding new record: {date_value}")
                         
                         # Extract tahun from bulan if not provided
                         tahun_val = None
@@ -268,11 +285,29 @@ class DataHandler:
                         )
                         
                         db.session.add(new_record)
+                        db.session.flush()  # Get the ID
+                        
+                        # Create CommodityData record if commodity data exists
+                        if 'Komoditas Andil Perubahan Harga' in row and pd.notna(row['Komoditas Andil Perubahan Harga']):
+                            commodity_record = CommodityData(
+                                tanggal=date_value,
+                                bulan=bulan_val,
+                                minggu=minggu_val,
+                                tahun=tahun_val,
+                                kab_kota=kab_kota_val,
+                                iph_id=new_record.id,
+                                iph_value=float(row['Indikator_Harga']),
+                                komoditas_andil=str(row['Komoditas Andil Perubahan Harga']),
+                                komoditas_fluktuasi=str(row['Komoditas Fluktuasi Harga Tertinggi']) if 'Komoditas Fluktuasi Harga Tertinggi' in row and pd.notna(row['Komoditas Fluktuasi Harga Tertinggi']) else None,
+                                nilai_fluktuasi=float(row['Fluktuasi Harga']) if 'Fluktuasi Harga' in row and pd.notna(row['Fluktuasi Harga']) else 0.0
+                            )
+                            db.session.add(commodity_record)
+                        
                         new_records += 1
             
             # Commit all changes at once
             db.session.commit()
-            print(f"✅ Database changes committed successfully")
+            print(f"Database changes committed successfully")
             
             # Get final count
             final_count = IPHData.query.count()
@@ -288,8 +323,8 @@ class DataHandler:
                 'backup_created': backup_info is not None
             }
             
-            print(f"📊 Database merge completed successfully:")
-            print(f"   ✅ {existing_count} existing + {new_records} new + {updated_records} updated = {final_count} total")
+            print(f"Database merge completed successfully:")
+            print(f"   {existing_count} existing + {new_records} new + {updated_records} updated = {final_count} total")
             
             # Return combined data as DataFrame
             combined_df = self.load_historical_data()
@@ -298,18 +333,18 @@ class DataHandler:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error during merge: {str(e)}")
+            print(f"Error during merge: {str(e)}")
             import traceback
             traceback.print_exc()
             
             # Attempt to restore from backup if available
             if backup_info:
-                print("⚠️ Database rollback executed. Backup available if needed.")
+                print("Database rollback executed. Backup available if needed.")
             
             raise Exception(f"Database merge failed: {str(e)}")
 
     def backup_database_to_csv(self):
-        """🆕 Backup database to CSV file"""
+        """ Backup database to CSV file"""
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             backup_filename = f"db_backup_{timestamp}.csv"
@@ -340,7 +375,7 @@ class DataHandler:
             return None
     
     def get_data_summary(self):
-        """🆕 Get comprehensive summary from database"""
+        """ Get comprehensive summary from database"""
         try:
             # Get basic counts
             total_records = IPHData.query.count()
@@ -522,25 +557,3 @@ class DataHandler:
         print(f" Created Tanggal column from Bulan and Minggu")
         
         return df
-
-    def export_to_csv(self, filepath=None):
-        """🆕 Export database data to CSV"""
-        try:
-            if filepath is None:
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                filepath = f'data/export_historical_{timestamp}.csv'
-            
-            df = self.load_historical_data()
-            
-            if df.empty:
-                print(" No data to export")
-                return None
-            
-            df.to_csv(filepath, index=False)
-            print(f" Data exported to {filepath}")
-            
-            return filepath
-            
-        except Exception as e:
-            print(f" Error exporting to CSV: {str(e)}")
-            return None

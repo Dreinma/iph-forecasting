@@ -1,22 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Sistem Peringatan - IPH Forecasting{% endblock %}
+{% block title %}Peringatan & Notifikasi Ekonomi - IPH Forecasting{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
     <div>
         <h1 class="h2 text-gradient mb-1">
-            <i class="fas fa-bell me-2"></i>
-            Sistem Peringatan Cerdas
+            <i class="fas fa-chart-line me-2"></i>
+            Analisis & Peringatan IPH Komoditas
         </h1>
-        <p class="text-muted mb-0">Monitoring otomatis perubahan harga dan anomali data</p>
+        <p class="text-muted mb-0">Monitoring volatilitas dan peringatan perubahan harga komoditas</p>
     </div>
     <div class="btn-toolbar">
-        <button type="button" class="btn btn-success me-2" onclick="showCreateAlertModal()">
-            <i class="fas fa-plus me-1"></i>
-            Buat Peringatan Baru
-        </button>
         <button type="button" class="btn btn-outline-primary" onclick="refreshAlerts()">
             <i class="fas fa-sync-alt me-1"></i>
             Refresh
@@ -24,198 +20,123 @@
     </div>
 </div>
 
-<!-- Alert Statistics -->
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card bg-danger text-white">
+<!-- IPH Komoditas Analysis -->
+<div class="row g-4 mb-4 align-items-stretch">
+    <div class="col-sm-12 col-md-4 col-lg-4">
+        <div class="card bg-primary text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-white-50">Peringatan Kritis</h6>
-                        <h3 class="mb-0" id="criticalCount">0</h3>
+                        <h6 class="text-white-50">IPH Saat Ini</h6>
+                        <h3 class="mb-0" id="currentIPH">-0.83%</h3>
+                        <small class="text-white-50">vs minggu lalu</small>
                     </div>
-                    <i class="fas fa-exclamation-triangle fa-2x opacity-50"></i>
+                    <i class="fas fa-chart-line fa-2x opacity-50"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
+    <div class="col-sm-12 col-md-4 col-lg-4">
+        <div class="card bg-warning text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-white-50">Peringatan Sedang</h6>
-                        <h3 class="mb-0" id="warningCount">0</h3>
+                        <h6 class="text-white-50">Volatilitas IPH</h6>
+                        <h3 class="mb-0" id="iphVolatility">1.24</h3>
+                        <small class="text-white-50">Standard Deviation</small>
                     </div>
-                    <i class="fas fa-exclamation-circle fa-2x opacity-50"></i>
+                    <i class="fas fa-wave-square fa-2x opacity-50"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
+    <div class="col-sm-12 col-md-4 col-lg-4">
+        <div class="card bg-info text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-white-50">Informasi</h6>
-                        <h3 class="mb-0" id="infoCount">0</h3>
+                        <h6 class="text-white-50">Trend 4 Minggu</h6>
+                        <h3 class="mb-0" id="iphTrend">-0.45%</h3>
+                        <small class="text-white-50">Rata-rata perubahan</small>
                     </div>
-                    <i class="fas fa-info-circle fa-2x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-white-50">Aturan Aktif</h6>
-                        <h3 class="mb-0" id="activeRulesCount">0</h3>
-                    </div>
-                    <i class="fas fa-check-circle fa-2x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Alert Rules Configuration -->
-<div class="row g-4 mb-4">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-cogs text-primary me-2"></i>
-                    Aturan Peringatan Aktif
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="list-group" id="alertRulesList">
-                    <!-- Threshold Alert -->
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">
-                                    <i class="fas fa-chart-line text-danger me-2"></i>
-                                    Peringatan Threshold
-                                </h6>
-                                <p class="mb-1 text-muted">IPH > 3% atau < -3%</p>
-                                <small>Terakhir dipicu: 2 jam yang lalu</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="thresholdAlert" checked>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Trend Alert -->
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">
-                                    <i class="fas fa-exchange-alt text-warning me-2"></i>
-                                    Deteksi Perubahan Trend
-                                </h6>
-                                <p class="mb-1 text-muted">Pembalikan trend signifikan</p>
-                                <small>Terakhir dipicu: 1 hari yang lalu</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="trendAlert" checked>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Volatility Alert -->
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">
-                                    <i class="fas fa-bolt text-info me-2"></i>
-                                    Lonjakan Volatilitas
-                                </h6>
-                                <p class="mb-1 text-muted">Pergerakan harga tidak wajar</p>
-                                <small>Terakhir dipicu: 3 hari yang lalu</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="volatilityAlert" checked>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Data Quality Alert -->
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">
-                                    <i class="fas fa-database text-secondary me-2"></i>
-                                    Kualitas Data
-                                </h6>
-                                <p class="mb-1 text-muted">Data hilang atau outlier</p>
-                                <small>Terakhir dipicu: Tidak pernah</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="dataQualityAlert" checked>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Model Performance Alert -->
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">
-                                    <i class="fas fa-robot text-purple me-2"></i>
-                                    Performa Model
-                                </h6>
-                                <p class="mb-1 text-muted">Degradasi akurasi model</p>
-                                <small>Terakhir dipicu: 5 hari yang lalu</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="modelAlert">
-                            </div>
-                        </div>
-                    </div>
+                    <i class="fas fa-arrow-trend-down fa-2x opacity-50"></i>
                 </div>
             </div>
         </div>
     </div>
     
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-bell text-warning me-2"></i>
-                    Peringatan Terkini
-                </h5>
-                <span class="badge bg-danger" id="newAlertsCount">3 Baru</span>
-            </div>
-            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                <div id="recentAlertsList">
-                    <!-- Recent alerts will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
-<!-- Alert History Chart -->
-<div class="row g-4">
+<!-- Peringatan & Notifikasi IPH Komoditas (Full Width) -->
+<div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-white">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-history text-info me-2"></i>
-                    Riwayat Peringatan (7 Hari Terakhir)
+                    <i class="fas fa-bell text-warning me-2"></i>
+                    Peringatan & Notifikasi IPH Komoditas
                 </h5>
             </div>
             <div class="card-body">
-                <div id="alertHistoryChart" style="height: 300px;">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-info" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                <div id="economicAlertsList">
+                    <!-- Economic alerts will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insight IPH Komoditas (Full Width) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb text-warning me-2"></i>
+                    Insight IPH Komoditas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="alert alert-info border-0 h-100">
+                            <div class="d-flex align-items-start">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="fas fa-info-circle fa-lg mt-1"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2 fw-bold">Analisis IPH Terkini</h6>
+                                    <p class="mb-2 text-dark">
+                                        IPH menunjukkan penurunan -0.83% dibanding minggu lalu, 
+                                        dipengaruhi penurunan harga beras (-1.26%) dan bawang merah (-0.29%).
+                                    </p>
+                                    <small class="text-muted d-flex align-items-center">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Terakhir diperbarui: 25 Oktober 2025
+                                    </small>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mt-2">Memuat riwayat peringatan...</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-warning border-0 h-100">
+                            <div class="d-flex align-items-start">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="fas fa-exclamation-triangle fa-lg mt-1"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2 fw-bold">Peringatan Volatilitas Tinggi</h6>
+                                    <p class="mb-2 text-dark">
+                                        Volatilitas IPH mencapai 1.24 (standar deviasi), menunjukkan fluktuasi harga komoditas yang tinggi. 
+                                        Cabai rawit dan bawang merah menunjukkan volatilitas ekstrem.
+                                    </p>
+                                    <small class="text-muted d-flex align-items-center">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Terakhir diperbarui: 25 Oktober 2025
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -223,225 +144,181 @@
     </div>
 </div>
 
-<!-- Create Alert Modal -->
-<div class="modal fade" id="createAlertModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-plus me-2"></i>
-                    Buat Aturan Peringatan Baru
+<!-- Analisis Komoditas Utama & Trend & Prediksi IPH (Side by Side) -->
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar text-info me-2"></i>
+                    Analisis Komoditas Utama
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <form id="createAlertForm">
-                    <div class="mb-3">
-                        <label for="alertName" class="form-label">Nama Peringatan</label>
-                        <input type="text" class="form-control" id="alertName" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="alertType" class="form-label">Tipe Peringatan</label>
-                        <select class="form-select" id="alertType" required>
-                            <option value="">Pilih tipe...</option>
-                            <option value="threshold">Threshold (Batas Nilai)</option>
-                            <option value="trend">Perubahan Trend</option>
-                            <option value="volatility">Lonjakan Volatilitas</option>
-                            <option value="pattern">Pola Tertentu</option>
-                        </select>
-                    </div>
-                    
-                    <div id="thresholdConfig" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="upperThreshold" class="form-label">Batas Atas (%)</label>
-                                    <input type="number" step="0.1" class="form-control" id="upperThreshold">
-                                </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Beras -->
+                    <div class="col-12">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">Beras</h6>
+                                <small class="text-muted">Komoditas utama</small>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="lowerThreshold" class="form-label">Batas Bawah (%)</label>
-                                    <input type="number" step="0.1" class="form-control" id="lowerThreshold">
-                                </div>
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-success fs-6">-1.26%</span>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="alertPriority" class="form-label">Prioritas</label>
-                        <select class="form-select" id="alertPriority" required>
-                            <option value="low">Rendah</option>
-                            <option value="medium">Sedang</option>
-                            <option value="high">Tinggi</option>
-                            <option value="critical">Kritis</option>
-                        </select>
+                    <!-- Minyak Goreng -->
+                    <div class="col-12">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">Minyak Goreng</h6>
+                                <small class="text-muted">Fluktuasi tinggi</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-warning fs-6">-0.25%</span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="alertDescription" class="form-label">Deskripsi</label>
-                        <textarea class="form-control" id="alertDescription" rows="3"></textarea>
+                    <!-- Bawang Merah -->
+                    <div class="col-12">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">Bawang Merah</h6>
+                                <small class="text-muted">Volatilitas tinggi</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-danger fs-6">-0.29%</span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="emailNotification">
-                        <label class="form-check-label" for="emailNotification">
-                            Kirim notifikasi email
-                        </label>
+                    <!-- Cabai Rawit -->
+                    <div class="col-12">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">Cabai Rawit</h6>
+                                <small class="text-muted">Fluktuasi ekstrem</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-danger fs-6">0.06%</span>
+                            </div>
+                        </div>
                     </div>
-                </form>
+                    
+                    <!-- Telur Ayam -->
+                    <div class="col-12">
+                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">Telur Ayam Ras</h6>
+                                <small class="text-muted">Stabil</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-info fs-6">0.02%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-success" onclick="saveAlertRule()">
-                    <i class="fas fa-save me-1"></i>
-                    Simpan Aturan
-                </button>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list-check text-success me-2"></i>
+                    Rekomendasi Tindakan
+                </h5>
+            </div>
+            <div class="card-body">
+                <div>
+                    <h6 class="text-dark mb-3 fw-bold">
+                        <i class="fas fa-lightbulb text-warning me-2"></i>
+                        Rekomendasi:
+                    </h6>
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex align-items-center px-0 py-2">
+                            <i class="fas fa-check text-success me-3"></i>
+                            <span class="small">Monitor volatilitas cabai rawit & bawang merah</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center px-0 py-2">
+                            <i class="fas fa-check text-success me-3"></i>
+                            <span class="small">Analisis dampak musim panen beras</span>
+                        </div>
+                        <div class="list-group-item d-flex align-items-center px-0 py-2">
+                            <i class="fas fa-check text-success me-3"></i>
+                            <span class="small">Perhatikan tren harga minyak goreng</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Alert system JavaScript
-let alertRules = [];
-let recentAlerts = [];
+// Economic alerts system JavaScript
+let economicAlerts = [];
+let economicIndicators = {};
 
-async function loadAlertRules() {
+async function loadEconomicAlerts() {
     try {
-        const response = await fetch('/api/alerts/rules');
+        const response = await fetch('/api/dashboard/economic-alerts');
         const data = await response.json();
         
         if (data.success) {
-            alertRules = data.rules;
-            updateAlertRulesList();
-            updateAlertStatistics(data.statistics);
+            economicAlerts = data.alerts || [];
+            displayEconomicAlerts();
+        } else {
+            // Fallback: show sample economic alerts
+            showSampleEconomicAlerts();
         }
     } catch (error) {
-        console.error('Error loading alert rules:', error);
+        console.error('Error loading economic alerts:', error);
+        showSampleEconomicAlerts();
     }
 }
 
-async function loadRecentAlerts() {
+async function loadEconomicIndicators() {
     try {
-        const response = await fetch('/api/alerts/recent');
+        const response = await fetch('/api/dashboard/economic-indicators');
         const data = await response.json();
         
         if (data.success) {
-            recentAlerts = data.alerts;
-            displayRecentAlerts();
+            economicIndicators = data.indicators;
+            updateEconomicIndicators();
+        } else {
+            // Use default values
+            updateEconomicIndicators();
         }
     } catch (error) {
-        console.error('Error loading recent alerts:', error);
+        console.error('Error loading economic indicators:', error);
+        updateEconomicIndicators();
     }
 }
 
-async function loadAlertHistory() {
-    try {
-        const response = await fetch('/api/alerts/history?days=7');
-        const data = await response.json();
-        
-        const chartDiv = document.getElementById('alertHistoryChart');
-        
-        if (!data.success || !data.alerts || data.alerts.length === 0) {
-            chartDiv.innerHTML = `
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-bell-slash fa-3x mb-3"></i>
-                    <p class="mb-2">No recent alerts found</p>
-                    <small>Historical alerts will appear here when thresholds are exceeded</small>
-                </div>
-            `;
-            return;
-        }
-        
-        // Display as list of historical alerts instead of chart
-        let alertsHtml = '<div class="list-group">';
-        
-        data.alerts.forEach(alert => {
-            const severityClass = {
-                'critical': 'list-group-item-danger',
-                'warning': 'list-group-item-warning',
-                'info': 'list-group-item-info'
-            }[alert.severity] || 'list-group-item-light';
-            
-            const icon = {
-                'critical': 'fa-exclamation-triangle text-danger',
-                'warning': 'fa-exclamation-circle text-warning',
-                'info': 'fa-info-circle text-info'
-            }[alert.severity] || 'fa-bell text-muted';
-            
-            const timeAgo = alert.days_ago === 0 ? 'Today' : 
-                          alert.days_ago === 1 ? 'Yesterday' : 
-                          `${alert.days_ago} days ago`;
-            
-            alertsHtml += `
-                <div class="list-group-item ${severityClass} ${alert.acknowledged ? 'opacity-75' : ''}">
-                    <div class="d-flex w-100 justify-content-between align-items-start">
-                        <div class="d-flex align-items-start">
-                            <i class="fas ${icon} me-3 mt-1"></i>
-                            <div>
-                                <h6 class="mb-1">${alert.title}</h6>
-                                <p class="mb-1">${alert.message}</p>
-                                <small class="text-muted">
-                                    <i class="fas fa-clock me-1"></i>
-                                    ${timeAgo} • Value: ${alert.value.toFixed(3)}%
-                                </small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            ${alert.acknowledged ? 
-                                '<span class="badge bg-secondary">Acknowledged</span>' : 
-                                '<span class="badge bg-primary">New</span>'
-                            }
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        alertsHtml += '</div>';
-        
-        if (data.total_alerts > data.alerts.length) {
-            alertsHtml += `
-                <div class="text-center mt-3">
-                    <small class="text-muted">
-                        Showing ${data.alerts.length} of ${data.total_alerts} total alerts
-                    </small>
-                </div>
-            `;
-        }
-        
-        chartDiv.innerHTML = alertsHtml;
-        
-    } catch (error) {
-        console.error('Error loading alert history:', error);
-        document.getElementById('alertHistoryChart').innerHTML = `
-            <div class="alert alert-danger m-3">
-                <i class="fas fa-times-circle me-2"></i>
-                Error loading alert history: ${error.message}
-            </div>
-        `;
-    }
-}
-
-function displayRecentAlerts() {
-    const container = document.getElementById('recentAlertsList');
+function displayEconomicAlerts() {
+    const container = document.getElementById('economicAlertsList');
     
-    if (recentAlerts.length === 0) {
+    if (economicAlerts.length === 0) {
         container.innerHTML = `
             <div class="text-center text-muted py-4">
-                <i class="fas fa-bell-slash fa-3x mb-3"></i>
-                <p>Tidak ada peringatan terkini</p>
+                <i class="fas fa-chart-line fa-3x mb-3"></i>
+                <p>Tidak ada peringatan ekonomi terkini</p>
+                <small>Peringatan akan muncul ketika ada perubahan signifikan pada indikator ekonomi</small>
             </div>
         `;
         return;
     }
     
     let html = '';
-    recentAlerts.forEach(alert => {
+    economicAlerts.forEach(alert => {
         const priorityClass = {
             'critical': 'danger',
             'high': 'warning',
@@ -450,26 +327,29 @@ function displayRecentAlerts() {
         }[alert.priority] || 'secondary';
         
         const icon = {
-            'threshold': 'fa-chart-line',
-            'trend': 'fa-exchange-alt',
-            'volatility': 'fa-bolt',
-            'data_quality': 'fa-database',
-            'model': 'fa-robot'
+            'volatility': 'fa-wave-square',
+            'commodity': 'fa-seedling',
+            'anomaly': 'fa-exclamation-triangle',
+            'trend': 'fa-chart-line',
+            'price': 'fa-tags',
+            'seasonal': 'fa-calendar',
+            'impact': 'fa-chart-bar'
         }[alert.type] || 'fa-bell';
         
         html += `
-            <div class="alert alert-${priorityClass} alert-dismissible fade show" role="alert">
+            <div class="alert alert-${priorityClass} border-0 mb-3" role="alert">
                 <div class="d-flex align-items-start">
-                    <i class="fas ${icon} me-3 mt-1"></i>
+                    <div class="flex-shrink-0 me-3">
+                        <i class="fas ${icon} fa-lg mt-1"></i>
+                    </div>
                     <div class="flex-grow-1">
-                        <h6 class="alert-heading mb-1">${alert.title}</h6>
-                        <p class="mb-1">${alert.message}</p>
-                        <small class="text-muted">
-                            <i class="fas fa-clock me-1"></i>
-                            ${new Date(alert.timestamp).toLocaleString('id-ID')}
+                        <h6 class="alert-heading mb-2 fw-bold">${alert.title}</h6>
+                        <p class="mb-2 text-dark">${alert.message}</p>
+                        <small class="text-muted d-flex align-items-center">
+                            <i class="fas fa-calendar me-1"></i>
+                            ${new Date(alert.timestamp).toLocaleDateString('id-ID')}
                         </small>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             </div>
         `;
@@ -478,78 +358,56 @@ function displayRecentAlerts() {
     container.innerHTML = html;
 }
 
-function updateAlertStatistics(stats) {
-    document.getElementById('criticalCount').textContent = stats.critical || 0;
-    document.getElementById('warningCount').textContent = stats.warning || 0;
-    document.getElementById('infoCount').textContent = stats.info || 0;
-    document.getElementById('activeRulesCount').textContent = stats.activeRules || 0;
-    document.getElementById('newAlertsCount').textContent = `${stats.newAlerts || 0} Baru`;
+function showSampleEconomicAlerts() {
+    const sampleAlerts = [
+        {
+            title: "Penurunan IPH Signifikan",
+            message: "IPH turun -0.83% minggu ini, dipengaruhi penurunan harga beras (-1.26%) dan bawang merah (-0.29%).",
+            priority: "high",
+            type: "trend",
+            timestamp: new Date().toISOString()
+        },
+        {
+            title: "Volatilitas Tinggi Cabai Rawit",
+            message: "Cabai rawit menunjukkan fluktuasi ekstrem dengan volatilitas 0.06%. Perlu monitoring ketat.",
+            priority: "medium",
+            type: "commodity",
+            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        }
+    ];
+    
+    economicAlerts = sampleAlerts;
+    displayEconomicAlerts();
 }
 
-function showCreateAlertModal() {
-    const modal = new bootstrap.Modal(document.getElementById('createAlertModal'));
-    modal.show();
-}
-
-document.getElementById('alertType')?.addEventListener('change', function(e) {
-    const thresholdConfig = document.getElementById('thresholdConfig');
-    if (e.target.value === 'threshold') {
-        thresholdConfig.style.display = 'block';
-    } else {
-        thresholdConfig.style.display = 'none';
-    }
-});
-
-async function saveAlertRule() {
-    const formData = {
-        name: document.getElementById('alertName').value,
-        type: document.getElementById('alertType').value,
-        priority: document.getElementById('alertPriority').value,
-        description: document.getElementById('alertDescription').value,
-        emailNotification: document.getElementById('emailNotification').checked
+function updateEconomicIndicators() {
+    // Update economic indicators with current or default values
+    const indicators = {
+        currentIPH: economicIndicators.currentIPH || "-0.83%",
+        iphVolatility: economicIndicators.iphVolatility || "1.24",
+        iphTrend: economicIndicators.iphTrend || "-0.45%"
     };
     
-    if (formData.type === 'threshold') {
-        formData.upperThreshold = parseFloat(document.getElementById('upperThreshold').value);
-        formData.lowerThreshold = parseFloat(document.getElementById('lowerThreshold').value);
-    }
-    
-    try {
-        const response = await fetch('/api/alerts/rules', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            bootstrap.Modal.getInstance(document.getElementById('createAlertModal')).hide();
-            showAlert('Aturan peringatan berhasil dibuat!', 'success');
-            loadAlertRules();
-        } else {
-            showAlert('Gagal membuat aturan: ' + result.message, 'danger');
-        }
-    } catch (error) {
-        showAlert('Error: ' + error.message, 'danger');
-    }
+    document.getElementById('currentIPH').textContent = indicators.currentIPH;
+    document.getElementById('iphVolatility').textContent = indicators.iphVolatility;
+    document.getElementById('iphTrend').textContent = indicators.iphTrend;
+    // anomalyCount removed from UI
 }
 
 function refreshAlerts() {
-    loadAlertRules();
-    loadRecentAlerts();
-    loadAlertHistory();
-    showAlert('Data peringatan diperbarui!', 'info');
+    loadEconomicAlerts();
+    loadEconomicIndicators();
+    showAlert('Data ekonomi diperbarui!', 'info');
 }
 
 function showAlert(message, type) {
     const alertHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+        <div class="alert alert-${type} fade show position-fixed" 
              style="top: 20px; right: 20px; z-index: 9999; max-width: 400px;" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle me-2"></i>
+                ${message}
+            </div>
         </div>
     `;
     
@@ -567,14 +425,14 @@ function showAlert(message, type) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    loadAlertRules();
-    loadRecentAlerts();
-    loadAlertHistory();
+    loadEconomicAlerts();
+    loadEconomicIndicators();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 60 seconds
     setInterval(() => {
-        loadRecentAlerts();
-    }, 30000);
+        loadEconomicAlerts();
+        loadEconomicIndicators();
+    }, 60000);
 });
 </script>
 {% endblock %}

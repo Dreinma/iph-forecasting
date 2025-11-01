@@ -6,12 +6,12 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'iph-forecasting-secret-key-2024'
     DEBUG = True
     
-    # 🆕 Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///C:/VSCode/iph_forecasting_app/data/prisma.db'
+    #  Database Configuration
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Set True for SQL query debugging
     
-    # 🆕 Database Connection Pool
+    #  Database Connection Pool
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
         'pool_recycle': 3600,
@@ -31,7 +31,7 @@ class Config:
     MODELS_PATH = 'data/models/'
     BACKUPS_PATH = 'data/backups/'
     
-    # 🆕 Database Backup Configuration
+    #  Database Backup Configuration
     DB_BACKUP_FOLDER = 'data/db_backups/'
     DB_BACKUP_RETENTION_DAYS = 30
     AUTO_BACKUP_ENABLED = True
@@ -45,7 +45,7 @@ class Config:
     MODEL_PERFORMANCE_THRESHOLD = 0.1  # 10% improvement threshold
     AUTO_RETRAIN_THRESHOLD = 50  # Retrain when new data > 50 records
     
-    # 🆕 Performance History Configuration
+    #  Performance History Configuration
     MAX_PERFORMANCE_HISTORY_PER_MODEL = 50  # Keep last 50 training records
     PERFORMANCE_CLEANUP_ENABLED = True
     
@@ -54,11 +54,11 @@ class Config:
     COMPARISON_CHART_HEIGHT = 400
     MAX_HISTORICAL_DISPLAY = 60  # Show last 60 periods in chart
     
-    # 🆕 Cache Configuration
+    #  Cache Configuration
     CACHE_TYPE = 'simple'
     CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes
     
-    # 🆕 Migration Configuration
+    #  Migration Configuration
     MIGRATION_BACKUP_ENABLED = True
     KEEP_CSV_AFTER_MIGRATION = True  # Keep CSV files as backup
     
@@ -77,13 +77,13 @@ class Config:
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
         
-        print("✅ Application directories initialized")
+        print(" Application directories initialized")
         
-        # 🆕 Initialize database
+        #  Initialize database
         from database import init_db
         init_db(app)
         
-        print("✅ Database initialized")
+        print(" Database initialized")
 
 class DevelopmentConfig(Config):
     DEBUG = True

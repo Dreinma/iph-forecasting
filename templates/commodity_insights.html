@@ -1,100 +1,63 @@
 {% extends "base.html" %}
 
-{% block title %}Insight Komoditas - Peramalan IPH{% endblock %}
+{% block title %}Insight Komoditas - IPH Monitoring{% endblock %}
 
 {% block content %}
-<!-- Page Header dengan status indicator -->
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
-    <div>
+<!-- Page Header -->
+<div class="pb-3 mb-4 border-bottom">
         <h1 class="h2 text-gradient mb-1">
             <i class="fas fa-wheat-awn me-2"></i>
             Insight Komoditas
-            <span class="badge bg-success ms-2" id="dataStatus">
-                <i class="fas fa-spinner fa-spin"></i> Loading...
-            </span>
         </h1>
         <p class="text-muted mb-0">Analisis dampak komoditas terhadap perubahan harga</p>
-    </div>
-    <div class="btn-toolbar">
-        <button type="button" class="btn btn-success me-2" onclick="showUploadCommodityModal()">
-            <i class="fas fa-upload me-1"></i>
-            Upload Data Komoditas
-        </button>
-        <button type="button" class="btn btn-primary" onclick="refreshInsights()">
-            <i class="fas fa-sync-alt me-1"></i>
-            Refresh
-        </button>
-        <button type="button" class="btn btn-outline-secondary" onclick="downloadSampleCommodityData()">
-            <i class="fas fa-download me-1"></i>
-            Sample Data
-        </button>
-    </div>
 </div>
 
-<!-- System Status Alert -->
-<div id="systemStatusAlert" style="display: none;">
-    <!-- Will be populated by JavaScript -->
-</div>
-
-<!-- Enhanced Current Week Insights -->
-<div class="row g-4 mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-calendar-week me-2"></i>
+<!-- Current Week Insights -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-calendar-week text-primary me-2"></i>
                         Insight Minggu Ini
                     </h5>
-                    <span class="badge bg-light text-primary" id="currentWeekStatus">Loading</span>
                 </div>
-            </div>
-            <div class="card-body p-0">
+    <div class="card-body">
                 <div id="currentWeekInsights">
                     <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">Memuat...</span>
                         </div>
                         <p class="mt-2 text-muted">Memuat insight minggu ini...</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Enhanced Monthly Analysis & Trends -->
-<div class="row g-4 mb-4">
-    <!-- Monthly Analysis dengan error handling -->
-    <div class="col-lg-6">
-        <div class="card h-100">
+<!-- Monthly Analysis -->
+<div class="card mb-4 border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
+        <h5 class="card-title mb-0">
                     <i class="fas fa-chart-bar text-info me-2"></i>
                     Analisis Bulanan
-                    <span class="badge bg-info text-white ms-2" id="monthlyStatus">Ready</span>
                 </h5>
                 <div class="d-flex gap-2">
                     <select class="form-select form-select-sm" id="monthSelector" style="width: auto;">
-                        <option value="">Bulan Terkini</option>
-                        <option value="januari">Januari</option>
-                        <option value="februari">Februari</option>
-                        <option value="maret">Maret</option>
-                        <option value="april">April</option>
-                        <option value="mei">Mei</option>
-                        <option value="juni">Juni</option>
-                        <option value="juli">Juli</option>
-                        <option value="agustus">Agustus</option>
-                        <option value="september">September</option>
-                        <option value="oktober">Oktober</option>
-                        <option value="november">November</option>
-                        <option value="desember">Desember</option>
+                <option value="Januari">Januari</option>
+                <option value="Februari">Februari</option>
+                <option value="Maret">Maret</option>
+                <option value="April">April</option>
+                <option value="Mei">Mei</option>
+                <option value="Juni">Juni</option>
+                <option value="Juli">Juli</option>
+                <option value="Agustus">Agustus</option>
+                <option value="September">September</option>
+                <option value="Oktober">Oktober</option>
+                <option value="November">November</option>
+                <option value="Desember">Desember</option>
                     </select>
                     <select class="form-select form-select-sm" id="yearSelector" style="width: auto;">
-                        <option value="">Tahun Terkini</option>
+                <option value="2023">2023</option>
                         <option value="2024">2024</option>
                         <option value="2025">2025</option>
-                        <option value="2023">2023</option>
                     </select>
                 </div>
             </div>
@@ -102,157 +65,73 @@
                 <div id="monthlyAnalysis">
                     <div class="text-center py-4">
                         <div class="spinner-border text-info" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">Memuat...</span>
                         </div>
                         <p class="mt-2 text-muted">Memuat analisis bulanan...</p>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Enhanced Commodity Trends -->
-    <div class="col-lg-6">
-        <div class="card h-100">
+<!-- Commodity Trends -->
+<div class="card mb-4 border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
+        <h5 class="card-title mb-0">
                     <i class="fas fa-trending-up text-success me-2"></i>
                     Trend Komoditas
-                    <span class="badge bg-success text-white ms-2" id="trendsStatus">Ready</span>
                 </h5>
-                <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(4)">1M</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(12)">3M</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="changeTrendPeriod(24)">6M</button>
-                    <button type="button" class="btn btn-outline-secondary active" onclick="changeTrendPeriod(52)">1Y</button>
-                </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-sm" id="trendStartMonth" style="width: auto;">
+                    <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option><option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option><option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+                </select>
+                <select class="form-select form-select-sm" id="trendStartYear" style="width: auto;">
+                    <option>2023</option><option>2024</option><option>2025</option>
+                </select>
+                <span class="text-muted small">s/d</span>
+                <select class="form-select form-select-sm" id="trendEndMonth" style="width: auto;">
+                    <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option><option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option><option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+                </select>
+                <select class="form-select form-select-sm" id="trendEndYear" style="width: auto;">
+                    <option>2023</option><option>2024</option><option>2025</option>
+                </select>
+                <button class="btn btn-sm btn-primary" id="applyTrendWindowBtn">Terapkan</button>
+            </div>
+        </div>
             </div>
             <div class="card-body">
                 <div id="commodityTrends">
                     <div class="text-center py-4">
                         <div class="spinner-border text-success" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">Memuat...</span>
                         </div>
                         <p class="mt-2 text-muted">Menganalisis trend komoditas...</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Ranking Komoditas Volatilitas -->
-<div class="row g-4 mb-4">
-    <div class="col-12">
-        <div class="card border-info">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-bar me-2"></i>
-                    Ranking Komoditas Paling Volatil
-                    <span class="badge bg-light text-info ms-2" id="volatilityRankingCount">0</span>
+<!-- Ranking Komoditas Paling Berpengaruh -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-chart-bar text-primary me-2"></i>
+            Ranking Komoditas Paling Berpengaruh
                 </h5>
-                <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-light active" onclick="changeVolatilityPeriod('all')">Keseluruhan</button>
-                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2023')">Tahun 2023</button>
-                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2024')">Tahun 2024</button>
-                    <button type="button" class="btn btn-outline-light" onclick="changeVolatilityPeriod('2025')">Tahun 2025</button>
-                </div>
             </div>
             <div class="card-body">
-                <div id="volatilityRanking">
+        <div id="impactRanking">
                     <div class="text-center py-4">
-                        <div class="spinner-border text-info" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Memuat...</span>
                         </div>
-                        <p class="mt-2 text-muted">Menganalisis ranking volatilitas komoditas...</p>
-                    </div>
-                </div>
+                <p class="mt-2 text-muted">Menganalisis ranking komoditas paling berpengaruh...</p>
             </div>
         </div>
     </div>
 </div>
 
 
-<!-- Enhanced Upload Modal -->
-<div class="modal fade" id="uploadCommodityModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-upload me-2"></i>
-                    Upload Data Komoditas
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info border-0 mb-4">
-                    <h6 class="alert-heading">
-                        <i class="fas fa-info-circle me-2"></i>Format Data yang Didukung
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>Kolom Wajib:</strong>
-                            <ul class="mb-0">
-                                <li>Bulan</li>
-                                <li>Minggu ke-</li>
-                                <li>Indikator Perubahan Harga (%)</li>
-                                <li>Komoditas Andil Perubahan Harga</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Format yang Diterima:</strong>
-                            <ul class="mb-0">
-                                <li>CSV (.csv)</li>
-                                <li>Excel (.xlsx)</li>
-                                <li>Maksimal 10MB</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                
-                <form id="uploadCommodityForm">
-                    <div class="mb-3">
-                        <label for="commodityFile" class="form-label">Pilih File</label>
-                        <input type="file" class="form-control" id="commodityFile" 
-                               accept=".csv,.xlsx" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="validateData" checked>
-                            <label class="form-check-label" for="validateData">
-                                Validasi data otomatis
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="backupExisting" checked>
-                            <label class="form-check-label" for="backupExisting">
-                                Backup data existing
-                            </label>
-                        </div>
-                    </div>
-                </form>
-                
-                <!-- Upload Progress -->
-                <div id="uploadProgress" style="display: none;">
-                    <div class="progress mb-3">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             id="uploadProgressBar" style="width: 0%"></div>
-                    </div>
-                    <div id="uploadStatus" class="text-center">
-                        <small class="text-muted">Preparing upload...</small>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-success" onclick="uploadCommodityData()" id="uploadCommodityBtn">
-                    <i class="fas fa-upload me-1"></i>Upload
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -300,13 +179,13 @@ async function safeApiCall(url, defaultValue = null) {
         console.error(`❌ API Error: ${url}`, error);
         
         if (error.name === 'AbortError') {
-            return { success: false, error: 'Request timeout', message: 'Request took too long to complete' };
+            return { success: false, error: 'Timeout', message: 'Permintaan memakan waktu terlalu lama' };
         }
         
         return { 
             success: false, 
             error: error.message, 
-            message: `Network error: ${error.message}` 
+            message: `Error jaringan: ${error.message}` 
         };
     }
 }
@@ -315,17 +194,11 @@ async function loadCurrentWeekInsights() {
     console.log('📅 Loading enhanced current week insights...');
     
     const container = document.getElementById('currentWeekInsights');
-    const statusBadge = document.getElementById('currentWeekStatus');
-    
-    statusBadge.textContent = 'Loading...';
-    statusBadge.className = 'badge bg-warning text-dark';
     
     try {
         const data = await safeApiCall('/api/commodity/current-week');
         
         if (data.success) {
-            statusBadge.textContent = 'Loaded';
-            statusBadge.className = 'badge bg-success text-white';
             
             const html = renderEnhancedCurrentWeekInsights(data);
             container.innerHTML = html;
@@ -334,16 +207,12 @@ async function loadCurrentWeekInsights() {
             updateDataStatus();
             
         } else {
-            statusBadge.textContent = 'Error';
-            statusBadge.className = 'badge bg-danger text-white';
             
             container.innerHTML = renderCurrentWeekError(data);
         }
         
     } catch (error) {
         console.error('❌ Error loading current week insights:', error);
-        statusBadge.textContent = 'Failed';
-        statusBadge.className = 'badge bg-danger text-white';
         
         container.innerHTML = renderCurrentWeekNetworkError(error);
     }
@@ -353,201 +222,86 @@ function renderEnhancedCurrentWeekInsights(data) {
     const iph = data.iph_analysis;
     const period = data.period;
     const commodities = data.commodity_impacts;
-    const volatility = data.volatility_analysis;
-    const categories = data.category_analysis;
+    // Normalize period label: "Juni 2025 Minggu 4"
+    const deriveYear = () => {
+        if (period && period.tanggal) {
+            const y = new Date(period.tanggal).getFullYear();
+            if (!isNaN(y)) return y;
+        }
+        // Try to parse trailing `'YY` from bulan
+        const m = String(period?.bulan || '').match(/['`](\d{2})$/);
+        if (m) return 2000 + parseInt(m[1], 10);
+        return new Date().getFullYear();
+    };
+    const cleanMonth = String(period?.bulan || '').replace(/['`]\d{2}$/,'').trim();
+    const weekNum = parseInt(String(period?.minggu || '').toString().replace(/\D/g,'')) || period?.minggu || '';
+    const prettyPeriod = `${cleanMonth} ${deriveYear()} Minggu ${weekNum}`;
     
+    const year = (period && period.tanggal) ? new Date(period.tanggal).getFullYear() : (new Date()).getFullYear();
     return `
-        <!-- Enhanced 3-Column Layout -->
-        <div class="row g-0">
-            <!-- Column 1: Period Summary & IPH Analysis -->
-            <div class="col-md-4 border-end">
-                <div class="p-4">
-                    <!-- Period Info -->
-                    <div class="text-center mb-4">
-                        <div class="mb-2">
-                            <span class="badge bg-dark fs-6 px-3 py-2">
-                                ${period.tanggal || 'Date N/A'}
-                            </span>
-                        </div>
-                        <h4 class="text-muted mb-1">${period.bulan} ${period.minggu}</h4>
+        <!-- Clean Layout -->
+        <div class="row g-4">
+            <!-- IPH Summary -->
+            <div class="col-md-4">
+                <div class="text-center">
+                    <div class="mb-3">
+                        <h4 class="text-muted mb-1">${prettyPeriod}</h4>
                         <small class="text-muted">${period.kota}</small>
                     </div>
                     
-                    <!-- IPH Analysis (No Progress Bar) -->
-                    <div class="text-center mb-4">
-                        <div class="position-relative d-inline-block mb-3">
-                            <div class="bg-${iph.color} text-white rounded-circle d-flex align-items-center justify-content-center" 
-                                 style="width: 100px; height: 100px;">
-                                <div class="text-center">
-                                    <div class="h4 mb-0 fw-bold">
-                                        ${iph.value > 0 ? '+' : ''}${iph.value.toFixed(2)}%
-                                    </div>
-                                    <small class="opacity-75">IPH</small>
-                                </div>
-                            </div>
+                    <!-- Simplified IPH Display -->
+                    <div class="mb-3">
+                        <div class="h2 fw-bold text-${iph.color} mb-2">
+                            ${iph.value > 0 ? '+' : ''}${iph.value.toFixed(2)}%
                         </div>
-                        <div>
-                            <span class="badge bg-${iph.color} fs-6 px-3 py-2">
-                                ${iph.direction} ${iph.level}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Volatility Info -->
-                    <div class="card bg-light border-0">
-                        <div class="card-body py-3">
-                            <h6 class="card-title mb-2">
-                                <i class="fas fa-bolt text-warning me-2"></i>
-                                Volatilitas Tertinggi
-                            </h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-bold">${volatility.most_volatile_commodity}</div>
-                                    <small class="text-muted">${volatility.volatility_level}</small>
-                                </div>
-                                <span class="badge bg-${volatility.volatility_color} fs-6">
-                                    ${volatility.volatility_percentage.toFixed(2)}%
-                                </span>
-                            </div>
-                        </div>
+                        <div class="text-muted small">Indikator Perubahan Harga</div>
                     </div>
                 </div>
             </div>
             
-            <!-- Column 2: Commodity Impacts -->
-            <div class="col-md-4 border-end">
-                <div class="p-4">
-                    <h6 class="mb-3">
+            <!-- Top Commodities -->
+            <div class="col-md-8">
+                <h6 class="mb-3 text-dark">
                         <i class="fas fa-chart-line me-2"></i>
-                        Dampak Komoditas
+                    Komoditas Berpengaruh
                     </h6>
                     
-                    <!-- Positive Impacts -->
+                <div class="row g-2">
                     ${commodities.significant_positive && commodities.significant_positive.length > 0 ? `
-                        <div class="mb-3">
-                            <h6 class="text-success small mb-2">
-                                <i class="fas fa-arrow-up me-1"></i>
-                                Pendorong Inflasi (${commodities.significant_positive.length})
-                            </h6>
-                            <div class="list-group list-group-flush">
-                                ${commodities.significant_positive.slice(0, 4).map(c => `
-                                    <div class="list-group-item border-0 px-0 py-2">
+                        ${commodities.significant_positive.slice(0, 3).map(c => `
+                            <div class="col-md-4">
+                                <div class="card border-success border-opacity-50">
+                                    <div class="card-body py-2 px-3">
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <div class="d-flex align-items-center">
                                                 <div>
-                                                    <div class="fw-medium">${c.name}</div>
-                                                    <small class="text-muted">${c.category}</small>
+                                                <div class="fw-medium small">${formatCommodityName(c.name)}</div>
+                                                
                                                 </div>
+                                            <span class="badge bg-success">+${c.impact.toFixed(2)}%</span>
                                             </div>
-                                            <span class="badge bg-success">+${c.impact.toFixed(3)}%</span>
+                                        </div>
                                         </div>
                                     </div>
                                 `).join('')}
-                            </div>
-                        </div>
                     ` : ''}
                     
-                    <!-- Negative Impacts -->
                     ${commodities.significant_negative && commodities.significant_negative.length > 0 ? `
-                        <div class="mb-3">
-                            <h6 class="text-danger small mb-2">
-                                <i class="fas fa-arrow-down me-1"></i>
-                                Penekan Inflasi (${commodities.significant_negative.length})
-                            </h6>
-                            <div class="list-group list-group-flush">
-                                ${commodities.significant_negative.slice(0, 4).map(c => `
-                                    <div class="list-group-item border-0 px-0 py-2">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div class="d-flex align-items-center">
-                                                <div>
-                                                    <div class="fw-medium">${c.name}</div>
-                                                    <small class="text-muted">${c.category}</small>
-                                                </div>
-                                            </div>
-                                            <span class="badge bg-danger">${c.impact.toFixed(3)}%</span>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <!-- Minor Impacts Summary -->
-                    ${commodities.minor_impacts && commodities.minor_impacts.length > 0 ? `
-                        <div class="alert alert-light border-0 py-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                ${commodities.minor_impacts.length} komoditas lain dengan dampak minimal
-                            </small>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-            
-            <!-- Column 3: Category Analysis -->
+                        ${commodities.significant_negative.slice(0, 3).map(c => `
             <div class="col-md-4">
-                <div class="p-4">
-                    <h6 class="mb-3">
-                        <i class="fas fa-layer-group me-2"></i>
-                        Analisis per Kategori
-                    </h6>
-                    
-                    ${Object.entries(categories).slice(0, 6).map(([category, analysis]) => `
-                        <div class="card border-${analysis.impact_color} mb-2">
+                                <div class="card border-danger border-opacity-50">
                             <div class="card-body py-2 px-3">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <span class="me-2 fs-5">${analysis.icon}</span>
                                         <div>
-                                            <div class="fw-medium small">${category}</div>
-                                            <small class="text-muted">${analysis.commodity_count} item</small>
+                                                <div class="fw-medium small">${formatCommodityName(c.name)}</div>
+                                                
                                         </div>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="badge bg-${analysis.direction_color} small">
-                                            ${analysis.total_impact > 0 ? '+' : ''}${analysis.total_impact.toFixed(3)}%
-                                        </span>
-                                        <div class="mt-1">
-                                            <small class="text-muted">${analysis.dominant_direction}</small>
-                                        </div>
+                                            <span class="badge bg-danger">${c.impact.toFixed(2)}%</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     `).join('')}
-                    
-                    <!-- Category Summary -->
-                    <div class="alert alert-info border-0 py-2 mt-3">
-                        <small>
-                            <i class="fas fa-chart-pie me-1"></i>
-                            <strong>Dominasi:</strong> ${Object.keys(categories)[0] || 'N/A'} kategori 
-                            ${Object.values(categories)[0]?.icon || '📦'}
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Bottom Summary Row -->
-        <div class="border-top bg-light">
-            <div class="p-3">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <div class="fw-bold text-primary">${commodities.total_commodities}</div>
-                        <small class="text-muted">Total Komoditas</small>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-success">${commodities.significant_positive ? commodities.significant_positive.length : 0}</div>
-                        <small class="text-muted">Pendorong</small>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-danger">${commodities.significant_negative ? commodities.significant_negative.length : 0}</div>
-                        <small class="text-muted">Penekan</small>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-warning">${Object.keys(categories).length}</div>
-                        <small class="text-muted">Kategori Aktif</small>
-                    </div>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -559,10 +313,6 @@ async function loadCommodityTrends(periods = 4) {
     console.log(`📈 Loading enhanced commodity trends for ${periods} periods...`);
     
     const container = document.getElementById('commodityTrends');
-    const statusBadge = document.getElementById('trendsStatus');
-    
-    statusBadge.textContent = 'Loading...';
-    statusBadge.className = 'badge bg-warning text-dark ms-2';
     
     container.innerHTML = `
         <div class="text-center py-3">
@@ -572,28 +322,50 @@ async function loadCommodityTrends(periods = 4) {
     `;
     
     try {
-        const data = await safeApiCall(`/api/commodity/trends?periods=${periods}`);
+        const map = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
+        const sm = document.getElementById('trendStartMonth') ? document.getElementById('trendStartMonth').value : '';
+        const sy = document.getElementById('trendStartYear') ? document.getElementById('trendStartYear').value : '';
+        const em = document.getElementById('trendEndMonth') ? document.getElementById('trendEndMonth').value : '';
+        const ey = document.getElementById('trendEndYear') ? document.getElementById('trendEndYear').value : '';
+        let params = `periods=${periods}`;
+        if (sm && sy) params += `&start_key=${sy}-${(map[sm]||sm.padStart(2,'0'))}`;
+        if (em && ey) params += `&end_key=${ey}-${(map[em]||em.padStart(2,'0'))}`;
+        const data = await safeApiCall(`/api/commodity/trends?${params}`);
         
-        if (data.success && data.commodity_trends && Object.keys(data.commodity_trends).length > 0) {
-            statusBadge.textContent = 'Loaded';
-            statusBadge.className = 'badge bg-success text-white ms-2';
-            
+        if (data.success) {
+            if (data.commodity_trends && Object.keys(data.commodity_trends).length > 0) {
             const html = renderEnhancedCommodityTrends(data, periods);
             container.innerHTML = html;
-            
             dataLoadingStatus.trends = true;
-            
+            } else if (data.data_availability === 'no_commodity_data') {
+                // Tampilkan peringatan yang rapi dengan periode terpilih
+                const map = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
+                const sm = document.getElementById('trendStartMonth')?.value;
+                const sy = document.getElementById('trendStartYear')?.value;
+                const em = document.getElementById('trendEndMonth')?.value;
+                const ey = document.getElementById('trendEndYear')?.value;
+                const rangeText = (sm && sy && em && ey) ? `${sm} ${sy} – ${em} ${ey}` : `${periods} periode terakhir`;
+                container.innerHTML = `
+                    <div class="alert alert-warning border-0">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3"><i class="fas fa-info-circle fa-lg text-warning"></i></div>
+                            <div>
+                                <h6 class="mb-1">Data Komoditas Tidak Tersedia</h6>
+                                <small class="text-muted d-block mb-1">Periode: ${rangeText}</small>
+                                <div class="small text-dark">${data.summary || 'Tidak ditemukan data komoditas pada rentang ini. Coba pilih rentang lain yang memiliki data.'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
         } else {
-            statusBadge.textContent = 'Error';
-            statusBadge.className = 'badge bg-danger text-white ms-2';
-            
+                container.innerHTML = renderTrendsError(data, periods);
+            }
+        } else {
             container.innerHTML = renderTrendsError(data, periods);
         }
         
     } catch (error) {
         console.error('❌ Error loading commodity trends:', error);
-        statusBadge.textContent = 'Failed';
-        statusBadge.className = 'badge bg-danger text-white ms-2';
         
         container.innerHTML = renderTrendsNetworkError(error, periods);
     }
@@ -607,15 +379,7 @@ function renderEnhancedCommodityTrends(data, periods) {
         return `
             <div class="alert alert-warning border-0">
                 <h6><i class="fas fa-exclamation-triangle me-2"></i>Data Trend Tidak Tersedia</h6>
-                <p class="mb-2">Tidak ada data trend komoditas untuk ${periods} periode terakhir.</p>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary btn-sm" onclick="loadCommodityTrends(${periods})">
-                        <i class="fas fa-redo me-1"></i>Retry
-                    </button>
-                    <button class="btn btn-outline-success btn-sm" onclick="showUploadCommodityModal()">
-                        <i class="fas fa-upload me-1"></i>Upload Data
-                    </button>
-                </div>
+                <p class="mb-0">Tidak ada data trend komoditas untuk ${periods} periode terakhir.</p>
             </div>
         `;
     }
@@ -625,12 +389,8 @@ function renderEnhancedCommodityTrends(data, periods) {
     return `
         <!-- Trends Header -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <small class="text-muted">
-                    ${data.commodities_found || 0} komoditas ditemukan dalam ${data.periods_analyzed || periods} periode
-                </small>
-            </div>
-            <span class="badge bg-info">${trends.length} ditampilkan</span>
+            <small class="text-muted">${data.commodities_found || 0} komoditas • ${data.periods_analyzed || periods} periode</small>
+            <span class="badge bg-light text-dark">${trends.length} ditampilkan</span>
         </div>
         
         <!-- Enhanced Trends Cards Grid -->
@@ -655,68 +415,12 @@ function renderEnhancedCommodityTrends(data, periods) {
                             ${index === 0 ? '<div class="position-absolute top-0 end-0 m-2"><i class="fas fa-crown text-warning"></i></div>' : ''}
                             
                             <div class="card-body p-3">
-                                <!-- Commodity Header -->
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <h6 class="mb-1 fw-bold">${name}</h6>
-                                        <span class="badge bg-secondary small">${category}</span>
-                                    </div>
-                                    <span class="badge bg-${impactConfig.color} fs-6">
-                                        ${total_impact > 0 ? '+' : ''}${total_impact.toFixed(3)}%
-                                    </span>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 fw-bold">${formatCommodityName(name)}</h6>
                                 </div>
-                                
-                                <!-- Trend Visualization -->
-                                <div class="d-flex align-items-center mb-3">
-                                    <div class="me-3">
-                                        <span class="badge bg-${trendConfig.color} px-3 py-2">
-                                            ${trendConfig.icon} ${trendConfig.text}
-                                        </span>
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex justify-content-between small text-muted">
-                                            <span>Strength:</span>
-                                            <span class="fw-medium">${trend_strength}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Metrics Grid -->
-                                <div class="row g-2 text-center">
-                                    <div class="col-4">
-                                        <div class="bg-light rounded p-2">
-                                            <div class="fw-bold text-primary small">${appearances}</div>
-                                            <div class="text-muted" style="font-size: 0.7rem;">Muncul</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="bg-light rounded p-2">
-                                            <div class="fw-bold text-info small">${avg_impact.toFixed(3)}</div>
-                                            <div class="text-muted" style="font-size: 0.7rem;">Avg Impact</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="bg-light rounded p-2">
-                                            <div class="fw-bold text-warning small">${volatility.toFixed(3)}</div>
-                                            <div class="text-muted" style="font-size: 0.7rem;">Volatilitas</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Trend Coefficient Info -->
-                                <div class="mt-2 text-center">
-                                    <small class="text-muted">
-                                        Trend Coefficient: ${trend_coefficient.toFixed(4)}
-                                    </small>
-                                </div>
-                                
-                                <!-- Period Activity -->
                                 <div class="mt-2">
-                                    <div class="d-flex align-items-center">
-                                        <small class="text-muted">
-                                            Aktif dalam ${appearances} periode
-                                        </small>
-                                    </div>
+                                    ${(() => { const dark = (['secondary','light'].includes(trendConfig.color) ? 'text-dark' : ''); return `<span class=\"badge bg-${trendConfig.color} ${dark}\">${trendConfig.icon} ${trendConfig.text}</span>`; })()}
+                                    <small class="text-muted ms-2">${appearances}x kemunculan</small>
                                 </div>
                             </div>
                         </div>
@@ -725,77 +429,26 @@ function renderEnhancedCommodityTrends(data, periods) {
             }).join('')}
         </div>
         
-        <!-- Trend Summary -->
-        <div class="alert alert-light border-0 py-3">
-            <h6 class="mb-2">
-                <i class="fas fa-chart-line me-2"></i>Ringkasan Trend
-            </h6>
-            <div class="small" style="white-space: pre-wrap; line-height: 1.4;">
-                ${data.summary || 'Analisis trend komoditas berdasarkan ' + periods + ' periode terakhir. Data menunjukkan pola perubahan dampak komoditas terhadap IPH.'}
-            </div>
-        </div>
         
-        <!-- Category Trends -->
-        ${data.category_trends && Object.keys(data.category_trends).length > 0 ? `
-            <div class="mt-3">
-                <h6 class="mb-2">
-                    <i class="fas fa-layer-group me-2"></i>Trend per Kategori
-                </h6>
-                <div class="row g-2">
-                    ${Object.entries(data.category_trends).map(([category, trend]) => `
-                        <div class="col-md-4">
-                            <div class="card bg-light border-0">
-                                <div class="card-body py-2 px-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="fw-medium small">${category}</div>
-                                            <small class="text-muted">${trend.commodities || 0} komoditas</small>
-                                        </div>
-                                        <span class="badge ${trend.trend_direction === 'inflationary' ? 'bg-warning' : 
-                                                            trend.trend_direction === 'deflationary' ? 'bg-info' : 'bg-secondary'} small">
-                                            ${trend.trend_direction || 'stable'}
-                                        </span>
-                                    </div>
-                                    <div class="mt-1 text-center">
-                                        <small class="text-muted">
-                                            Total Impact: ${(trend.total_impact || 0).toFixed(3)}%
-                                        </small>
+        
+        <!-- Simple Statistics -->
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="text-center p-2 bg-success bg-opacity-10 rounded">
+                    <div class="fw-bold text-success">${Object.values(data.commodity_trends).filter(t => t.trend === 'increasing').length}</div>
+                    <small class="text-muted">Trend Naik</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center p-2 bg-info bg-opacity-10 rounded">
+                    <div class="fw-bold text-info">${Object.values(data.commodity_trends).filter(t => t.trend === 'decreasing').length}</div>
+                    <small class="text-muted">Trend Turun</small>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        ` : `
-            <div class="alert alert-light border-0 py-2 mt-3">
-                <small class="text-muted">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Analisis kategori tidak tersedia untuk periode ini
-                </small>
-            </div>
-        `}
-        
-        <!-- Detailed Statistics -->
-        <div class="row mt-3">
-            <div class="col-md-6">
-                <div class="card bg-success bg-opacity-10 border-success">
-                    <div class="card-body py-2">
-                        <h6 class="text-success mb-1">📈 Trending Up</h6>
-                        <small class="text-muted">
-                            ${Object.values(data.commodity_trends).filter(t => t.trend === 'increasing').length} komoditas menunjukkan trend naik
-                        </small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card bg-info bg-opacity-10 border-info">
-                    <div class="card-body py-2">
-                        <h6 class="text-info mb-1">📉 Trending Down</h6>
-                        <small class="text-muted">
-                            ${Object.values(data.commodity_trends).filter(t => t.trend === 'decreasing').length} komoditas menunjukkan trend turun
-                        </small>
-                    </div>
+            <div class="col-md-4">
+                <div class="text-center p-2 bg-secondary bg-opacity-10 rounded">
+                    <div class="fw-bold text-secondary">${Object.values(data.commodity_trends).filter(t => t.trend === 'stable').length}</div>
+                    <small class="text-muted">Stabil</small>
                 </div>
             </div>
         </div>
@@ -809,8 +462,6 @@ async function loadSeasonalPatterns(view = 'overview') {
     const container = document.getElementById('seasonalPatterns');
     const statusBadge = document.getElementById('seasonalStatus');
     
-    statusBadge.textContent = 'Loading...';
-    statusBadge.className = 'badge bg-warning text-dark ms-2';
     
     container.innerHTML = `
         <div class="text-center py-3">
@@ -823,8 +474,6 @@ async function loadSeasonalPatterns(view = 'overview') {
         const data = await safeApiCall('/api/commodity/seasonal');
         
         if (data.success && data.seasonal_patterns) {
-            statusBadge.textContent = 'Loaded';
-            statusBadge.className = 'badge bg-success text-white ms-2';
             
             const html = renderEnhancedSeasonalPatterns(data, view);
             container.innerHTML = html;
@@ -832,16 +481,12 @@ async function loadSeasonalPatterns(view = 'overview') {
             dataLoadingStatus.seasonal = true;
             
         } else {
-            statusBadge.textContent = 'Error';
-            statusBadge.className = 'badge bg-danger text-white ms-2';
             
             container.innerHTML = renderSeasonalPatternsError(data, view);
         }
         
     } catch (error) {
         console.error('❌ Error loading seasonal patterns:', error);
-        statusBadge.textContent = 'Failed';
-        statusBadge.className = 'badge bg-danger text-white ms-2';
         
         container.innerHTML = renderSeasonalPatternsNetworkError(error, view);
     }
@@ -901,7 +546,7 @@ function renderEnhancedSeasonalPatterns(data, view) {
                     Ringkasan Pola Seasonal
                 </h6>
                 <div class="small" style="white-space: pre-wrap; line-height: 1.4;">
-                    ${data.summary || 'No seasonal summary available'}
+                    ${data.summary || 'Tidak ada ringkasan musiman tersedia'}
                 </div>
             </div>
         </div>
@@ -926,10 +571,10 @@ function renderSeasonalOverview(patterns, insights) {
         <div class="row g-3 mb-4">
             ${Object.entries(patterns).map(([month, pattern]) => {
                 const monthCategory = pattern.month_category || { 
-                    primary: 'Unknown', 
+                    primary: 'Tidak Diketahui', 
                     color: 'secondary', 
                     risk_level: 'low',
-                    volatility_level: 'Unknown'
+                    volatility_level: 'Tidak Diketahui'
                 };
                 
                 const riskBadge = monthCategory.risk_level === 'high' ? 'bg-danger' : 
@@ -976,7 +621,7 @@ function renderSeasonalOverview(patterns, insights) {
                                 <div class="text-center">
                                     <small class="text-muted">
                                         Diversitas: ${pattern.commodity_diversity || 0} komoditas<br>
-                                        Kategori Dominan: ${pattern.dominant_category || 'N/A'}
+                                        Kategori Dominan: ${pattern.dominant_category || 'Tidak Ada'}
                                     </small>
                                 </div>
                             </div>
@@ -994,7 +639,7 @@ function renderSeasonalOverview(patterns, insights) {
                     <div class="card bg-danger bg-opacity-10 border-danger">
                         <div class="card-body py-3">
                             <h6 class="card-title text-danger mb-2">
-                                🔴 Puncak Inflasi
+                                🔴 Puncak Tertinggi
                             </h6>
                             ${insights.peak_inflation_months.slice(0, 2).map(month => `
                                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -1013,7 +658,7 @@ function renderSeasonalOverview(patterns, insights) {
                     <div class="card bg-info bg-opacity-10 border-info">
                         <div class="card-body py-3">
                             <h6 class="card-title text-info mb-2">
-                                🔵 Puncak Deflasi
+                                🔵 Puncak Terendah
                             </h6>
                             ${insights.peak_deflation_months.slice(0, 2).map(month => `
                                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -1162,7 +807,7 @@ function renderSeasonalByCategory(patterns, insights) {
                             <!-- Category Trend Indicator -->
                             <div class="text-center">
                                 <span class="badge bg-${data.seasonal_trend_color} px-3 py-2">
-                                    ${data.seasonal_trend_icon} ${data.seasonal_trend}
+                                    ${data.seasonal_trend_icon}
                                 </span>
                             </div>
                         </div>
@@ -1192,9 +837,9 @@ function getTrendConfig(trend, strength) {
             color: 'secondary'
         },
         'insufficient_data': {
-            icon: '❓',
-            text: 'Data Kurang',
-            color: 'light'
+            icon: '➡️',
+            text: 'Stabil',
+            color: 'secondary'
         }
     };
     
@@ -1211,6 +856,16 @@ function getImpactConfig(impact) {
         return { color: 'info', level: 'medium' };
     } else {
         return { color: 'light', level: 'low' };
+    }
+}
+
+// Format helper untuk nama komoditas: underscore -> spasi, lower-case
+function formatCommodityName(rawName) {
+    if (!rawName) return '';
+    try {
+        return String(rawName).replace(/_/g, ' ').toLowerCase();
+    } catch (_) {
+        return rawName;
     }
 }
 
@@ -1482,11 +1137,11 @@ function renderCurrentWeekError(data) {
                     <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
                     <div>
                         <h6 class="mb-1">Data Tidak Tersedia</h6>
-                        <p class="mb-2">${data.message || 'No current week data available'}</p>
+                        <p class="mb-2">${data.message || 'Tidak ada data minggu ini tersedia'}</p>
                         ${data.suggestion ? `<small class="text-muted">${data.suggestion}</small>` : ''}
                         <div class="mt-3">
                             <button class="btn btn-outline-primary btn-sm me-2" onclick="loadCurrentWeekInsights()">
-                                <i class="fas fa-redo me-1"></i>Retry
+                                <i class="fas fa-redo me-1"></i>Coba Lagi
                             </button>
                             <button class="btn btn-outline-success btn-sm" onclick="showUploadCommodityModal()">
                                 <i class="fas fa-upload me-1"></i>Upload Data
@@ -1503,10 +1158,10 @@ function renderCurrentWeekNetworkError(error) {
     return `
         <div class="p-4">
             <div class="alert alert-danger border-0">
-                <h6><i class="fas fa-wifi me-2"></i>Network Error</h6>
-                <p class="mb-2">Failed to load current week data: ${error.message}</p>
+                <h6><i class="fas fa-wifi me-2"></i>Error Jaringan</h6>
+                <p class="mb-2">Gagal memuat data minggu ini: ${error.message}</p>
                 <button class="btn btn-outline-danger btn-sm" onclick="loadCurrentWeekInsights()">
-                    <i class="fas fa-redo me-1"></i>Try Again
+                    <i class="fas fa-redo me-1"></i>Coba Lagi
                 </button>
             </div>
         </div>
@@ -1514,17 +1169,21 @@ function renderCurrentWeekNetworkError(error) {
 }
 
 function renderTrendsError(data, periods) {
+    // Rapi tanpa tombol aksi
+    const sm = document.getElementById('trendStartMonth')?.value;
+    const sy = document.getElementById('trendStartYear')?.value;
+    const em = document.getElementById('trendEndMonth')?.value;
+    const ey = document.getElementById('trendEndYear')?.value;
+    const rangeText = (sm && sy && em && ey) ? `${sm} ${sy} – ${em} ${ey}` : `${periods} periode`;
     return `
         <div class="alert alert-warning border-0">
-            <h6><i class="fas fa-exclamation-triangle me-2"></i>Data Trend Tidak Tersedia</h6>
-            <p class="mb-2">${data.message || 'No trend data available'}</p>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary btn-sm" onclick="loadCommodityTrends(${periods})">
-                    <i class="fas fa-redo me-1"></i>Retry
-                </button>
-                <button class="btn btn-outline-success btn-sm" onclick="showUploadCommodityModal()">
-                    <i class="fas fa-upload me-1"></i>Upload Data
-                </button>
+            <div class="d-flex align-items-start">
+                <div class="me-3"><i class="fas fa-exclamation-triangle fa-lg text-warning"></i></div>
+                <div>
+                    <h6 class="mb-1">Data Trend Tidak Tersedia</h6>
+                    <small class="text-muted d-block mb-1">Periode: ${rangeText}</small>
+                    <div class="small">${data.message || 'Tidak ada data trend untuk rentang yang dipilih.'}</div>
+                </div>
             </div>
         </div>
     `;
@@ -1533,8 +1192,8 @@ function renderTrendsError(data, periods) {
 function renderTrendsNetworkError(error, periods) {
     return `
         <div class="alert alert-danger border-0">
-            <h6><i class="fas fa-wifi me-2"></i>Network Error</h6>
-            <p class="mb-2">Failed to load commodity trends: ${error.message}</p>
+            <h6><i class="fas fa-wifi me-2"></i>Error Jaringan</h6>
+            <p class="mb-2">Gagal memuat trend komoditas: ${error.message}</p>
             <button class="btn btn-outline-danger btn-sm" onclick="loadCommodityTrends(${periods})">
                 <i class="fas fa-redo me-1"></i>Try Again
             </button>
@@ -1546,7 +1205,7 @@ function renderSeasonalPatternsError(data, view) {
     return `
         <div class="alert alert-warning border-0">
             <h6><i class="fas fa-exclamation-triangle me-2"></i>Data Seasonal Tidak Tersedia</h6>
-            <p class="mb-2">${data.message || 'No seasonal data available'}</p>
+            <p class="mb-2">${data.message || 'Tidak ada data musiman tersedia'}</p>
             <button class="btn btn-outline-primary btn-sm" onclick="loadSeasonalPatterns('${view}')">
                 <i class="fas fa-redo me-1"></i>Retry
             </button>
@@ -1557,8 +1216,8 @@ function renderSeasonalPatternsError(data, view) {
 function renderSeasonalPatternsNetworkError(error, view) {
     return `
         <div class="alert alert-danger border-0">
-            <h6><i class="fas fa-wifi me-2"></i>Network Error</h6>
-            <p class="mb-2">Failed to load seasonal patterns: ${error.message}</p>
+            <h6><i class="fas fa-wifi me-2"></i>Error Jaringan</h6>
+            <p class="mb-2">Gagal memuat pola musiman: ${error.message}</p>
             <button class="btn btn-outline-danger btn-sm" onclick="loadSeasonalPatterns('${view}')">
                 <i class="fas fa-redo me-1"></i>Try Again
             </button>
@@ -1567,14 +1226,10 @@ function renderSeasonalPatternsNetworkError(error, view) {
 }
 
 // TAMBAHKAN MONTHLY ANALYSIS FUNCTIONS
-async function loadMonthlyAnalysis(month = null) {
-    console.log(`📊 Loading enhanced monthly analysis for: ${month || 'latest month'}`);
+async function loadMonthlyAnalysis(month = 'Juni', year = '2024') {
+    console.log(`📊 Loading enhanced monthly analysis for: ${month} ${year}`);
     
     const container = document.getElementById('monthlyAnalysis');
-    const statusBadge = document.getElementById('monthlyStatus');
-    
-    statusBadge.textContent = 'Loading...';
-    statusBadge.className = 'badge bg-warning text-dark ms-2';
     
     container.innerHTML = `
         <div class="text-center py-3">
@@ -1584,12 +1239,15 @@ async function loadMonthlyAnalysis(month = null) {
     `;
     
     try {
-        const url = month ? `/api/commodity/monthly-analysis?month=${encodeURIComponent(month)}` : '/api/commodity/monthly-analysis';
+        let url = '/api/commodity/monthly-analysis';
+        const params = [];
+        if (month) params.push(`month=${encodeURIComponent(month)}`);
+        if (year) params.push(`year=${encodeURIComponent(year)}`);
+        if (params.length > 0) url += '?' + params.join('&');
+        
         const data = await safeApiCall(url);
         
         if (data.success) {
-            statusBadge.textContent = 'Loaded';
-            statusBadge.className = 'badge bg-success text-white ms-2';
             
             const html = renderEnhancedMonthlyAnalysis(data);
             container.innerHTML = html;
@@ -1597,16 +1255,12 @@ async function loadMonthlyAnalysis(month = null) {
             dataLoadingStatus.monthly = true;
             
         } else {
-            statusBadge.textContent = 'Error';
-            statusBadge.className = 'badge bg-danger text-white ms-2';
             
             container.innerHTML = renderMonthlyAnalysisError(data, month);
         }
         
     } catch (error) {
         console.error('❌ Error loading monthly analysis:', error);
-        statusBadge.textContent = 'Failed';
-        statusBadge.className = 'badge bg-danger text-white ms-2';
         
         container.innerHTML = renderMonthlyAnalysisNetworkError(error, month);
     }
@@ -1624,12 +1278,9 @@ function renderEnhancedMonthlyAnalysis(data) {
         <!-- Month Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h5 class="mb-1">${data.month}</h5>
+                <h5 class="mb-1">${data.month} ${(document.getElementById('yearSelector') && document.getElementById('yearSelector').value) ? document.getElementById('yearSelector').value : ''}</h5>
                 <small class="text-muted">${data.analysis_period.weeks_analyzed} minggu • ${data.analysis_period.total_records} records</small>
             </div>
-            <span class="badge ${iph.avg_iph > 0 ? 'bg-warning' : iph.avg_iph < 0 ? 'bg-info' : 'bg-secondary'} fs-6 px-3 py-2">
-                ${iph.avg_iph.toFixed(2)}% ${iph.trend}
-            </span>
         </div>
         
         <!-- IPH Range Indicator -->
@@ -1672,10 +1323,9 @@ function renderEnhancedMonthlyAnalysis(data) {
                                     <div>
                                         <div class="d-flex align-items-center mb-1">
                                             ${index === 0 ? '<i class="fas fa-crown text-warning me-1"></i>' : ''}
-                                            <span class="fw-medium small">${c.name}</span>
+                                            <span class="fw-medium small">${formatCommodityName(c.name)}</span>
                                         </div>
                                         <div class="d-flex align-items-center">
-                                            <span class="badge bg-secondary small me-1">${c.category}</span>
                                             <span class="badge bg-light text-dark small">${c.frequency}x</span>
                                         </div>
                                     </div>
@@ -1695,12 +1345,6 @@ function renderEnhancedMonthlyAnalysis(data) {
             </div>
         ` : '<div class="alert alert-light">Tidak ada data komoditas untuk bulan ini</div>'}
         
-        <!-- Monthly Summary -->
-        <div class="alert alert-primary border-0 py-3">
-            <div class="small" style="white-space: pre-wrap; line-height: 1.4;">
-                ${data.monthly_summary || 'Tidak ada ringkasan tersedia'}
-            </div>
-        </div>
     `;
 }
 
@@ -1864,7 +1508,7 @@ function renderEnhancedVolatilityAlerts(data, threshold) {
         <div class="alert alert-info border-0 py-2 mt-3">
             <small>
                 <i class="fas fa-chart-line me-1"></i>
-                <strong>Ringkasan:</strong> ${data.summary || 'No summary available'}
+                <strong>Ringkasan:</strong> ${data.summary || 'Tidak ada ringkasan tersedia'}
             </small>
         </div>
     `;
@@ -1889,10 +1533,7 @@ function renderVolatilityAlertsError(data, threshold) {
     return `
         <div class="alert alert-warning border-0">
             <h6><i class="fas fa-exclamation-triangle me-2"></i>Data Volatilitas Tidak Tersedia</h6>
-            <p class="mb-2">${data.message || 'No volatility data available'}</p>
-            <button class="btn btn-outline-primary btn-sm" onclick="loadVolatilityAlerts(${threshold})">
-                <i class="fas fa-redo me-1"></i>Retry
-            </button>
+            <p class="mb-0">${data.message || 'Tidak ada data volatilitas tersedia'}</p>
         </div>
     `;
 }
@@ -1900,11 +1541,8 @@ function renderVolatilityAlertsError(data, threshold) {
 function renderVolatilityAlertsNetworkError(error, threshold) {
     return `
         <div class="alert alert-danger border-0">
-            <h6><i class="fas fa-wifi me-2"></i>Network Error</h6>
-            <p class="mb-2">Failed to load volatility alerts: ${error.message}</p>
-            <button class="btn btn-outline-danger btn-sm" onclick="loadVolatilityAlerts(${threshold})">
-                <i class="fas fa-redo me-1"></i>Try Again
-            </button>
+            <h6><i class="fas fa-wifi me-2"></i>Kesalahan Jaringan</h6>
+            <p class="mb-0">Gagal memuat peringatan volatilitas: ${error.message}</p>
         </div>
     `;
 }
@@ -1916,23 +1554,15 @@ function renderMonthlyAnalysisError(data, month) {
                 <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
                 <div>
                     <h6 class="mb-1">Data Tidak Tersedia</h6>
-                    <p class="mb-2">${data.message || 'No monthly data available'}</p>
+                    <p class="mb-0">${data.message || 'Tidak ada data bulanan tersedia'}</p>
                     ${data.available_months ? `
-                        <div class="mb-2">
+                        <div class="mt-2">
                             <small class="text-muted">Bulan tersedia:</small><br>
                             ${data.available_months.slice(0, 6).map(m => 
                                 `<span class="badge bg-light text-dark me-1">${m}</span>`
                             ).join('')}
                         </div>
                     ` : ''}
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-primary btn-sm" onclick="loadMonthlyAnalysis(${month ? `'${month}'` : 'null'})">
-                            <i class="fas fa-redo me-1"></i>Retry
-                        </button>
-                        <button class="btn btn-outline-success btn-sm" onclick="showUploadCommodityModal()">
-                            <i class="fas fa-upload me-1"></i>Upload Data
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1942,11 +1572,8 @@ function renderMonthlyAnalysisError(data, month) {
 function renderMonthlyAnalysisNetworkError(error, month) {
     return `
         <div class="alert alert-danger border-0">
-            <h6><i class="fas fa-wifi me-2"></i>Network Error</h6>
-            <p class="mb-2">Failed to load monthly analysis: ${error.message}</p>
-            <button class="btn btn-outline-danger btn-sm" onclick="loadMonthlyAnalysis(${month ? `'${month}'` : 'null'})">
-                <i class="fas fa-redo me-1"></i>Try Again
-            </button>
+            <h6><i class="fas fa-wifi me-2"></i>Kesalahan Jaringan</h6>
+            <p class="mb-0">Gagal memuat analisis bulanan: ${error.message}</p>
         </div>
     `;
 }
@@ -1988,98 +1615,6 @@ function changeSeasonalView(view) {
     loadSeasonalPatterns(view);
 }
 
-// Enhanced upload functionality
-async function uploadCommodityData() {
-    const fileInput = document.getElementById('commodityFile');
-    const file = fileInput.files[0];
-    const uploadBtn = document.getElementById('uploadCommodityBtn');
-    const progressDiv = document.getElementById('uploadProgress');
-    const progressBar = document.getElementById('uploadProgressBar');
-    const statusDiv = document.getElementById('uploadStatus');
-    
-    if (!file) {
-        alert('Please select a file');
-        return;
-    }
-    
-    // Validate file
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-        alert('File size must be less than 10MB');
-        return;
-    }
-    
-    const allowedTypes = ['.csv', '.xlsx'];
-    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    if (!allowedTypes.includes(fileExt)) {
-        alert('Please select a CSV or Excel file');
-        return;
-    }
-    
-    try {
-        // Show progress
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
-        progressDiv.style.display = 'block';
-        
-        // Simulate upload progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += 10;
-            progressBar.style.width = progress + '%';
-            
-            if (progress <= 30) {
-                statusDiv.innerHTML = '<small class="text-muted">Uploading file...</small>';
-            } else if (progress <= 60) {
-                statusDiv.innerHTML = '<small class="text-muted">Validating data...</small>';
-            } else if (progress <= 90) {
-                statusDiv.innerHTML = '<small class="text-muted">Processing commodities...</small>';
-            }
-        }, 200);
-        
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('validate_data', document.getElementById('validateData').checked);
-        formData.append('backup_existing', document.getElementById('backupExisting').checked);
-        
-        const response = await fetch('/api/commodity/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        clearInterval(progressInterval);
-        progressBar.style.width = '100%';
-        
-        if (result.success) {
-            statusDiv.innerHTML = '<small class="text-success"><i class="fas fa-check me-1"></i>Upload successful!</small>';
-            
-            setTimeout(() => {
-                bootstrap.Modal.getInstance(document.getElementById('uploadCommodityModal')).hide();
-                showAlert(`Success! ${result.records} records uploaded.`, 'success');
-                refreshInsights();
-            }, 1000);
-            
-        } else {
-            statusDiv.innerHTML = `<small class="text-danger"><i class="fas fa-times me-1"></i>Upload failed: ${result.message}</small>`;
-            alert(`Error: ${result.message}`);
-        }
-        
-    } catch (error) {
-        clearInterval(progressInterval);
-        statusDiv.innerHTML = `<small class="text-danger"><i class="fas fa-times me-1"></i>Network error: ${error.message}</small>`;
-        alert(`Upload failed: ${error.message}`);
-    } finally {
-        uploadBtn.disabled = false;
-        uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload';
-        
-        setTimeout(() => {
-            progressDiv.style.display = 'none';
-            progressBar.style.width = '0%';
-        }, 2000);
-    }
-}
 
 // Enhanced refresh function
 function refreshInsights() {
@@ -2090,45 +1625,25 @@ function refreshInsights() {
         currentWeek: false,
         monthly: false,
         trends: false,
-        alerts: false,
-        seasonal: false
+        impact: false
     };
     
     // Update status badge
-    const dataStatus = document.getElementById('dataStatus');
-    dataStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-    dataStatus.className = 'badge bg-warning ms-2';
     
     // Load all insights
     loadCurrentWeekInsights();
     loadMonthlyAnalysis();
     loadCommodityTrends(currentTrendPeriod);
-    loadVolatilityAlerts(currentAlertThreshold);
-    loadSeasonalPatterns(currentSeasonalView);
+    loadImpactRanking();
     
     showAlert('Refreshing commodity insights...', 'info');
 }
 
 // Data status monitoring
 function updateDataStatus() {
-    const dataStatus = document.getElementById('dataStatus');
-    const loadedCount = Object.values(dataLoadingStatus).filter(status => status).length;
-    const totalPanels = Object.keys(dataLoadingStatus).length;
-    
-    if (loadedCount === totalPanels) {
-        dataStatus.innerHTML = '<i class="fas fa-check-circle"></i> All Data Loaded';
-        dataStatus.className = 'badge bg-success ms-2';
-    } else {
-        dataStatus.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Loading (${loadedCount}/${totalPanels})`;
-        dataStatus.className = 'badge bg-warning ms-2';
-    }
+    // Status tracking removed for cleaner UI
 }
 
-// Utility functions
-function showUploadCommodityModal() {
-    const modal = new bootstrap.Modal(document.getElementById('uploadCommodityModal'));
-    modal.show();
-}
 
 
 function showAlert(message, type) {
@@ -2153,11 +1668,123 @@ function showAlert(message, type) {
     }, 5000);
 }
 
-// Month selector change handler
-document.getElementById('monthSelector')?.addEventListener('change', (e) => {
-    const selectedMonth = e.target.value;
-    loadMonthlyAnalysis(selectedMonth);
-});
+
+// Load Impact Ranking
+async function loadImpactRanking() {
+    console.log('📊 Loading impact ranking...');
+    
+    const container = document.getElementById('impactRanking');
+    
+    container.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Menganalisis ranking komoditas paling berpengaruh...</p>
+        </div>
+    `;
+    
+    try {
+        const data = await safeApiCall('/api/commodity/impact-ranking');
+        
+        if (data.success && data.ranking && data.ranking.length > 0) {
+            
+            const html = renderImpactRanking(data);
+            container.innerHTML = html;
+            
+        } else {
+            
+            container.innerHTML = `
+                <div class="alert alert-light border-0">
+                    <div class="text-center py-3">
+                        <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
+                        <h6 class="text-muted">Tidak Ada Data Komoditas</h6>
+                        <p class="mb-0 small text-muted">Belum ada data komoditas yang dapat dianalisis</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading impact ranking:', error);
+        
+        container.innerHTML = `
+            <div class="alert alert-danger border-0">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Error Memuat Data</h6>
+                <p class="mb-2">Gagal memuat ranking komoditas: ${error.message}</p>
+                <button class="btn btn-outline-danger btn-sm" onclick="loadImpactRanking()">
+                    <i class="fas fa-redo me-1"></i>Coba Lagi
+                </button>
+            </div>
+        `;
+    }
+    
+    // Update loading status
+    dataLoadingStatus.impact = true;
+    updateDataStatus();
+}
+
+function renderImpactRanking(data) {
+    const ranking = data.ranking.slice(0, 10); // Top 10
+    const maxFrequency = Math.max(...ranking.map(item => item.frequency));
+    
+    return `
+        <!-- Impact Ranking Bar Chart -->
+        <div class="mb-4">
+            ${ranking.map((item, index) => {
+                const percentage = (item.frequency / maxFrequency) * 100;
+                const barColor = index < 3 ? 'bg-primary' : index < 6 ? 'bg-info' : 'bg-secondary';
+                
+                return `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="d-flex align-items-center">
+                                <span class="badge ${index < 3 ? 'bg-warning' : 'bg-light text-dark'} me-2" style="min-width: 30px;">
+                                    ${index + 1}
+                                </span>
+                                <div>
+                                    <div class="fw-medium">${formatCommodityName(item.commodity_name)}</div>
+                                    <small class="text-muted">${item.frequency}x muncul</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold text-primary">${item.frequency}</div>
+                                <small class="text-muted">frekuensi</small>
+                            </div>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar ${barColor}" 
+                                 role="progressbar" 
+                                 style="width: ${percentage}%"
+                                 aria-valuenow="${item.frequency}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="${maxFrequency}">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        
+        <!-- Summary -->
+        <div class="alert alert-light border-0 py-2 mt-3">
+            <div class="row text-center">
+                <div class="col-4">
+                    <div class="fw-bold text-primary">${data.total_commodities || 0}</div>
+                    <small class="text-muted">Total Komoditas</small>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold text-info">${data.total_appearances || 0}</div>
+                    <small class="text-muted">Total Muncul</small>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold text-success">${data.avg_frequency ? data.avg_frequency.toFixed(1) : 'Tidak Ada'}</div>
+                    <small class="text-muted">Rata-rata</small>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -2165,6 +1792,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check if we have commodity data
     checkCommodityDataAvailability();
+    
+    // Add event listeners for dropdowns and radio buttons
+    setupEventListeners();
     
     // Load all insights
     refreshInsights();
@@ -2176,6 +1806,101 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 5 * 60 * 1000);
 });
 
+// Setup event listeners for dropdowns and radio buttons
+function setupEventListeners() {
+    // Month selector dropdown
+    const monthSelector = document.getElementById('monthSelector');
+    const yearSelector = document.getElementById('yearSelector');
+    
+    if (monthSelector) {
+        monthSelector.addEventListener('change', function() {
+            const selectedMonth = this.value;
+            const selectedYear = yearSelector ? yearSelector.value : '2024';
+            loadMonthlyAnalysis(selectedMonth, selectedYear);
+        });
+    }
+    
+    if (yearSelector) {
+        yearSelector.addEventListener('change', function() {
+            const selectedYear = this.value;
+            const selectedMonth = monthSelector ? monthSelector.value : 'Juni';
+            loadMonthlyAnalysis(selectedMonth, selectedYear);
+        });
+    }
+    
+    // Trend period radio buttons
+    // Default 3 bulan terakhir untuk selector rentang
+    (async function initTrendDefaults(){
+        try {
+            const resp = await fetch('/api/data/available-periods');
+            const json = await resp.json();
+            if (json.success && json.periods && json.periods.length >= 3) {
+                const last = json.periods[json.periods.length - 1];
+                const prev2 = json.periods[json.periods.length - 3];
+                const monthMap = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                const smEl = document.getElementById('trendStartMonth');
+                const syEl = document.getElementById('trendStartYear');
+                const emEl = document.getElementById('trendEndMonth');
+                const eyEl = document.getElementById('trendEndYear');
+                if (smEl && syEl && emEl && eyEl) {
+                    smEl.value = monthMap[(prev2.month || (parseInt(prev2.key.split('-')[1])||1))-1] || 'Januari';
+                    syEl.value = String(prev2.year || parseInt(prev2.key.split('-')[0]) || '');
+                    emEl.value = monthMap[(last.month || (parseInt(last.key.split('-')[1])||1))-1] || 'Januari';
+                    eyEl.value = String(last.year || parseInt(last.key.split('-')[0]) || '');
+                }
+                // Muat tren untuk rentang default
+                loadCommodityTrends(999);
+                return;
+            }
+        } catch {}
+        // fallback
+        loadCommodityTrends(12);
+    })();
+
+    const applyTrendBtn = document.getElementById('applyTrendWindowBtn');
+    if (applyTrendBtn) {
+        applyTrendBtn.addEventListener('click', function() {
+            // Validasi rentang waktu (start <= end)
+            const monthMap = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
+            const smEl = document.getElementById('trendStartMonth');
+            const syEl = document.getElementById('trendStartYear');
+            const emEl = document.getElementById('trendEndMonth');
+            const eyEl = document.getElementById('trendEndYear');
+            const sm = smEl ? smEl.value : '';
+            const sy = syEl ? syEl.value : '';
+            const em = emEl ? emEl.value : '';
+            const ey = eyEl ? eyEl.value : '';
+            if (sm && sy && em && ey) {
+                const startYm = parseInt(`${sy}${monthMap[sm] || sm.padStart(2,'0')}`);
+                const endYm = parseInt(`${ey}${monthMap[em] || em.padStart(2,'0')}`);
+                if (startYm > endYm) {
+                    // Tampilkan peringatan dan jangan lanjut
+                    const container = document.getElementById('commodityTrends');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="alert alert-danger border-0">
+                                <div class="d-flex align-items-start">
+                                    <div class="me-3"><i class="fas fa-exclamation-triangle fa-lg"></i></div>
+                                    <div>
+                                        <h6 class="mb-1">Rentang Waktu Tidak Valid</h6>
+                                        <small class="text-muted">Tanggal mulai harus lebih awal atau sama dengan tanggal akhir.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    // Tambahkan highlight pada input
+                    [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.add('is-invalid'); });
+                    setTimeout(() => { [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.remove('is-invalid'); }); }, 2000);
+                    return;
+                }
+            }
+            // gunakan 999 agar backend mengambil penuh berdasarkan rentang
+            loadCommodityTrends(999);
+        });
+    }
+}
+
 // Check commodity data availability
 async function checkCommodityDataAvailability() {
     try {
@@ -2184,7 +1909,7 @@ async function checkCommodityDataAvailability() {
         
         if (!data.success || !data.has_data) {
             showSystemAlert(
-                'No commodity data found. Please upload commodity data to enable insights.',
+                'Tidak ada data komoditas ditemukan. Harap unggah data komoditas untuk mengaktifkan insights.',
                 'warning'
             );
         }
@@ -2202,9 +1927,6 @@ function showSystemAlert(message, type) {
                 <div class="flex-grow-1">
                     <strong>System Status:</strong> ${message}
                 </div>
-                <button class="btn btn-sm btn-outline-${type}" onclick="showUploadCommodityModal()">
-                    <i class="fas fa-upload me-1"></i>Upload Data
-                </button>
             </div>
         </div>
     `;

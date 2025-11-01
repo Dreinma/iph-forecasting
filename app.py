@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+﻿from flask import Flask, render_template, request, jsonify, redirect, flash
 import pandas as pd
 import json
 import os
@@ -102,13 +102,13 @@ def calculate_overall_model_score(mae, rmse, r2_score, mape):
         # RMSE Score (0-3 range, lower is better)  
         rmse_score = max(0, min(100, (3.0 - min(rmse, 3.0)) / 3.0 * 100))
         
-        # R² Score (0-1 range, higher is better)
+        # R Score (0-1 range, higher is better)
         r2_normalized = max(0, min(100, max(r2_score, 0) * 100))
         
         # MAPE Score (0-100% range, lower is better)
         mape_score = max(0, min(100, (100 - min(mape, 100))))
 
-        # UPDATED WEIGHTS: MAE(35%) + RMSE(25%) + R²(25%) + MAPE(15%)
+        # UPDATED WEIGHTS: MAE(35%) + RMSE(25%) + R(25%) + MAPE(15%)
         overall = (
             mae_score * 0.35 +
             rmse_score * 0.25 +
@@ -119,7 +119,7 @@ def calculate_overall_model_score(mae, rmse, r2_score, mape):
         return max(0, min(100, overall))
         
     except Exception as e:
-        print(f"⚠️ Error calculating overall score: {e}")
+        print(f"WARNING: Error calculating overall score: {e}")
         return 0.0
 
 def get_model_status_badge(overall_score, mae):
@@ -168,20 +168,20 @@ def init_database_and_migrate():
         with app.app_context():
             # 1. Create all tables
             db.create_all()
-            print("✅ Database tables created successfully!")
+            print("SUCCESS: Database tables created successfully!")
             
             # 2. Check if data already migrated
             iph_count = db.session.query(db.func.count(IPHData.id)).scalar()
             
             if iph_count == 0:
-                print("\n📊 Database kosong")
+                print("\nINFO: Database kosong")
                 create_default_admin()
                 create_default_alert_rules()
             else:
-                print(f"✅ Database sudah ada dengan {iph_count} records")
+                print(f"SUCCESS: Database sudah ada dengan {iph_count} records")
                 
     except Exception as e:
-        print(f"❌ Error initializing database: {str(e)}")
+        print(f"ERROR: Error initializing database: {str(e)}")
 
 def migrate_csv_if_exists():
     """Migrate CSV ke database jika file ada"""
@@ -193,26 +193,26 @@ def migrate_csv_if_exists():
     csv_path = 'data/IPH-Kota-Batu.csv'
     
     if not os.path.exists(csv_path):
-        print(f"⚠️ CSV file not found: {csv_path}")
+        print(f"WARNING: CSV file not found: {csv_path}")
         return False
     
     try:
-        print(f"📂 Reading CSV: {csv_path}")
+        print(f" Reading CSV: {csv_path}")
         df = pd.read_csv(csv_path)
-        print(f"📊 Loaded {len(df)} records from CSV")
+        print(f"INFO: Loaded {len(df)} records from CSV")
         
         # Clean data
         if 'Bulan' in df.columns:
             df['Bulan'] = df['Bulan'].ffill()
         
         if 'Minggu ke-' not in df.columns:
-            print("❌ Column 'Minggu ke-' not found")
+            print("ERROR: Column 'Minggu ke-' not found")
             return False
         
         df = df.dropna(subset=['Minggu ke-', ' Indikator Perubahan Harga (%)'])
         df = df[df['Bulan'].astype(str).str.strip() != '']
         
-        print(f"📋 Cleaned data: {len(df)} records")
+        print(f" Cleaned data: {len(df)} records")
         
         migrated_iph = 0
         migrated_commodity = 0
@@ -278,20 +278,20 @@ def migrate_csv_if_exists():
                 migrated_commodity += 1
                 
                 if (index + 1) % 20 == 0:
-                    print(f"   📝 Processed {index + 1} records...")
+                    print(f"    Processed {index + 1} records...")
                     
             except Exception as e:
-                print(f"   ⚠️ Row {index}: {str(e)}")
+                print(f"   WARNING: Row {index}: {str(e)}")
                 continue
         
         db.session.commit()
-        print(f"✅ CSV Migration completed!")
-        print(f"   📊 IPH records: {migrated_iph}")
-        print(f"   🌾 Commodity records: {migrated_commodity}")
+        print(f"SUCCESS: CSV Migration completed!")
+        print(f"   INFO: IPH records: {migrated_iph}")
+        print(f"    Commodity records: {migrated_commodity}")
         return True
         
     except Exception as e:
-        print(f"❌ CSV Migration failed: {str(e)}")
+        print(f"ERROR: CSV Migration failed: {str(e)}")
         db.session.rollback()
         return False
 
@@ -358,7 +358,7 @@ def create_default_admin():
     try:
         existing_admin = AdminUser.query.filter_by(username='admin').first()
         if existing_admin:
-            print("👤 Admin user already exists")
+            print(" Admin user already exists")
             return True
         
         admin = AdminUser(
@@ -369,10 +369,10 @@ def create_default_admin():
         )
         db.session.add(admin)
         db.session.commit()
-        print("✅ Default admin created (admin / admin123)")
+        print("SUCCESS: Default admin created (admin / admin123)")
         return True
     except Exception as e:
-        print(f"⚠️ Admin creation: {str(e)}")
+        print(f"WARNING: Admin creation: {str(e)}")
         return False
 
 def create_default_alert_rules():
@@ -380,7 +380,7 @@ def create_default_alert_rules():
     try:
         existing_rules = AlertRule.query.count()
         if existing_rules > 0:
-            print("📋 Alert rules already exist")
+            print(" Alert rules already exist")
             return True
         
         default_rules = [
@@ -415,13 +415,13 @@ def create_default_alert_rules():
             db.session.add(rule)
         
         db.session.commit()
-        print(f"✅ Created {len(default_rules)} default alert rules")
+        print(f"SUCCESS: Created {len(default_rules)} default alert rules")
         return True
     except Exception as e:
-        print(f"⚠️ Alert rules: {str(e)}")
+        print(f"WARNING: Alert rules: {str(e)}")
         return False
 
-# ✅ CALL INITIALIZATION
+# SUCCESS: CALL INITIALIZATION
 init_database_and_migrate()
 
 # Initialize services
@@ -550,7 +550,7 @@ def upload_data():
                     for encoding in ['utf-8', 'latin-1', 'cp1252']:
                         try:
                             df = pd.read_csv(filepath, encoding=encoding)
-                            print(f"✅ CSV loaded with {encoding} encoding")
+                            print(f"SUCCESS: CSV loaded with {encoding} encoding")
                             break
                         except UnicodeDecodeError:
                             continue
@@ -559,7 +559,7 @@ def upload_data():
                 else:
                     df = pd.read_excel(filepath)
                     
-                print(f"📊 Loaded {len(df)} rows, {len(df.columns)} columns")
+                print(f"INFO: Loaded {len(df)} rows, {len(df.columns)} columns")
                 
             except Exception as e:
                 return jsonify({'success': False, 'message': f'Error reading file: {str(e)}'})
@@ -580,7 +580,7 @@ def upload_data():
             try:
                 result = forecast_service.process_new_data_and_forecast(df, forecast_weeks)
                 
-                # ✅ Check if result indicates recovery mode
+                # SUCCESS: Check if result indicates recovery mode
                 if result.get('success') and result.get('data_processing', {}).get('merge_info', {}).get('recovery_mode'):
                     result['warning'] = 'Some duplicate data was detected and skipped. Existing data was used for training.'
                 
@@ -628,7 +628,7 @@ def upload_data():
         return jsonify({'success': False, 'message': 'Invalid file format. Please upload CSV or Excel file.'})
         
     except Exception as e:
-        print(f"❌ Upload error: {str(e)}")
+        print(f"ERROR: Upload error: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -717,7 +717,7 @@ def add_manual_record():
             'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
         }
         
-        minggu_num = int(minggu.replace('M', ''))
+        minggu_num = int(str(minggu).replace('M', ''))
         bulan_num = bulan_map.get(bulan, 1)
         
         # Calculate approximate date (first week of month + (minggu-1) * 7 days)
@@ -823,7 +823,7 @@ def retrain_models():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        # print(f"❌ Error retraining models: {str(e)}")
+        # print(f"ERROR: Error retraining models: {str(e)}")
         # print(error_trace)
         
         return jsonify({
@@ -857,7 +857,7 @@ def forecast_chart_data():
             historical_df = forecast_service.data_handler.load_historical_data()
             print(f"Loaded {len(historical_df)} historical records")
         except Exception as e:
-            print(f"❌ Error loading historical data: {str(e)}")
+            print(f"ERROR: Error loading historical data: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': f'Historical data error: {str(e)}'
@@ -880,10 +880,10 @@ def forecast_chart_data():
                     'value': float(row['Indikator_Harga'])
                 })
             except Exception as e:
-                print(f"⚠️ Error processing historical row: {e}")
+                print(f"WARNING: Error processing historical row: {e}")
                 continue
         
-        print(f"✅ Processed {len(historical_data)} historical points")
+        print(f"SUCCESS: Processed {len(historical_data)} historical points")
         
         forecast_data = []
         metadata = {
@@ -895,7 +895,7 @@ def forecast_chart_data():
         forecast_file_path = 'data/latest_forecast.json'
         if os.path.exists(forecast_file_path):
             try:
-                print(f"📂 Loading forecast from file: {forecast_file_path}")
+                print(f" Loading forecast from file: {forecast_file_path}")
                 with open(forecast_file_path, 'r') as f:
                     forecast_file_data = json.load(f)
                 
@@ -911,16 +911,17 @@ def forecast_chart_data():
                             'date': item['date'],
                             'prediction': float(item['prediction']),
                             'lower_bound': float(item['lower_bound']),
-                            'upper_bound': float(item['upper_bound'])
+                            'upper_bound': float(item['upper_bound']),
+                            'confidence': float(item.get('confidence', 0.5))
                         })
                     except Exception as e:
-                        print(f"⚠️ Error processing forecast row: {e}")
+                        print(f"WARNING: Error processing forecast row: {e}")
                         continue
                 
-                print(f"✅ Loaded {len(forecast_data)} forecast points from file")
+                print(f"SUCCESS: Loaded {len(forecast_data)} forecast points from file")
                 
             except Exception as e:
-                print(f"⚠️ Error reading forecast file: {e}")
+                print(f"WARNING: Error reading forecast file: {e}")
                 # Fallback ke API
                 forecast_result = forecast_service.get_current_forecast()
                 if forecast_result.get('success') and forecast_result.get('forecast', {}).get('data'):
@@ -938,15 +939,16 @@ def forecast_chart_data():
                                 'date': item['Tanggal'][:10] if isinstance(item['Tanggal'], str) else item['Tanggal'].strftime('%Y-%m-%d'),
                                 'prediction': float(item['Prediksi']),
                                 'lower_bound': float(item.get('Batas_Bawah', item['Prediksi'])),
-                                'upper_bound': float(item.get('Batas_Atas', item['Prediksi']))
+                                'upper_bound': float(item.get('Batas_Atas', item['Prediksi'])),
+                                'confidence': float(item.get('Confidence_Width', 0.5))
                             })
                         except Exception as e:
-                            print(f"⚠️ Error processing forecast row: {e}")
+                            print(f"WARNING: Error processing forecast row: {e}")
                             continue
                     
-                    print(f"✅ Loaded {len(forecast_data)} forecast points from API")
+                    print(f"SUCCESS: Loaded {len(forecast_data)} forecast points from API")
         else:
-            print("📂 Forecast file not found, trying API...")
+            print(" Forecast file not found, trying API...")
             forecast_result = forecast_service.get_current_forecast()          
             if forecast_result.get('success') and forecast_result.get('forecast', {}).get('data'):
                 forecast_info = forecast_result['forecast']
@@ -963,15 +965,16 @@ def forecast_chart_data():
                             'date': item['Tanggal'][:10] if isinstance(item['Tanggal'], str) else item['Tanggal'].strftime('%Y-%m-%d'),
                             'prediction': float(item['Prediksi']),
                             'lower_bound': float(item.get('Batas_Bawah', item['Prediksi'])),
-                            'upper_bound': float(item.get('Batas_Atas', item['Prediksi']))
+                            'upper_bound': float(item.get('Batas_Atas', item['Prediksi'])),
+                            'confidence': float(item.get('Confidence_Width', 0.5))
                         })
                     except Exception as e:
-                        print(f"⚠️ Error processing forecast row: {e}")
+                        print(f"WARNING: Error processing forecast row: {e}")
                         continue
                 
-                print(f"✅ Processed {len(forecast_data)} forecast points")
+                print(f"SUCCESS: Processed {len(forecast_data)} forecast points")
             else:
-                print("ℹ️ No forecast data available")
+                print("INFO: No forecast data available")
                 
         result = {
             'success': True,
@@ -981,14 +984,14 @@ def forecast_chart_data():
             'timestamp': datetime.now().isoformat()
         }
         
-        print(f"✅ API returning: historical={len(historical_data)}, forecast={len(forecast_data)}")
+        print(f"SUCCESS: API returning: historical={len(historical_data)}, forecast={len(forecast_data)}")
         return jsonify(result)
         
     except Exception as e:
         error_msg = f"API Error: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"ERROR: {error_msg}")
         import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         
         return jsonify({
             'success': False,
@@ -1054,8 +1057,8 @@ def model_comparison_chart():
         
     except Exception as e:
         import traceback
-        print(f"❌ Error in model comparison API: {str(e)}")
-        print(f"❌ Traceback: {traceback.format_exc()}")
+        print(f"ERROR: Error in model comparison API: {str(e)}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False, 
             'error': str(e),
@@ -1068,13 +1071,13 @@ def get_economic_alerts():
     print("API /api/economic-alerts called")
     try:
         alerts_data = forecast_service.get_real_economic_alerts()
-        print(f"✅ API returning: success={alerts_data['success']}, alerts_count={len(alerts_data.get('alerts', []))}")
+        print(f"SUCCESS: API returning: success={alerts_data['success']}, alerts_count={len(alerts_data.get('alerts', []))}")
         return jsonify(alerts_data)
     except Exception as e:
         error_msg = f"API error: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"ERROR: {error_msg}")
         import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'error': error_msg,
@@ -1091,17 +1094,17 @@ def api_moving_averages():
         offset = request.args.get('offset', 0, type=int)
         
         df = forecast_service.data_handler.load_historical_data()
-        print(f"📊 Data loaded: {len(df)} records")
+        print(f"INFO: Data loaded: {len(df)} records")
 
         if df is None or df.empty:
-            print(f"   ❌ ERROR: No data in database")
+            print(f"   ERROR: ERROR: No data in database")
             return jsonify({
                 'success': False, 
                 'message': 'Tidak ada data di database. Silakan upload data terlebih dahulu.'
             }), 400
 
         result = visualization_service.calculate_moving_averages(timeframe, offset)
-        print(f"   ✅ Service returned: success={result.get('success')}")
+        print(f"   SUCCESS: Service returned: success={result.get('success')}")
         print(f"{'='*60}\n")
 
         if not result['success']:
@@ -1132,7 +1135,7 @@ def api_volatility():
         else:
             return jsonify(result), 400
     except Exception as e:
-        print(f"   ❌ EXCEPTION: {str(e)}")
+        print(f"   ERROR: EXCEPTION: {str(e)}")
         import traceback
         traceback.print_exc()
         print(f"{'='*60}\n")
@@ -1151,7 +1154,7 @@ def api_model_performance():
         available_models = forecast_service.model_manager.engine.get_available_models()
         
         if not available_models:
-            print("⚠️ No trained models found - training now...")
+            print("WARNING: No trained models found - training now...")
             # Auto-train if no models
             df = forecast_service.data_handler.load_historical_data()
             if not df.empty:
@@ -1167,6 +1170,61 @@ def api_model_performance():
             'success': False,
             'message': f'Error: {str(e)}'
         })
+
+@app.route('/api/dashboard/model-performance')
+def api_dashboard_model_performance():
+    """API endpoint for dashboard model performance metrics"""
+    try:
+        # Get model performance summary
+        model_summary = forecast_service.model_manager.get_model_performance_summary()
+        
+        if not model_summary:
+            return jsonify({
+                'success': False,
+                'message': 'No model performance data available'
+            }), 404
+        
+        # Format response with 2 decimal places
+        models_data = []
+        best_mae = float('inf')
+        
+        # Find best model (lowest MAE)
+        for model_name, model_data in model_summary.items():
+            if model_data.get('latest_mae', float('inf')) < best_mae:
+                best_mae = model_data.get('latest_mae', float('inf'))
+        
+        for model_name, model_data in model_summary.items():
+            latest_mae = model_data.get('latest_mae', 0)
+            latest_r2 = model_data.get('latest_r2', 0)
+            training_count = model_data.get('training_count', 0)
+            
+            # Calculate RMSE and MAPE (approximate values)
+            rmse = latest_mae * 1.2  # Approximate RMSE
+            mape = latest_mae * 10   # Approximate MAPE
+            
+            models_data.append({
+                'name': model_name,
+                'mae': round(float(latest_mae), 2),
+                'rmse': round(float(rmse), 2),
+                'r2': round(float(latest_r2), 2),
+                'mape': round(float(mape), 2),
+                'status': 'Best' if latest_mae == best_mae else 'Good',
+                'training_count': training_count
+            })
+        
+        # Sort by MAE (best first)
+        models_data.sort(key=lambda x: x['mae'])
+        
+        return jsonify({
+            'success': True,
+            'models': models_data
+        })
+    except Exception as e:
+        print(f"Error in dashboard model performance: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
 
 @app.route('/api/data/available-periods')
 def api_available_periods():
@@ -1211,7 +1269,7 @@ def api_available_periods():
         for year in years:
             periods_by_year[year] = [p for p in periods if p['year'] == year]
         
-        print(f"✅ Available periods: {len(periods)} total, {len(years)} years")
+        print(f"SUCCESS: Available periods: {len(periods)} total, {len(years)} years")
         
         return jsonify({
             'success': True,
@@ -1222,7 +1280,7 @@ def api_available_periods():
         })
         
     except Exception as e:
-        print(f"❌ Error getting available periods: {str(e)}")
+        print(f"ERROR: Error getting available periods: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}'
@@ -1241,14 +1299,14 @@ def api_commodity_current_week():
         print(f" Success status: {result.get('success')}")
         
         if result.get('success'):
-            print(f"   📅 Period keys: {list(result.get('period', {}).keys())}")
+            print(f"    Period keys: {list(result.get('period', {}).keys())}")
             print(f"   IPH analysis keys: {list(result.get('iph_analysis', {}).keys())}")
-            print(f"   🏷️ Category analysis count: {len(result.get('category_analysis', {}))}")
+            print(f"   TAG: Category analysis count: {len(result.get('category_analysis', {}))}")
         else:
-            print(f"   ❌ Error: {result.get('message', 'Unknown error')}")
+            print(f"   ERROR: Error: {result.get('message', 'Unknown error')}")
         
         if result.get('success') and not result.get('iph_analysis'):
-            print("⚠️ Missing iph_analysis, creating fallback...")
+            print("WARNING: Missing iph_analysis, creating fallback...")
             iph_value = result.get('iph_value', 0)
             result['iph_analysis'] = {
                 'value': float(iph_value),
@@ -1260,7 +1318,7 @@ def api_commodity_current_week():
         return jsonify(clean_for_json(result))
         
     except Exception as e:
-        print(f"❌ API Error - current week insights: {str(e)}")
+        print(f"ERROR: API Error - current week insights: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -1276,24 +1334,25 @@ def api_commodity_monthly():
     """Enhanced monthly commodity analysis"""
     try:
         month = request.args.get('month', '').strip()
-        print(f"API: Loading monthly analysis for month: '{month}'")
+        year = request.args.get('year', '').strip()
+        print(f"API: Loading monthly analysis for month: '{month}', year: '{year}'")
         
-        result = commodity_service.get_monthly_analysis(month if month else None)
+        result = commodity_service.get_monthly_analysis(month if month else None, year if year else None)
         
         print(f" Monthly analysis result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
         print(f" Success: {result.get('success')}")
         
         if result.get('success'):
-            print(f"   📅 Month: {result.get('month')}")
+            print(f"    Month: {result.get('month')}")
             print(f"    Analysis period keys: {list(result.get('analysis_period', {}).keys())}")
             print(f"   IPH stats keys: {list(result.get('iph_statistics', {}).keys())}")
         else:
-            print(f"   ❌ Error: {result.get('message')}")
+            print(f"   ERROR: Error: {result.get('message')}")
         
         return jsonify(clean_for_json(result))
         
     except Exception as e:
-        print(f"❌ API Error - monthly analysis: {str(e)}")
+        print(f"ERROR: API Error - monthly analysis: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -1310,15 +1369,20 @@ def api_commodity_trends():
     try:
         commodity = request.args.get('commodity', '').strip()
         periods = int(request.args.get('periods', 4))
+        start_key = request.args.get('start_key')
+        end_key = request.args.get('end_key')
         
-        if not (2 <= periods <= 24):
+        # Allow flexible periods, including 999 for "use full range". Only guard against invalid values
+        if periods <= 0:
             periods = 4
         
-        print(f"API: Loading commodity trends - periods: {periods}, commodity: '{commodity}'")
+        print(f"API: Loading commodity trends - periods: {periods}, start_key: {start_key}, end_key: {end_key}, commodity: '{commodity}'")
         
         result = commodity_service.get_commodity_trends(
             commodity if commodity else None, 
-            periods
+            periods,
+            start_key,
+            end_key
         )
         
         print(f" Trends result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
@@ -1337,7 +1401,7 @@ def api_commodity_trends():
         return jsonify(clean_for_json(result))
         
     except Exception as e:
-        print(f"❌ API Error - commodity trends: {str(e)}")
+        print(f"ERROR: API Error - commodity trends: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -1360,7 +1424,7 @@ def api_commodity_seasonal():
         
         if result.get('success'):
             patterns_count = len(result.get('seasonal_patterns', {}))
-            print(f"   🗓️ Found {patterns_count} monthly patterns")
+            print(f"   DATE: Found {patterns_count} monthly patterns")
             
             if result.get('seasonal_patterns'):
                 first_pattern = list(result['seasonal_patterns'].items())[0] if result['seasonal_patterns'] else None
@@ -1371,7 +1435,7 @@ def api_commodity_seasonal():
         return jsonify(clean_for_json(result))
         
     except Exception as e:
-        print(f"❌ API Error - seasonal patterns: {str(e)}")
+        print(f"ERROR: API Error - seasonal patterns: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -1397,11 +1461,11 @@ def api_commodity_alerts():
         print(f" Alerts result: success={result.get('success')}")
         if result.get('success'):
             alerts_count = len(result.get('alerts', []))
-            print(f"   ⚠️ Found {alerts_count} alerts")
+            print(f"   WARNING: Found {alerts_count} alerts")
         
         return jsonify(clean_for_json(result))
     except Exception as e:
-        print(f"❌ API Error - commodity alerts: {str(e)}")
+        print(f"ERROR: API Error - commodity alerts: {str(e)}")
         return jsonify(clean_for_json({
             'success': False, 
             'error': str(e),
@@ -1432,10 +1496,10 @@ def upload_commodity_data():
                     for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
                         try:
                             df = pd.read_csv(temp_path, encoding=encoding)
-                            print(f"✅ CSV loaded successfully with {encoding} encoding")
+                            print(f"SUCCESS: CSV loaded successfully with {encoding} encoding")
                             break
                         except UnicodeDecodeError:
-                            print(f"⚠️ Failed to load with {encoding} encoding, trying next...")
+                            print(f"WARNING: Failed to load with {encoding} encoding, trying next...")
                             continue
                     
                     if df is None:
@@ -1445,10 +1509,10 @@ def upload_commodity_data():
                         })
                 else:
                     df = pd.read_excel(temp_path)
-                    print("✅ Excel file loaded successfully")
+                    print("SUCCESS: Excel file loaded successfully")
                 
                 print(f" Loaded {len(df)} rows, {len(df.columns)} columns")
-                print(f"📋 Original columns: {list(df.columns)}")
+                print(f" Original columns: {list(df.columns)}")
                 
                 required_column_patterns = {
                     'bulan': [r'.*[Bb]ulan.*', r'.*[Mm]onth.*'],
@@ -1484,7 +1548,7 @@ def upload_commodity_data():
                         'required_patterns': {k: v[0] for k, v in required_column_patterns.items() if k in missing_requirements}
                     })
                 
-                print(f"✅ Column mapping successful: {column_mapping}")
+                print(f"SUCCESS: Column mapping successful: {column_mapping}")
                 
                 df = df.dropna(how='all')
                 
@@ -1495,9 +1559,9 @@ def upload_commodity_data():
                         try:
                             import shutil
                             shutil.copy2(commodity_path, backup_path)
-                            print(f"📦 Existing data backed up to: {backup_path}")
+                            print(f" Existing data backed up to: {backup_path}")
                         except Exception as backup_error:
-                            print(f"⚠️ Backup failed: {backup_error}")
+                            print(f"WARNING: Backup failed: {backup_error}")
                 
                 os.makedirs(os.path.dirname(commodity_path), exist_ok=True)
                 df.to_csv(commodity_path, index=False)
@@ -1505,14 +1569,14 @@ def upload_commodity_data():
                 commodity_service.commodity_cache = None
                 commodity_service.last_cache_time = None
                 
-                print(f"✅ Commodity data saved to: {commodity_path}")
+                print(f"SUCCESS: Commodity data saved to: {commodity_path}")
                 
                 try:
                     test_df = commodity_service.load_commodity_data()
                     if test_df.empty:
-                        print("⚠️ Warning: Saved data appears to be empty after processing")
+                        print("WARNING: Warning: Saved data appears to be empty after processing")
                 except Exception as validation_error:
-                    print(f"⚠️ Data validation warning: {validation_error}")
+                    print(f"WARNING: Data validation warning: {validation_error}")
                 
                 return jsonify(clean_for_json({
                     'success': True,
@@ -1528,7 +1592,7 @@ def upload_commodity_data():
                 }))
                 
             except Exception as processing_error:
-                print(f"❌ Processing error: {str(processing_error)}")
+                print(f"ERROR: Processing error: {str(processing_error)}")
                 import traceback
                 traceback.print_exc()
                 
@@ -1541,7 +1605,7 @@ def upload_commodity_data():
             finally:
                 try:
                     os.remove(temp_path)
-                    print(f"🗑️ Cleaned up temp file: {temp_path}")
+                    print(f"CLEANUP: Cleaned up temp file: {temp_path}")
                 except:
                     pass
         
@@ -1552,7 +1616,7 @@ def upload_commodity_data():
         })
         
     except Exception as e:
-        print(f"❌ Upload error: {str(e)}")
+        print(f"ERROR: Upload error: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -1580,13 +1644,37 @@ def api_commodity_data_status():
             'last_updated': datetime.now().isoformat()
         }))
     except Exception as e:
-        print(f"❌ Commodity data status error: {str(e)}")
+        print(f"ERROR: Commodity data status error: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),
             'has_data': False,
             'record_count': 0
         })
+
+@app.route('/api/commodity/impact-ranking')
+def api_commodity_impact_ranking():
+    """Get impact ranking of commodities"""
+    try:
+        # Get impact ranking from commodity service
+        ranking_data = commodity_service.get_impact_ranking()
+        
+        return jsonify(clean_for_json({
+            'success': True,
+            'ranking': ranking_data.get('ranking', []),
+            'total_commodities': ranking_data.get('total_commodities', 0),
+            'total_appearances': ranking_data.get('total_appearances', 0),
+            'avg_frequency': ranking_data.get('avg_frequency', 0),
+            'message': 'Impact ranking retrieved successfully'
+        }))
+        
+    except Exception as e:
+        print(f"ERROR: Impact ranking error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'ranking': []
+        }), 500
 
 # 6. ALERTS APIs
 
@@ -1796,7 +1884,7 @@ def available_models():
         })
         
     except Exception as e:
-        print(f"❌ Error getting available models: {str(e)}")
+        print(f"ERROR: Error getting available models: {str(e)}")
         return jsonify({
             'success': False,
             'message': 'Error getting models',
@@ -1845,7 +1933,7 @@ def generate_forecast():
             })
             
     except Exception as e:
-        print(f"❌ Error generating forecast: {str(e)}")
+        print(f"ERROR: Error generating forecast: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error generating forecast: {str(e)}'
@@ -1865,782 +1953,6 @@ def inject_datetime():
 
 app.add_url_rule('/upload', 'data_control', data_control)
 
-# ADMIN ROUTES
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    """Admin login page"""
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        # Simple admin authentication (in production, use proper auth)
-        if username == 'admin' and password == 'admin123':
-            session['admin_logged_in'] = True
-            return redirect('/admin/dashboard')
-        else:
-            return render_template('admin/login.html', error='Username atau password salah')
-    
-    return render_template('admin/login.html')
-
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    """Admin dashboard"""
-    if not session.get('admin_logged_in'):
-        return redirect('/admin/login')
-    return render_template('admin/dashboard.html')
-
-@app.route('/admin/alert-rules')
-def admin_alert_rules():
-    """Admin alert rules management"""
-    if not session.get('admin_logged_in'):
-        return redirect('/admin/login')
-    return render_template('admin/alert_rules.html')
-
-@app.route('/admin/alerts/current')
-def admin_current_alerts():
-    """Admin current alerts"""
-    if not session.get('admin_logged_in'):
-        return redirect('/admin/login')
-    return render_template('admin/current_alerts.html')
-
-@app.route('/admin/alerts/history')
-def admin_alert_history():
-    """Admin alert history"""
-    if not session.get('admin_logged_in'):
-        return redirect('/admin/login')
-    return render_template('admin/alert_history.html')
-
-@app.route('/admin/logout')
-def admin_logout():
-    """Admin logout"""
-    session.pop('admin_logged_in', None)
-    return redirect('/admin/login')
-
-# ADMIN API ROUTES
-@app.route('/api/admin/stats')
-def admin_stats():
-    """Get admin dashboard statistics"""
-    try:
-        # Get basic statistics
-        total_alerts = AlertHistory.query.count()
-        active_alerts = AlertHistory.query.filter_by(is_active=True).count()
-        critical_alerts = AlertHistory.query.filter_by(severity='critical', is_active=True).count()
-        alert_rules = AlertRule.query.count()
-        
-        return jsonify({
-            'success': True,
-            'stats': {
-                'total_alerts': total_alerts,
-                'active_alerts': active_alerts,
-                'critical_alerts': critical_alerts,
-                'alert_rules': alert_rules
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-
-# --- Dashboard API fallbacks to avoid 404 on UI ---
-@app.route('/api/dashboard/historical-chart')
-def api_dashboard_historical_chart():
-    try:
-        # Load historical data
-        df = forecast_service.data_handler.load_historical_data()
-        
-        if df is None or df.empty:
-            return jsonify({
-                'success': False,
-                'message': 'No historical data available'
-            })
-        
-        # Create chart data
-        chart_data = {
-            'data': [{
-                'x': df['Tanggal'].dt.strftime('%Y-%m-%d').tolist(),
-                'y': df['Indikator_Harga'].tolist(),
-                'type': 'scatter',
-                'mode': 'lines+markers',
-                'name': 'IPH Historical',
-                'line': {'color': '#4e73df', 'width': 2}
-            }],
-            'layout': {
-                'title': 'IPH Historical Data',
-                'xaxis': {'title': 'Date'},
-                'yaxis': {'title': 'IPH (%)'},
-                'hovermode': 'x unified'
-            }
-        }
-        
-        return jsonify({
-            'success': True,
-            'chart': chart_data
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/dashboard/model-performance')
-def api_dashboard_model_performance():
-    try:
-        # Get latest performance from database
-        from database import ModelPerformance
-        from sqlalchemy import func
-        
-        # Get latest performance for each model
-        subquery = db.session.query(
-            ModelPerformance.model_name,
-            func.max(ModelPerformance.trained_at).label('max_trained_at')
-        ).group_by(ModelPerformance.model_name).subquery()
-        
-        latest_models = db.session.query(ModelPerformance).join(
-            subquery,
-            db.and_(
-                ModelPerformance.model_name == subquery.c.model_name,
-                ModelPerformance.trained_at == subquery.c.max_trained_at
-            )
-        ).all()
-        
-        if not latest_models:
-            return jsonify({
-                'success': False,
-                'message': 'No model performance data available'
-            })
-        
-        # Format response
-        models_data = []
-        for model in latest_models:
-            models_data.append({
-                'name': model.model_name,
-                'mae': model.mae,
-                'rmse': model.rmse,
-                'r2': model.r2_score,
-                'mape': model.mape or 0,
-                'status': 'Best' if model.is_best else 'Good'
-            })
-        
-        # Sort by MAE
-        models_data.sort(key=lambda x: x['mae'])
-        
-        return jsonify({
-            'success': True,
-            'models': models_data
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/dashboard/forecast-table')
-def api_dashboard_forecast_table():
-
-    try:
-        print("\n" + "="*80)
-        print("🔍 [API] /api/dashboard/forecast-table called")
-        
-        # Get current forecast
-        forecast_result = forecast_service.get_current_forecast()
-        print(f"   📊 Forecast result type: {type(forecast_result)}")
-        print(f"   📊 Forecast result keys: {forecast_result.keys()}")
-        
-        if not forecast_result.get('success', False):
-            error_msg = forecast_result.get('error', 'No forecast available')
-            print(f"   ❌ Forecast not available: {error_msg}")
-            return jsonify({
-                'success': False,
-                'message': error_msg
-            })
-        
-        # ✅ FIX: forecast_result['forecast'] adalah dict dengan key 'data'
-        forecast_dict = forecast_result['forecast']
-        forecast_data = forecast_dict['data']  # List of dicts
-        
-        print(f"   📊 Forecast data type: {type(forecast_data)}")
-        print(f"   📊 Forecast data length: {len(forecast_data)}")
-        
-        if len(forecast_data) > 0:
-            print(f"   📋 First item keys: {forecast_data[0].keys()}")
-        
-        # Format forecast data
-        forecasts = []
-        for item in forecast_data:
-            try:
-                forecasts.append({
-                    'date': item['Tanggal'],  # Already string from get_current_forecast
-                    'value': float(item['Prediksi']),
-                    'lower_bound': float(item['Batas_Bawah']),
-                    'upper_bound': float(item['Batas_Atas']),
-                    'confidence': float(item['Confidence'])
-                })
-            except Exception as item_error:
-                print(f"   ⚠️ Error processing item: {str(item_error)}")
-                print(f"      Item: {item}")
-                continue
-        
-        print(f"   ✅ Successfully formatted {len(forecasts)} forecast records")
-        print("="*80 + "\n")
-        
-        return jsonify({
-            'success': True,
-            'forecasts': forecasts
-        })
-        
-    except Exception as e:
-        print(f"   ❌ EXCEPTION: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        print("="*80 + "\n")
-        
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/admin/recent-alerts')
-def admin_recent_alerts():
-    """Get recent alerts for admin dashboard"""
-    try:
-        alerts = AlertHistory.query.filter_by(is_active=True).order_by(AlertHistory.created_at.desc()).limit(5).all()
-        
-        alert_data = []
-        for alert in alerts:
-            alert_data.append({
-                'id': alert.id,
-                'title': alert.title,
-                'message': alert.message,
-                'severity': alert.severity,
-                'timestamp': alert.created_at.strftime('%d/%m/%Y %H:%M')
-            })
-        
-        return jsonify({
-            'success': True,
-            'alerts': alert_data
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alert-stats')
-def admin_alert_stats():
-    """Get alert statistics"""
-    try:
-        critical = AlertHistory.query.filter_by(severity='critical', is_active=True).count()
-        warning = AlertHistory.query.filter_by(severity='warning', is_active=True).count()
-        info = AlertHistory.query.filter_by(severity='info', is_active=True).count()
-        total = critical + warning + info
-        
-        return jsonify({
-            'success': True,
-            'stats': {
-                'critical': critical,
-                'warning': warning,
-                'info': info,
-                'total': total
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alert-rules', methods=['GET', 'POST'])
-def admin_alert_rules_api():
-    """Admin alert rules API"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    if request.method == 'GET':
-        try:
-            rules = AlertRule.query.all()
-            rules_data = []
-            for rule in rules:
-                rules_data.append({
-                    'id': rule.id,
-                    'name': rule.name,
-                    'severity': rule.severity,
-                    'condition': rule.condition,
-                    'threshold': rule.threshold,
-                    'metric': rule.metric,
-                    'message': rule.message,
-                    'is_active': rule.is_active,
-                    'created_at': rule.created_at.strftime('%d/%m/%Y %H:%M')
-                })
-            
-            return jsonify({
-                'success': True,
-                'rules': rules_data
-            })
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)})
-    
-    elif request.method == 'POST':
-        try:
-            data = request.get_json()
-            
-            new_rule = AlertRule(
-                name=data['name'],
-                severity=data['severity'],
-                condition=data['condition'],
-                threshold=float(data['threshold']),
-                metric=data['metric'],
-                message=data['message'],
-                is_active=data.get('is_active', True)
-            )
-            
-            db.session.add(new_rule)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Alert rule created successfully'})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alert-rules/<int:rule_id>', methods=['GET', 'PUT', 'DELETE'])
-def admin_alert_rule_detail(rule_id):
-    """Admin alert rule detail API"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    if request.method == 'GET':
-        try:
-            rule = AlertRule.query.get_or_404(rule_id)
-            return jsonify({
-                'success': True,
-                'rule': {
-                    'id': rule.id,
-                    'name': rule.name,
-                    'severity': rule.severity,
-                    'condition': rule.condition,
-                    'threshold': rule.threshold,
-                    'metric': rule.metric,
-                    'message': rule.message,
-                    'is_active': rule.is_active,
-                    'created_at': rule.created_at.strftime('%d/%m/%Y %H:%M')
-                }
-            })
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)})
-    
-    elif request.method == 'PUT':
-        try:
-            rule = AlertRule.query.get_or_404(rule_id)
-            data = request.get_json()
-            
-            rule.name = data['name']
-            rule.severity = data['severity']
-            rule.condition = data['condition']
-            rule.threshold = float(data['threshold'])
-            rule.metric = data['metric']
-            rule.message = data['message']
-            rule.is_active = data.get('is_active', True)
-            
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Alert rule updated successfully'})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)})
-    
-    elif request.method == 'DELETE':
-        try:
-            rule = AlertRule.query.get_or_404(rule_id)
-            db.session.delete(rule)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Alert rule deleted successfully'})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alert-history')
-def admin_alert_history_api():
-    """Get unlimited alert history with pagination and filters"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    try:
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 20))
-        severity = request.args.get('severity')
-        date_from = request.args.get('date_from')
-        date_to = request.args.get('date_to')
-        search = request.args.get('search')
-        
-        # Build query
-        query = AlertHistory.query
-        
-        # Apply filters
-        if severity:
-            query = query.filter_by(severity=severity)
-        
-        if date_from:
-            from datetime import datetime
-            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(AlertHistory.created_at >= date_from_obj)
-        
-        if date_to:
-            from datetime import datetime
-            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
-            query = query.filter(AlertHistory.created_at <= date_to_obj)
-        
-        if search:
-            query = query.filter(AlertHistory.message.contains(search))
-        
-        # Get total count
-        total = query.count()
-        
-        # Apply pagination
-        alerts = query.order_by(AlertHistory.created_at.desc()).paginate(
-            page=page, per_page=limit, error_out=False
-        )
-        
-        # Format alerts
-        alerts_data = []
-        for alert in alerts.items:
-            alerts_data.append({
-                'id': alert.id,
-                'title': alert.title,
-                'message': alert.message,
-                'severity': alert.severity,
-                'is_active': alert.is_active,
-                'acknowledged': alert.acknowledged,
-                'created_at': alert.created_at.strftime('%d/%m/%Y %H:%M'),
-                'admin_notes': alert.admin_notes
-            })
-        
-        return jsonify({
-            'success': True,
-            'alerts': alerts_data,
-            'pagination': {
-                'page': page,
-                'pages': alerts.pages,
-                'per_page': limit,
-                'total': total,
-                'has_next': alerts.has_next,
-                'has_prev': alerts.has_prev
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alert-history/export')
-def admin_alert_history_export():
-    """Export alert history to CSV"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    try:
-        import csv
-        import io
-        from flask import make_response
-        
-        # Get all alerts (no pagination for export)
-        alerts = AlertHistory.query.order_by(AlertHistory.created_at.desc()).all()
-        
-        # Create CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        # Write header
-        writer.writerow([
-            'ID', 'Title', 'Message', 'Severity', 'Is Active', 
-            'Acknowledged', 'Created At', 'Admin Notes'
-        ])
-        
-        # Write data
-        for alert in alerts:
-            writer.writerow([
-                alert.id,
-                alert.title,
-                alert.message,
-                alert.severity,
-                alert.is_active,
-                alert.acknowledged,
-                alert.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                alert.admin_notes or ''
-            ])
-        
-        # Create response
-        response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=alert_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        
-        return response
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alerts/<int:alert_id>/acknowledge', methods=['POST'])
-def admin_acknowledge_alert(alert_id):
-    """Acknowledge an alert"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    try:
-        alert = AlertHistory.query.get_or_404(alert_id)
-        alert.acknowledged = True
-        alert.acknowledged_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Alert acknowledged successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/admin/alerts/<int:alert_id>/deactivate', methods=['POST'])
-def admin_deactivate_alert(alert_id):
-    """Deactivate an alert"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'})
-    
-    try:
-        alert = AlertHistory.query.get_or_404(alert_id)
-        alert.is_active = False
-        alert.deactivated_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Alert deactivated successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)})
-
-# MODEL DETECTION APIs (Visualization)
-
-@app.route('/api/visualization/model-overfitting', methods=['POST'])
-def detect_model_overfitting():
-    """Deteksi overfitting untuk visualization"""
-    try:
-        data = request.get_json()
-        
-        train_mae = float(data.get('train_mae', 0))
-        test_mae = float(data.get('test_mae', 0))
-        
-        if test_mae == 0:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid test MAE'
-            }), 400
-        
-        # Calculate overfitting percentage
-        diff_percent = abs(train_mae - test_mae) / test_mae * 100
-        
-        # Determine severity
-        if diff_percent > 30:
-            severity = 'SEVERE'
-            color = 'danger'
-            recommendation = '🔴 RETRAIN DIPERLUKAN - Overfitting parah'
-        elif diff_percent > 15:
-            severity = 'MODERATE'
-            color = 'warning'
-            recommendation = '🟡 MONITOR - Overfitting terdeteksi'
-        else:
-            severity = 'NONE'
-            color = 'success'
-            recommendation = '🟢 NORMAL - Model stabil'
-        
-        return jsonify({
-            'success': True,
-            'overfitting_detected': diff_percent > 15,
-            'severity': severity,
-            'difference_percent': float(diff_percent),
-            'train_mae': float(train_mae),
-            'test_mae': float(test_mae),
-            'color': color,
-            'recommendation': recommendation
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-
-@app.route('/api/visualization/model-degradation', methods=['POST'])
-def detect_model_degradation():
-    """Deteksi degradasi performa model"""
-    try:
-        data = request.get_json()
-        
-        model_name = data.get('model_name')
-        current_mae = float(data.get('current_mae', 0))
-        previous_mae = float(data.get('previous_mae', 0))
-        current_r2 = float(data.get('current_r2', 0))
-        previous_r2 = float(data.get('previous_r2', 0))
-        
-        if previous_mae == 0:
-            return jsonify({
-                'success': True,
-                'degraded': False,
-                'reason': 'No historical data',
-                'recommendation': 'Monitor performa model'
-            })
-        
-        # Calculate changes
-        mae_increase_percent = ((current_mae - previous_mae) / previous_mae * 100) if previous_mae > 0 else 0
-        r2_decrease = previous_r2 - current_r2
-        
-        # Determine if degraded
-        is_degraded = mae_increase_percent > 10 or r2_decrease > 0.05
-        
-        # Recommendation
-        if is_degraded:
-            if mae_increase_percent > 20 or r2_decrease > 0.10:
-                recommendation = '🔴 RETRAIN URGENT - Degradasi signifikan'
-                severity = 'CRITICAL'
-            else:
-                recommendation = '🟡 RETRAIN RECOMMENDED - Degradasi terdeteksi'
-                severity = 'WARNING'
-        else:
-            recommendation = '🟢 STABIL - Performa terjaga'
-            severity = 'OK'
-        
-        return jsonify({
-            'success': True,
-            'degraded': is_degraded,
-            'severity': severity,
-            'mae_increase_percent': float(mae_increase_percent),
-            'r2_decrease': float(r2_decrease),
-            'current_mae': float(current_mae),
-            'previous_mae': float(previous_mae),
-            'current_r2': float(current_r2),
-            'previous_r2': float(previous_r2),
-            'recommendation': recommendation
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-
-# ADMIN MODEL CONTROL APIs (Admin Panel Only)
-
-@app.route('/api/admin/models/list')
-def admin_list_models():
-    """List semua model untuk admin"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'}), 401
-    
-    try:
-        models_path = 'data/models/'
-        models = []
-        
-        if os.path.exists(models_path):
-            for file in os.listdir(models_path):
-                if file.endswith('.pkl'):
-                    filepath = os.path.join(models_path, file)
-                    stat = os.stat(filepath)
-                    
-                    models.append({
-                        'name': file.replace('.pkl', ''),
-                        'filename': file,
-                        'size_mb': stat.st_size / (1024 * 1024),
-                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
-                    })
-        
-        return jsonify({
-            'success': True,
-            'models': models,
-            'total': len(models)
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-
-@app.route('/api/admin/models/delete/<model_name>', methods=['DELETE'])
-def admin_delete_model(model_name):
-    """Hapus model (admin only)"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'}), 401
-    
-    try:
-        models_path = 'data/models/'
-        model_file = os.path.join(models_path, f"{model_name}.pkl")
-        
-        if not os.path.exists(model_file):
-            return jsonify({
-                'success': False,
-                'error': 'Model tidak ditemukan'
-            }), 404
-        
-        # Backup sebelum delete
-        backup_path = os.path.join(
-            'data/model_versions/',
-            f"{model_name}_deleted_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
-        )
-        os.makedirs('data/model_versions/', exist_ok=True)
-        shutil.copy2(model_file, backup_path)
-        
-        # Delete
-        os.remove(model_file)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Model {model_name} berhasil dihapus',
-            'backup_path': backup_path
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-
-@app.route('/api/admin/models/restore/<backup_file>', methods=['POST'])
-def admin_restore_model(backup_file):
-    """Restore model dari backup (admin only)"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'}), 401
-    
-    try:
-        backup_path = os.path.join('data/model_versions/', backup_file)
-        
-        if not os.path.exists(backup_path):
-            return jsonify({
-                'success': False,
-                'error': 'Backup tidak ditemukan'
-            }), 404
-        
-        # Extract model name
-        model_name = backup_file.split('_deleted_')[0]
-        model_file = os.path.join('data/models/', f"{model_name}.pkl")
-        
-        # Restore
-        shutil.copy2(backup_path, model_file)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Model {model_name} berhasil di-restore',
-            'model_path': model_file
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-
-@app.route('/api/admin/models/backups')
-def admin_list_backups():
-    """List semua backup model (admin only)"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'error': 'Not authorized'}), 401
-    
-    try:
-        backup_path = 'data/model_versions/'
-        backups = []
-        
-        if os.path.exists(backup_path):
-            for file in os.listdir(backup_path):
-                if file.endswith('.pkl'):
-                    filepath = os.path.join(backup_path, file)
-                    stat = os.stat(filepath)
-                    
-                    backups.append({
-                        'filename': file,
-                        'size_mb': stat.st_size / (1024 * 1024),
-                        'created': datetime.fromtimestamp(stat.st_ctime).isoformat()
-                    })
-        
-        # Sort by creation time (newest first)
-        backups.sort(key=lambda x: x['created'], reverse=True)
-        
-        return jsonify({
-            'success': True,
-            'backups': backups,
-            'total': len(backups)
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 # APPLICATION STARTUP

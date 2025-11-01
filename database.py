@@ -311,10 +311,10 @@ def init_db(app):
     with app.app_context():
         # Create all tables
         db.create_all()
-        print("✅ Database tables created successfully!")
+        print(" Database tables created successfully!")
         
         # Print table info
-        print(f"📊 Tables created:")
+        print(f" Tables created:")
         print(f"   - {IPHData.__tablename__}")
         print(f"   - {CommodityData.__tablename__}")
         print(f"   - {ModelPerformance.__tablename__}")
@@ -340,5 +340,5 @@ def get_db_stats():
         }
         return stats
     except Exception as e:
-        print(f"❌ Error getting DB stats: {e}")
+        print(f" Error getting DB stats: {e}")
         return {}

@@ -17,6 +17,8 @@ class VisualizationService:
             return int(obj)
         elif isinstance(obj, np.floating):
             return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, pd.Series):
@@ -87,23 +89,23 @@ class VisualizationService:
     def calculate_moving_averages(self, timeframe='6M', offset_months=0):
         """Moving averages analysis"""
         try:
-            print(f"🔍 Calculating moving averages for {timeframe}...")
+            print(f"Calculating moving averages for {timeframe}...")
 
             df = self.data_handler.load_historical_data()
 
             if df is None or df.empty:
-                print("❌ No data returned from database")
+                print("No data returned from database")
                 return {'success': False, 'message': 'Tidak ada data tersedia'}
                 
-            print(f"✅ Data loaded: {len(df)} records")
+            print(f" Data loaded: {len(df)} records")
 
             df_filtered, coverage_info = self.filter_by_timeframe(df, timeframe, offset_months)
             df = df_filtered.sort_values('Tanggal').reset_index(drop=True)
 
-            print(f"✅ After filter: {len(df)} records")
+            print(f" After filter: {len(df)} records")
 
             if coverage_info:
-                print(f"   📊 Coverage: {coverage_info['coverage']}% ({coverage_info['status']})")
+                print(f"    Coverage: {coverage_info['coverage']}% ({coverage_info['status']})")
 
             if len(df) < 7:
                 return {'success': False, 'message': 'Data tidak cukup (minimal 7 data)'}
@@ -176,16 +178,77 @@ class VisualizationService:
                 }
             }
             
-            print(f"✅ Moving averages calculated successfully")
+            # Calculate additional statistics for moving averages
+            latest_idx = len(df) - 1
+            current_actual = df['Indikator_Harga'].iloc[latest_idx]
+            current_ma3 = df['MA_3'].iloc[latest_idx]
+            current_ma7 = df['MA_7'].iloc[latest_idx]
+            current_ma14 = df['MA_14'].iloc[latest_idx]
+            current_ma30 = df['MA_30'].iloc[latest_idx] if not pd.isna(df['MA_30'].iloc[latest_idx]) else None
+            
+            # Trend analysis
+            ma3_trend = "naik" if current_ma3 > df['MA_3'].iloc[latest_idx-1] else "turun"
+            ma7_trend = "naik" if current_ma7 > df['MA_7'].iloc[latest_idx-1] else "turun"
+            
+            # Crossover analysis
+            golden_cross = current_ma3 > current_ma7 and df['MA_3'].iloc[latest_idx-1] <= df['MA_7'].iloc[latest_idx-1]
+            death_cross = current_ma3 < current_ma7 and df['MA_3'].iloc[latest_idx-1] >= df['MA_7'].iloc[latest_idx-1]
+            
+            # Distance from actual price
+            distance_ma3 = abs(current_actual - current_ma3)
+            distance_ma7 = abs(current_actual - current_ma7)
+            distance_ma14 = abs(current_actual - current_ma14)
+            
+            # Volatility of MA lines (standard deviation)
+            ma3_volatility = df['MA_3'].std() if len(df) > 1 else 0
+            ma7_volatility = df['MA_7'].std() if len(df) > 1 else 0
+            
+            # Support/Resistance levels
+            support_level = min(current_ma3, current_ma7, current_ma14)
+            resistance_level = max(current_ma3, current_ma7, current_ma14)
+            
+            print(f" Moving averages calculated successfully")
 
-            # ✅ FIX: Include coverage info in response
+            # Enhanced response with moving averages statistics
             return {
                 'success': True, 
                 'chart': chart_data,
                 'stats': {
-                    'data_coverage': self._clean_for_json(coverage_info),  # ✅ ADD coverage info
+                    'data_coverage': self._clean_for_json(coverage_info),
                     'total_records': int(len(df)),
-                    'date_range': f"{dates[0]} to {dates[-1]}"
+                    'date_range': f"{dates[0]} to {dates[-1]}",
+                    'moving_averages': {
+                        'current_values': {
+                            'actual': self._clean_for_json(round(float(current_actual), 3)),
+                            'ma3': self._clean_for_json(round(float(current_ma3), 3)),
+                            'ma7': self._clean_for_json(round(float(current_ma7), 3)),
+                            'ma14': self._clean_for_json(round(float(current_ma14), 3)),
+                            'ma30': self._clean_for_json(round(float(current_ma30), 3)) if current_ma30 is not None else None
+                        },
+                        'trends': {
+                            'ma3_trend': self._clean_for_json(ma3_trend),
+                            'ma7_trend': self._clean_for_json(ma7_trend),
+                            'overall_trend': self._clean_for_json("naik" if current_ma3 > current_ma7 else "turun")
+                        },
+                        'signals': {
+                            'golden_cross': self._clean_for_json(golden_cross),
+                            'death_cross': self._clean_for_json(death_cross),
+                            'signal_strength': "strong" if golden_cross or death_cross else "neutral"
+                        },
+                        'distances': {
+                            'from_ma3': self._clean_for_json(round(float(distance_ma3), 3)),
+                            'from_ma7': self._clean_for_json(round(float(distance_ma7), 3)),
+                            'from_ma14': self._clean_for_json(round(float(distance_ma14), 3))
+                        },
+                        'volatility': {
+                            'ma3_volatility': self._clean_for_json(round(float(ma3_volatility), 3)),
+                            'ma7_volatility': self._clean_for_json(round(float(ma7_volatility), 3))
+                        },
+                        'levels': {
+                            'support': self._clean_for_json(round(float(support_level), 3)),
+                            'resistance': self._clean_for_json(round(float(resistance_level), 3))
+                        }
+                    }
                 }
             }            
         except Exception as e:
@@ -195,9 +258,9 @@ class VisualizationService:
             return {'success': False, 'message': f'Error: {str(e)}'}
 
     def analyze_volatility(self, timeframe='6M', offset_months=0):
-        """🔧 FIXED: Volatility analysis with proper JSON handling"""
+        """ FIXED: Volatility analysis with proper JSON handling"""
         try:
-            print(f"🔍 Starting volatility analysis for {timeframe}")
+            print(f" Starting volatility analysis for {timeframe}")
             
             df = self.data_handler.load_historical_data()
             if df.empty:
@@ -206,10 +269,10 @@ class VisualizationService:
             df_filtered, coverage_info = self.filter_by_timeframe(df, timeframe, offset_months)
             df = df_filtered.sort_values('Tanggal').reset_index(drop=True)
 
-            print(f"📊 Filtered data shape: {df.shape}")
+            print(f" Filtered data shape: {df.shape}")
 
             if coverage_info:
-                print(f"   📊 Coverage: {coverage_info['coverage']}% ({coverage_info['status']})")            
+                print(f"    Coverage: {coverage_info['coverage']}% ({coverage_info['status']})")            
             if len(df) < 7:
                 return {'success': False, 'message': 'Data tidak cukup untuk analisis volatilitas'}
             
@@ -223,7 +286,7 @@ class VisualizationService:
             df['Volatility_14'] = df['Volatility_14'].fillna(0).replace([np.inf, -np.inf], 0)
             df['Volatility_30'] = df['Volatility_30'].fillna(0).replace([np.inf, -np.inf], 0)
             
-            print(f"📊 Volatility calculated, sample values: {df['Volatility_7'].head(3).tolist()}")
+            print(f" Volatility calculated, sample values: {df['Volatility_7'].head(3).tolist()}")
             
             # Convert dates to strings
             dates = [d.strftime('%Y-%m-%d') for d in df['Tanggal']]
@@ -231,7 +294,7 @@ class VisualizationService:
             # Calculate average volatility for reference line
             avg_volatility = float(df['Volatility_7'].mean())
             
-            print(f"📊 Average volatility: {avg_volatility}")
+            print(f" Average volatility: {avg_volatility}")
             
             vol_7_series = df['Volatility_7'].copy()
 
@@ -245,16 +308,16 @@ class VisualizationService:
                 min_volatility = 0.0
                 max_volatility = 0.0
 
-            print(f"📊 Min volatility: {min_volatility}, Max: {max_volatility}")
+            print(f" Min volatility: {min_volatility}, Max: {max_volatility}")
 
 
-            # 🔧 FIX: Ensure all data is JSON serializable
+            #  FIX: Ensure all data is JSON serializable
             def safe_convert(series):
                 """Convert series to JSON-safe list"""
                 return [float(x) if pd.notna(x) and x not in [np.inf, -np.inf] else 0 
                        for x in series]
             
-            # ✅ CHART 1: Accuracy Trends (Simple)
+            #  CHART 1: Accuracy Trends (Simple)
             accuracy_chart = {
                 'data': [
                     {
@@ -278,7 +341,7 @@ class VisualizationService:
             }
 
         
-            # ✅ CHART 2: Forecast vs Actual (Simple)
+            #  CHART 2: Forecast vs Actual (Simple)
             forecast_chart = {
                 'data': [
                     {
@@ -301,7 +364,7 @@ class VisualizationService:
                 }
             }
             
-            # ✅ CHART 3: Model Drift (Simple)
+            #  CHART 3: Model Drift (Simple)
             drift_chart = {
                 'data': [
                     {
@@ -322,9 +385,9 @@ class VisualizationService:
                 }
             }
             
-            print(f"   ✅ All charts created")
+            print(f"    All charts created")
             
-            # ✅ Calculate basic statistics
+            #  Calculate basic statistics
             stats = {
                 'best_model': 'Random Forest',
                 'current_mae': 0.12,
@@ -339,10 +402,10 @@ class VisualizationService:
                 'last_updated': datetime.now().strftime('%d/%m/%Y %H:%M'),
                 'drift_detected': False,
                 'recommendation': 'Model performa stabil. Lanjutkan monitoring rutin.',
-                'current_volatility': round(float(df['Volatility_7'].iloc[-1]), 2),  # ✅ 2 decimal
-                'avg_volatility_30': round(float(avg_volatility), 2),                # ✅ 2 decimal
-                'max_volatility': round(max_volatility, 2),                          # ✅ 2 decimal
-                'min_volatility': round(min_volatility, 2),                          # ✅ 2 decimal (FIXED!)
+                'current_volatility': round(float(df['Volatility_7'].iloc[-1]), 2),  #  2 decimal
+                'avg_volatility_30': round(float(avg_volatility), 2),                #  2 decimal
+                'max_volatility': round(max_volatility, 2),                          #  2 decimal
+                'min_volatility': round(min_volatility, 2),                          #  2 decimal (FIXED!)
                 'model_comparison_table': [
                     {
                         'rank': 1,
@@ -400,7 +463,7 @@ class VisualizationService:
                 }
             }
             
-            print(f"   ✅ Statistics calculated")
+            print(f"    Statistics calculated")
             
             result = {
                 'success': True,
@@ -419,11 +482,11 @@ class VisualizationService:
             }
             
             
-            print("✅ Volatility analysis completed successfully")
+            print(" Volatility analysis completed successfully")
             return result
             
         except Exception as e:
-            print(f"❌ Volatility error: {str(e)}")
+            print(f" Volatility error: {str(e)}")
             import traceback
             traceback.print_exc()
             return {'success': False, 'message': f'Error volatilitas: {str(e)}'}
@@ -433,11 +496,11 @@ class VisualizationService:
         Load REAL model performance from database
         """
         try:
-            print(f"🔍 Loading model performance from DATABASE...")
+            print(f" Loading model performance from DATABASE...")
             
             from database import ModelPerformance
             
-            # ✅ LOAD FROM DATABASE
+            #  LOAD FROM DATABASE
             perf_records = ModelPerformance.query.order_by(
                 ModelPerformance.trained_at.desc()
             ).limit(200).all()  # Last 200 training records
@@ -448,9 +511,9 @@ class VisualizationService:
                     'message': 'No model performance data in database. Please train models first.'
                 }
             
-            print(f"📊 Found {len(perf_records)} performance records in database")
+            print(f" Found {len(perf_records)} performance records in database")
             
-            # ✅ GROUP BY MODEL
+            #  GROUP BY MODEL
             model_data = {}
             for record in perf_records:
                 model_name = record.model_name
@@ -463,9 +526,9 @@ class VisualizationService:
                     'trained_at': record.trained_at
                 })
             
-            print(f"📊 Models found: {list(model_data.keys())}")
+            print(f" Models found: {list(model_data.keys())}")
             
-            # ✅ PREPARE CHART DATA
+            #  PREPARE CHART DATA
             colors = {
                 'KNN': '#ef4444',
                 'Random_Forest': '#22c55e', 
@@ -547,7 +610,7 @@ class VisualizationService:
                 }
             }
             
-            # ✅ STATS
+            #  STATS
             best_mae = latest_perf[best_model]['mae']
             best_r2 = latest_perf[best_model]['r2']
             
@@ -596,11 +659,11 @@ class VisualizationService:
                 'models_available': list(model_data.keys())
             }
             
-            print(f"✅ Model performance loaded from database")
+            print(f" Model performance loaded from database")
             return result
             
         except Exception as e:
-            print(f"❌ Error: {str(e)}")
+            print(f" Error: {str(e)}")
             import traceback
             traceback.print_exc()
             return {'success': False, 'message': str(e)}

@@ -41,32 +41,32 @@ class CommodityInsightService:
         self.commodity_categories = {
             'PROTEIN': {
                 'items': ['DAGING_AYAM', 'DAGING_SAPI', 'TELUR_AYAM', 'IKAN_KEMBUNG', 'TEMPE'],
-                'icon': '🥩',
+                'icon': '',
                 'description': 'Sumber protein hewani dan nabati'
             },
             'SAYURAN_BUMBU': {
                 'items': ['CABAI_RAWIT', 'CABAI_MERAH', 'BAWANG_MERAH', 'BAWANG_PUTIH'],
-                'icon': '🌶️',
+                'icon': '',
                 'description': 'Sayuran dan bumbu dapur'
             },
             'KARBOHIDRAT': {
                 'items': ['BERAS', 'TEPUNG_TERIGU'],
-                'icon': '🌾',
+                'icon': '',
                 'description': 'Sumber karbohidrat utama'
             },
             'LEMAK_MINYAK': {
                 'items': ['MINYAK_GORENG'],
-                'icon': '🛢️',
+                'icon': '',
                 'description': 'Minyak dan lemak'
             },
             'PEMANIS': {
                 'items': ['GULA_PASIR'],
-                'icon': '🍯',
+                'icon': '',
                 'description': 'Pemanis dan gula'
             },
             'BUAH': {
                 'items': ['PISANG'],
-                'icon': '🍌',
+                'icon': '',
                 'description': 'Buah-buahan'
             }
         }
@@ -75,13 +75,19 @@ class CommodityInsightService:
         """Enhanced commodity data loading dengan better error handling"""
         try:
             if self.use_database:
-                return self._load_from_database()
+                db_data = self._load_from_database()
+                if not db_data.empty:
+                    return db_data
+                else:
+                    print("Database empty, falling back to CSV...")
+                    return self._load_from_csv()
             else:
                 return self._load_from_csv()
                 
         except Exception as e:
             print(f"Critical error loading commodity data: {str(e)}")
-            return pd.DataFrame()
+            print("Falling back to CSV...")
+            return self._load_from_csv()
     
     def _load_from_database(self):
         """Load commodity data from database"""
@@ -93,16 +99,17 @@ class CommodityInsightService:
             if (self.commodity_cache is not None and 
                 self.last_cache_time is not None and 
                 (current_time - self.last_cache_time).seconds < self.cache_duration):
-                print("📋 Using cached commodity data from database")
+                print(" Using cached commodity data from database")
                 return self.commodity_cache.copy()
             
             print("Loading fresh commodity data from database...")
             
             # Query all commodity data
             commodity_records = CommodityData.query.all()
+            print(f" DEBUG: Found {len(commodity_records)} commodity records in database")
             
             if not commodity_records:
-                print("⚠️ No commodity data found in database")
+                print(" No commodity data found in database")
                 return pd.DataFrame()
             
             # Convert to DataFrame
@@ -111,12 +118,12 @@ class CommodityInsightService:
                 data.append({
                     'Tanggal': record.tanggal.strftime('%Y-%m-%d'),
                     'Bulan': record.bulan,
-                    'Minggu ke-': record.minggu,
-                    'Kab/Kota': record.kab_kota,
-                    ' Indikator Perubahan Harga (%)': record.iph_value,
-                    'Komoditas Andil Perubahan Harga ': record.komoditas_andil,
-                    'Komoditas Fluktuasi Harga Tertinggi': record.komoditas_fluktuasi,
-                    'Fluktuasi Harga': record.nilai_fluktuasi
+                    'Minggu': record.minggu,  # Fixed: remove 'ke-' suffix
+                    'Kota': record.kab_kota,  # Fixed: use 'Kota' instead of 'Kab/Kota'
+                    'IPH': record.iph_value,  # Fixed: use 'IPH' instead of long name
+                    'Komoditas_Andil': record.komoditas_andil,  # Fixed: use underscore
+                    'Komoditas_Fluktuasi_Tertinggi': record.komoditas_fluktuasi,  # Fixed: use underscore
+                    'Nilai_Fluktuasi': record.nilai_fluktuasi  # Fixed: use underscore
                 })
             
             df = pd.DataFrame(data)
@@ -128,7 +135,7 @@ class CommodityInsightService:
             self.commodity_cache = df.copy()
             self.last_cache_time = current_time
             
-            print(f"✅ Commodity data loaded from database: {len(df)} records")
+            print(f" Commodity data loaded from database: {len(df)} records")
             return df
                 
         except Exception as e:
@@ -139,7 +146,7 @@ class CommodityInsightService:
         """Load commodity data from CSV (fallback)"""
         try:
             if not os.path.exists(self.commodity_data_path):
-                print(f"⚠️ Commodity data not found at {self.commodity_data_path}")
+                print(f" Commodity data not found at {self.commodity_data_path}")
                 return pd.DataFrame()
             
             # Check cache first
@@ -147,7 +154,7 @@ class CommodityInsightService:
             if (self.commodity_cache is not None and 
                 self.last_cache_time is not None and 
                 (current_time - self.last_cache_time).seconds < self.cache_duration):
-                print("📋 Using cached commodity data from CSV")
+                print(" Using cached commodity data from CSV")
                 return self.commodity_cache.copy()
             
             print("Loading fresh commodity data from CSV...")
@@ -159,7 +166,7 @@ class CommodityInsightService:
             for encoding in encodings_to_try:
                 try:
                     df = pd.read_csv(self.commodity_data_path, encoding=encoding)
-                    print(f"✅ CSV loaded with {encoding} encoding")
+                    print(f" CSV loaded with {encoding} encoding")
                     break
                 except UnicodeDecodeError:
                     continue
@@ -177,7 +184,7 @@ class CommodityInsightService:
             self.commodity_cache = df.copy()
             self.last_cache_time = current_time
             
-            print(f"✅ Commodity data loaded from CSV: {len(df)} records")
+            print(f" Commodity data loaded from CSV: {len(df)} records")
             return df
             
         except Exception as e:
@@ -335,13 +342,17 @@ class CommodityInsightService:
                     standardized_name = self._standardize_commodity_name(commodity_name)
                     category_info = self._get_commodity_category_info(standardized_name)
                     
+                    # Skip only generic category names, keep specific commodities
+                    if category_info['category'] in ['KARBOHIDRAT', 'SAYURAN_BUMBU'] and len(standardized_name.split('_')) <= 1:
+                        continue
+                    
                     commodity_data = {
                         'name': standardized_name,
                         'original_name': commodity_name,
                         'impact': impact_value,
-                        'category': category_info['category'],
-                        'category_icon': category_info['icon'],
-                        'category_description': category_info['description']
+                        'category': 'KOMODITAS',
+                        'category_icon': '',
+                        'category_description': 'Komoditas utama'
                     }
                     
                     commodities.append(commodity_data)
@@ -380,7 +391,7 @@ class CommodityInsightService:
                 }
         return {
             'category': 'LAINNYA',
-            'icon': '📦',
+            'icon': '',
             'description': 'Komoditas lainnya'
         }
     
@@ -421,7 +432,7 @@ class CommodityInsightService:
                     'original_name': 'Data Not Available',
                     'impact': 0.0,
                     'category': 'UNKNOWN',
-                    'category_icon': '❓',
+                    'category_icon': '',
                     'category_description': 'Data tidak tersedia'
                 }]
             
@@ -504,7 +515,7 @@ class CommodityInsightService:
                 'recommendations': self._generate_weekly_recommendations(latest_record, commodities, category_analysis)
             }
             
-            print("✅ Enhanced current week insights generated successfully")
+            print(" Enhanced current week insights generated successfully")
             return insights
             
         except Exception as e:
@@ -527,7 +538,7 @@ class CommodityInsightService:
                 },
                 'commodity_impacts': {
                     'significant_positive': [
-                        {'name': 'CABAI_RAWIT', 'impact': 0.5, 'category': 'SAYURAN_BUMBU', 'category_icon': '🌶️'}
+                        {'name': 'CABAI_RAWIT', 'impact': 0.5, 'category': 'SAYURAN_BUMBU', 'category_icon': ''}
                     ],
                     'significant_negative': [],
                     'minor_impacts': [],
@@ -544,7 +555,7 @@ class CommodityInsightService:
                     'SAYURAN_BUMBU': {
                         'total_impact': 0.5,
                         'commodity_count': 1,
-                        'icon': '🌶️',
+                        'icon': '',
                         'direction_color': 'warning',
                         'impact_color': 'warning',
                         'dominant_direction': 'inflationary'
@@ -564,7 +575,7 @@ class CommodityInsightService:
             'commodity_count': 0,
             'avg_impact': 0,
             'dominant_direction': 'neutral',
-            'icon': '📦',
+            'icon': '',
             'description': 'Unknown category'
         })
         
@@ -651,10 +662,10 @@ class CommodityInsightService:
         else:
             return 'success'
 
-    def get_monthly_analysis(self, month=None):
+    def get_monthly_analysis(self, month=None, year=None):
         """Enhanced monthly analysis dengan better error handling"""
         try:
-            print(f"Enhanced monthly analysis for month: '{month}'")
+            print(f"Enhanced monthly analysis for month: '{month}', year: '{year}'")
             
             df = self.load_commodity_data()
             
@@ -665,51 +676,104 @@ class CommodityInsightService:
                     'suggestion': 'Upload commodity data file to enable monthly analysis'
                 }
             
-            print(f"📋 Processing {len(df)} total records")
+            print(f" Processing {len(df)} total records")
             
-            # Enhanced month filtering
-            if month and month.strip():
-                month_clean = month.strip().lower()
-                
-                # Create flexible month matching
-                df_month = df[df['Bulan'].str.lower().str.contains(month_clean, na=False)]
-                
-                if df_month.empty:
-                    # Try alternative matching with month variations
-                    month_variations = {
-                        'jan': 'januari', 'feb': 'februari', 'mar': 'maret',
-                        'apr': 'april', 'may': 'mei', 'jun': 'juni',
-                        'jul': 'juli', 'aug': 'agustus', 'sep': 'september',
-                        'oct': 'oktober', 'nov': 'november', 'dec': 'desember'
-                    }
-                    
-                    for short_month, full_month in month_variations.items():
-                        if month_clean == short_month or month_clean == full_month:
-                            df_month = df[df['Bulan'].str.lower().str.contains(full_month, na=False)]
-                            break
-                
-                if df_month.empty:
-                    available_months = df['Bulan'].dropna().unique().tolist()
-                    return {
-                        'success': False, 
-                        'message': f'No data found for month: {month}',
-                        'available_months': available_months,
-                        'suggestion': f'Try one of these months: {", ".join(available_months[:5])}'
-                    }
-                    
-                selected_month = month
-            else:
+            # Enhanced month and year filtering
+            df_filtered = df.copy()
+            
+            # Set default to latest month and year if not specified
+            if not month or not month.strip():
                 # Get latest month with data
                 latest_month = df['Bulan'].dropna().iloc[-1] if not df.empty else None
                 if not latest_month:
                     return {
                         'success': False,
-                        'message': 'No valid month data found'
+                        'message': 'Tidak ada data bulan tersedia'
                     }
-                df_month = df[df['Bulan'] == latest_month]
-                selected_month = latest_month
+                month = latest_month
+                
+            if not year or not year.strip():
+                # Get latest year with data
+                df_temp = df.copy()
+                df_temp['year'] = pd.to_datetime(df_temp['Tanggal']).dt.year
+                latest_year = df_temp['year'].max() if not df_temp.empty else None
+                if not latest_year:
+                    return {
+                        'success': False,
+                        'message': 'Tidak ada data tahun tersedia'
+                    }
+                year = str(latest_year)
             
-            print(f"Analyzing {len(df_month)} records for month: {selected_month}")
+            # Filter by month and year
+            month_clean = month.strip().lower()
+            year_clean = int(year.strip())
+            
+            # Filter by month and year - STRICT matching to avoid cross-year contamination
+            # First, create year column from actual date (most reliable)
+            df['year'] = pd.to_datetime(df['Tanggal']).dt.year
+            
+            # Filter by year FIRST (critical to avoid cross-year contamination)
+            df_filtered = df[df['year'] == year_clean].copy()
+            
+            print(f" After year filter ({year_clean}): {len(df_filtered)} records")
+            
+            if df_filtered.empty:
+                return {
+                    'success': False,
+                    'message': f'Data tidak tersedia untuk tahun {year}',
+                    'suggestion': 'Pilih tahun yang memiliki data'
+                }
+            
+            # Then filter by month - use exact or prefix match
+            month_clean = month.strip().lower()
+            
+            # Normalize bulan in dataframe: remove year suffix
+            df_filtered['Bulan_Normalized'] = df_filtered['Bulan'].astype(str).str.lower()
+            df_filtered['Bulan_Normalized'] = df_filtered['Bulan_Normalized'].str.replace(r"'?\d{2,4}.*$", "", regex=True).str.strip()
+            
+            # Use exact or startswith match (more strict than contains)
+            month_clean_normalized = month_clean.replace("'", "").strip()
+            
+            # Match bulan yang dimulai dengan nama bulan yang dicari (exact prefix match)
+            df_filtered = df_filtered[
+                (df_filtered['Bulan_Normalized'].str.startswith(month_clean_normalized, na=False)) |
+                (df_filtered['Bulan'].str.lower().str.startswith(month_clean, na=False))
+            ]
+            
+            print(f" After month filter ({month}): {len(df_filtered)} records")
+            
+            # Double-check: verify all records are from correct year
+            df_filtered['year_check'] = pd.to_datetime(df_filtered['Tanggal']).dt.year
+            wrong_year = df_filtered[df_filtered['year_check'] != year_clean]
+            if not wrong_year.empty:
+                print(f" WARNING: Found {len(wrong_year)} records with wrong year! Removing them...")
+                # Remove wrong year records
+                df_filtered = df_filtered[df_filtered['year_check'] == year_clean]
+            
+            # Clean up temporary columns
+            if 'Bulan_Normalized' in df_filtered.columns:
+                df_filtered = df_filtered.drop(columns=['Bulan_Normalized'])
+            if 'year_check' in df_filtered.columns:
+                df_filtered = df_filtered.drop(columns=['year_check'])
+            
+            # Final validation: ensure max 5 records per month (normal month has max 5 weeks)
+            if len(df_filtered) > 5:
+                print(f" WARNING: Found {len(df_filtered)} records for {month} {year}, expected max 5!")
+                # Sort by date and take first 5 (most recent if needed, or earliest)
+                df_filtered = df_filtered.sort_values('Tanggal').head(5)
+                print(f" Limited to 5 records")
+            
+            # Check if data exists for the selected month/year
+            if df_filtered.empty:
+                return {
+                    'success': False,
+                    'message': f'Data tidak tersedia untuk {month} {year}',
+                    'suggestion': 'Pilih bulan dan tahun yang memiliki data'
+                }
+            
+            selected_month = month
+            
+            print(f"Analyzing {len(df_filtered)} records for month: {selected_month}")
             
             # Enhanced commodity aggregation
             all_commodities = defaultdict(lambda: {
@@ -717,11 +781,11 @@ class CommodityInsightService:
                 'frequencies': 0,
                 'periods': [],
                 'category': 'UNKNOWN',
-                'category_icon': '📦'
+                'category_icon': ''
             })
             
             # Process each record in the month
-            for _, row in df_month.iterrows():
+            for _, row in df_filtered.iterrows():
                 period_label = f"{row.get('Minggu', 'M?')}"
                 commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
                 
@@ -731,7 +795,7 @@ class CommodityInsightService:
                     all_commodities[commodity_name]['frequencies'] += 1
                     all_commodities[commodity_name]['periods'].append(period_label)
                     all_commodities[commodity_name]['category'] = comm.get('category', 'UNKNOWN')
-                    all_commodities[commodity_name]['category_icon'] = comm.get('category_icon', '📦')
+                    all_commodities[commodity_name]['category_icon'] = comm.get('category_icon', '')
             
             # Calculate enhanced statistics
             commodity_stats = []
@@ -757,12 +821,16 @@ class CommodityInsightService:
             # Sort by absolute total impact
             commodity_stats.sort(key=lambda x: abs(x['total_impact']), reverse=True)
             
+            # Check if we have valid commodity data
+            valid_commodity_data = df_filtered[df_filtered['Komoditas_Andil'] != 'DATA_TIDAK_TERSEDIA']
+            has_valid_commodity_data = not valid_commodity_data.empty
+            
             # Enhanced volatility analysis
-            volatility_data = df_month['Komoditas_Fluktuasi_Tertinggi'].dropna()
+            volatility_data = df_filtered['Komoditas_Fluktuasi_Tertinggi'].dropna()
             volatility_summary = {}
             if not volatility_data.empty:
                 volatility_counts = volatility_data.value_counts().to_dict()
-                volatility_values = df_month['Nilai_Fluktuasi'].dropna()
+                volatility_values = df_filtered['Nilai_Fluktuasi'].dropna()
                 
                 volatility_summary = {
                     'most_frequent_volatile': list(volatility_counts.keys())[0] if volatility_counts else 'Tidak ada',
@@ -775,7 +843,7 @@ class CommodityInsightService:
                 }
             
             # Calculate month statistics
-            month_iph_values = df_month['IPH'].dropna()
+            month_iph_values = df_filtered['IPH'].dropna()
             
             # Enhanced category breakdown
             category_breakdown = self._get_enhanced_category_breakdown(commodity_stats)
@@ -784,8 +852,8 @@ class CommodityInsightService:
                 'success': True,
                 'month': str(selected_month),
                 'analysis_period': {
-                    'weeks_analyzed': len(df_month),
-                    'total_records': len(df_month),
+                    'weeks_analyzed': len(df_filtered),
+                    'total_records': len(df_filtered),
                     'valid_iph_records': len(month_iph_values)
                 },
                 'iph_statistics': {
@@ -795,14 +863,14 @@ class CommodityInsightService:
                     'std_iph': float(month_iph_values.std()) if len(month_iph_values) > 1 else 0.0,
                     'trend': 'Inflasi' if month_iph_values.mean() > 0 else 'Deflasi' if month_iph_values.mean() < 0 else 'Stabil'
                 },
-                'top_impact_commodities': commodity_stats[:8],  # Show more commodities
+                'top_impact_commodities': commodity_stats[:8] if has_valid_commodity_data else [],  # Show more commodities
                 'volatility_summary': volatility_summary,
                 'category_breakdown': category_breakdown,
-                'monthly_summary': self._generate_enhanced_monthly_summary(df_month, commodity_stats, category_breakdown),
+                'monthly_summary': self._generate_enhanced_monthly_summary(df_filtered, commodity_stats, category_breakdown),
                 'recommendations': self._generate_monthly_recommendations(commodity_stats, category_breakdown)
             }
             
-            print("✅ Enhanced monthly analysis completed successfully")
+            print(" Enhanced monthly analysis completed successfully")
             return result
             
         except Exception as e:
@@ -812,7 +880,7 @@ class CommodityInsightService:
             
             return {
                 'success': False,
-                'message': f'Error in monthly analysis: {str(e)}',
+                'message': f'Error dalam analisis bulanan: {str(e)}',
                 'error_details': str(e)
             }
 
@@ -857,7 +925,7 @@ class CommodityInsightService:
             'commodities': [],
             'avg_impact': 0,
             'max_impact_commodity': None,
-            'icon': '📦',
+            'icon': '',
             'description': 'Unknown',
             'dominance_score': 0
         })
@@ -899,24 +967,24 @@ class CommodityInsightService:
         
         return result
 
-    def _generate_enhanced_monthly_summary(self, df_month, commodity_stats, category_breakdown):
+    def _generate_enhanced_monthly_summary(self, df_filtered, commodity_stats, category_breakdown):
         """Generate enhanced monthly summary"""
         try:
-            month = df_month.iloc[0]['Bulan'] if not df_month.empty else 'Unknown'
-            avg_iph = df_month['IPH'].mean() if 'IPH' in df_month.columns else 0
-            weeks_count = len(df_month)
+            month = df_filtered.iloc[0]['Bulan'] if not df_filtered.empty else 'Unknown'
+            avg_iph = df_filtered['IPH'].mean() if 'IPH' in df_filtered.columns else 0
+            weeks_count = len(df_filtered)
             
             summary = f"Analisis Lengkap {month}\n\n"
             
             # IPH Analysis
             if avg_iph > 2:
-                summary += f"🔴 **Inflasi Tinggi**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
+                summary += f" **Inflasi Tinggi**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
             elif avg_iph > 0:
-                summary += f"🟡 **Inflasi Moderat**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
+                summary += f" **Inflasi Moderat**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
             elif avg_iph < -2:
-                summary += f"🔵 **Deflasi Tinggi**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
+                summary += f" **Deflasi Tinggi**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
             else:
-                summary += f"🟢 **Kondisi Stabil**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
+                summary += f" **Kondisi Stabil**: Rata-rata IPH {avg_iph:.2f}% dalam {weeks_count} minggu\n"
             
             # Top commodities impact
             if commodity_stats:
@@ -925,6 +993,8 @@ class CommodityInsightService:
                 for i, comm in enumerate(top_3, 1):
                     direction = "+" if comm['total_impact'] > 0 else "-"
                     summary += f"{i}. {comm['name']} {direction} {abs(comm['total_impact']):.3f}% ({comm['frequency']}x)\n"
+            else:
+                summary += f"\n**Catatan**: Data komoditas tidak tersedia untuk periode ini. Analisis hanya berdasarkan data IPH.\n"
             
             # Category dominance
             if category_breakdown:
@@ -935,16 +1005,16 @@ class CommodityInsightService:
             
             # Overall assessment
             if abs(avg_iph) > 2:
-                summary += f"\n⚠️ **Perhatian**: {month} menunjukkan pergerakan harga signifikan!"
+                summary += f"\n **Perhatian**: {month} menunjukkan pergerakan harga signifikan!"
             elif abs(avg_iph) > 1:
                 summary += f"\nCatatan: {month} menunjukkan pergerakan harga moderat"
             else:
-                summary += f"\n✅ **Positif**: {month} menunjukkan stabilitas harga yang baik"
+                summary += f"\n **Positif**: {month} menunjukkan stabilitas harga yang baik"
             
             return summary
             
         except Exception as e:
-            print(f"⚠️ Error generating enhanced monthly summary: {e}")
+            print(f" Error generating enhanced monthly summary: {e}")
             return f"Analisis {month}: Data tersedia namun terjadi error dalam pemrosesan detail"
 
     def _generate_monthly_recommendations(self, commodity_stats, category_breakdown):
@@ -991,13 +1061,13 @@ class CommodityInsightService:
             return recommendations
             
         except Exception as e:
-            print(f"⚠️ Error generating monthly recommendations: {e}")
+            print(f" Error generating monthly recommendations: {e}")
             return []
 
     def get_seasonal_patterns(self):
         """Enhanced seasonal patterns dengan clear categorization"""
         try:
-            print("🗓️ Analyzing enhanced seasonal patterns...")
+            print(" Analyzing enhanced seasonal patterns...")
             
             df = self.load_commodity_data()
             
@@ -1121,7 +1191,7 @@ class CommodityInsightService:
             print(f"Error in enhanced seasonal analysis: {str(e)}")
             return {
                 'success': False,
-                'message': f'Error analyzing seasonal patterns: {str(e)}'
+                'message': f'Error menganalisis pola musiman: {str(e)}'
             }
 
     def _categorize_month_pattern(self, avg_iph, iph_volatility, commodity_volatility):
@@ -1211,7 +1281,7 @@ class CommodityInsightService:
         if not patterns:
             return "No seasonal data available"
         
-        summary = "🗓️ **Pola Seasonal Komoditas (Berdasarkan Bulan Kalender)**\n\n"
+        summary = " **Pola Seasonal Komoditas (Berdasarkan Bulan Kalender)**\n\n"
         
         # High-level overview
         total_months = len(patterns)
@@ -1222,29 +1292,29 @@ class CommodityInsightService:
         # Peak periods
         if insights['peak_inflation_months']:
             peak_month = insights['peak_inflation_months'][0]
-            summary += f"🔴 **Puncak Inflasi**: {peak_month['month']} ({peak_month['avg_iph']:.2f}%)\n"
+            summary += f" **Puncak Inflasi**: {peak_month['month']} ({peak_month['avg_iph']:.2f}%)\n"
             summary += f"   Didominasi: {peak_month['dominant_commodity']} (kategori {peak_month['dominant_category']})\n\n"
         
         if insights['peak_deflation_months']:
             trough_month = insights['peak_deflation_months'][0]
-            summary += f"🔵 **Puncak Deflasi**: {trough_month['month']} ({trough_month['avg_iph']:.2f}%)\n"
+            summary += f" **Puncak Deflasi**: {trough_month['month']} ({trough_month['avg_iph']:.2f}%)\n"
             summary += f"   Didominasi: {trough_month['dominant_commodity']} (kategori {trough_month['dominant_category']})\n\n"
         
         # Stability analysis
         if insights['stable_months']:
             stable_count = len(insights['stable_months'])
-            summary += f"✅ **Bulan Stabil**: {stable_count} bulan menunjukkan stabilitas harga\n\n"
+            summary += f" **Bulan Stabil**: {stable_count} bulan menunjukkan stabilitas harga\n\n"
         
         # Risk assessment
         if insights['high_risk_months']:
             risk_months = [m['month'] for m in insights['high_risk_months']]
-            summary += f"⚠️ **Bulan Berisiko Tinggi**: {', '.join(risk_months)}\n"
+            summary += f" **Bulan Berisiko Tinggi**: {', '.join(risk_months)}\n"
             summary += f"   Memerlukan monitoring ekstra dan persiapan kebijakan\n\n"
         
         # Volatility patterns
         if insights['most_volatile_months']:
             volatile_month = insights['most_volatile_months'][0]
-            summary += f"⚡ **Bulan Paling Volatile**: {volatile_month['month']} "
+            summary += f" **Bulan Paling Volatile**: {volatile_month['month']} "
             summary += f"(volatility: {volatile_month['volatility']:.3f}%)\n"
         
         return summary
@@ -1346,35 +1416,35 @@ class CommodityInsightService:
             print(f"Error in enhanced alert analysis: {str(e)}")
             return {
                 'success': False,
-                'message': f'Error analyzing alerts: {str(e)}'
+                'message': f'Error menganalisis peringatan: {str(e)}'
             }
 
     def _generate_enhanced_alert_summary(self, alerts, threshold, stats):
         """Generate enhanced alert summary"""
         if not alerts:
-            return f"✅ Kondisi Normal: Tidak ada komoditas dengan volatilitas > {threshold:.1%}"
+            return f" Kondisi Normal: Tidak ada komoditas dengan volatilitas > {threshold:.1%}"
         
-        summary = f"⚠️ **Alert Volatilitas Komoditas** (Threshold: {threshold:.1%})\n\n"
+        summary = f" **Alert Volatilitas Komoditas** (Threshold: {threshold:.1%})\n\n"
         
         # Alert breakdown
         if stats['critical_alerts'] > 0:
-            summary += f"🔴 **Kritis**: {stats['critical_alerts']} komoditas (>20%)\n"
+            summary += f" **Kritis**: {stats['critical_alerts']} komoditas (>20%)\n"
         if stats['high_alerts'] > 0:
-            summary += f"🟡 **Tinggi**: {stats['high_alerts']} komoditas (15-20%)\n"
+            summary += f" **Tinggi**: {stats['high_alerts']} komoditas (15-20%)\n"
         if stats['medium_alerts'] > 0:
-            summary += f"🔵 **Sedang**: {stats['medium_alerts']} komoditas (10-15%)\n"
+            summary += f" **Sedang**: {stats['medium_alerts']} komoditas (10-15%)\n"
         
         # Most problematic
         if alerts:
             top_alert = alerts[0]
-            summary += f"\n🎯 **Paling Bermasalah**: {top_alert['commodity']}\n"
+            summary += f"\n **Paling Bermasalah**: {top_alert['commodity']}\n"
             summary += f"   Volatilitas: {top_alert['volatility_percentage']:.1f}% ({top_alert['severity_text']})\n"
             summary += f"   Kategori: {top_alert['category']} {top_alert['category_icon']}\n"
         
         # Recent trend
         recent_alerts = [a for a in alerts if a['days_ago'] <= 7]
         if recent_alerts:
-            summary += f"\n📅 **Minggu Ini**: {len(recent_alerts)} alert baru"
+            summary += f"\n **Minggu Ini**: {len(recent_alerts)} alert baru"
         
         return summary
 
@@ -1408,7 +1478,7 @@ class CommodityInsightService:
                         'priority': 'high',
                         'type': 'category_intervention',
                         'title': f'Intervensi Kategori {category}',
-                        'description': f"{category_info.get('icon', '📦')} {count} komoditas dalam kategori {category} menunjukkan volatilitas tinggi",
+                        'description': f"{category_info.get('icon', '')} {count} komoditas dalam kategori {category} menunjukkan volatilitas tinggi",
                         'category': category,
                         'action': f'Analisis supply chain {category_info.get("description", "kategori ini")}',
                         'timeframe': '1-2 minggu'
@@ -1429,10 +1499,10 @@ class CommodityInsightService:
             return recommendations
             
         except Exception as e:
-            print(f"⚠️ Error generating enhanced recommendations: {e}")
+            print(f" Error generating enhanced recommendations: {e}")
             return []
         
-    def get_commodity_trends(self, commodity_name=None, periods=4):
+    def get_commodity_trends(self, commodity_name=None, periods=4, start_key=None, end_key=None):
         """Enhanced commodity trends analysis dengan better structure"""
         try:
             df = self.load_commodity_data()
@@ -1443,38 +1513,97 @@ class CommodityInsightService:
                     'message': 'No commodity data available'
                 }
             
-            # Get recent periods
-            df_recent = df.tail(periods * 3)  # Get more data for better analysis
+            # Get recent periods - but limit to available data
+            total_available = len(df)
+
+            # Optional: slice by start_key (YYYY-MM) and end_key (YYYY-MM)
+            if start_key or end_key:
+                try:
+                    # Expect start_key like '2024-06'
+                    df = df.copy()
+                    df['year'] = pd.to_datetime(df['Tanggal']).dt.year
+                    df['month'] = pd.to_datetime(df['Tanggal']).dt.month
+                    # Build numeric yyyymm for comparison
+                    df['_ym'] = df['year'] * 100 + df['month']
+                    start_ym = None
+                    end_ym = None
+                    if start_key:
+                        sy, sm = [int(x) for x in str(start_key).split('-')[:2]]
+                        start_ym = sy * 100 + sm
+                    if end_key:
+                        ey, em = [int(x) for x in str(end_key).split('-')[:2]]
+                        end_ym = ey * 100 + em
+
+                    if start_ym is not None and end_ym is not None:
+                        df_recent = df[(df['_ym'] >= start_ym) & (df['_ym'] <= end_ym)]
+                    elif start_ym is not None:
+                        df_recent = df[df['_ym'] >= start_ym]
+                    elif end_ym is not None:
+                        df_recent = df[df['_ym'] <= end_ym]
+                    else:
+                        df_recent = df
+
+                    if periods < 999:
+                        df_recent = df_recent.head(periods)
+                except Exception as _:
+                    df_recent = df.tail(min(periods if periods < 999 else total_available, total_available))
+                periods_to_analyze = len(df_recent)
+            else:
+                # Handle "all data" option (999 or very large number)
+                if periods >= 999:
+                    df_recent = df  # Use all available data
+                    periods_to_analyze = total_available
+                else:
+                    periods_to_analyze = min(periods, total_available)
+                    df_recent = df.tail(periods_to_analyze)  # Get exact number of periods requested, limited by available data
             
             trends = {}
+            valid_trend_rows = 0
             
             for _, row in df_recent.iterrows():
                 period_key = f"{row.get('Bulan', 'Unknown')} {row.get('Minggu', 'Unknown')}"
-                commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
-                
-                for comm in commodities:
-                    # Filter by specific commodity if requested
-                    if commodity_name and comm['name'] != commodity_name.upper():
-                        continue
+                if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
+                    valid_trend_rows += 1
+                    commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
                     
-                    if comm['name'] not in trends:
-                        trends[comm['name']] = {
-                            'periods': [],
-                            'impacts': [],
-                            'appearances': 0,
-                            'category': comm.get('category', 'LAINNYA'),
-                            'total_impact': 0,
-                            'trend': 'stable',
-                            'trend_strength': 'weak',
-                            'trend_coefficient': 0.0,
-                            'volatility': 0.0,
-                            'avg_impact': 0.0
-                        }
-                    
-                    trends[comm['name']]['periods'].append(period_key)
-                    trends[comm['name']]['impacts'].append(comm['impact'])
-                    trends[comm['name']]['appearances'] += 1
-                    trends[comm['name']]['total_impact'] += comm['impact']
+                    for comm in commodities:
+                        # Filter by specific commodity if requested
+                        if commodity_name and comm['name'] != commodity_name.upper():
+                            continue
+                        
+                        if comm['name'] not in trends:
+                            trends[comm['name']] = {
+                                'periods': [],
+                                'impacts': [],
+                                'appearances': 0,
+                                'category': comm.get('category', 'LAINNYA'),
+                                'total_impact': 0,
+                                'trend': 'stable',
+                                'trend_strength': 'weak',
+                                'trend_coefficient': 0.0,
+                                'volatility': 0.0,
+                                'avg_impact': 0.0
+                            }
+                        
+                        trends[comm['name']]['periods'].append(period_key)
+                        trends[comm['name']]['impacts'].append(comm['impact'])
+                        trends[comm['name']]['appearances'] += 1
+                        trends[comm['name']]['total_impact'] += comm['impact']
+            
+            # If no valid commodity data found, provide informative message
+            if not trends:
+                return {
+                    'success': True,
+                    'periods_analyzed': periods_to_analyze,
+                    'total_available_periods': total_available,
+                    'commodities_found': 0,
+                    'commodity_trends': {},
+                    'summary': f"📊 Analisis Trend Komoditas:\n\n**Scope**: {periods_to_analyze} periode dari {total_available} total\n**Status**: Data komoditas tidak tersedia untuk periode yang dipilih\n**Saran**: Pilih periode yang lebih baru atau upload data komoditas historis",
+                    'category_trends': {},
+                    'analysis_scope': 'all_data' if periods >= 999 else f'last_{periods_to_analyze}_periods',
+                    'data_availability': 'no_commodity_data'
+                }
+            
             
             # Enhanced trend calculation
             for name, data in trends.items():
@@ -1529,18 +1658,20 @@ class CommodityInsightService:
             ))
             
             # Generate enhanced summary
-            summary = self._generate_enhanced_trend_summary(sorted_trends)
+            summary = self._generate_enhanced_trend_summary(sorted_trends, periods_to_analyze, total_available)
             
             # Generate category trends
             category_trends = self._analyze_category_trends(sorted_trends)
             
             return {
                 'success': True,
-                'periods_analyzed': periods,
+                'periods_analyzed': periods_to_analyze,
+                'total_available_periods': total_available,
                 'commodities_found': len(trends),
                 'commodity_trends': sorted_trends,
                 'summary': summary,
-                'category_trends': category_trends
+                'category_trends': category_trends,
+                'analysis_scope': 'all_data' if periods >= 999 else f'last_{periods_to_analyze}_periods'
             }
             
         except Exception as e:
@@ -1550,7 +1681,108 @@ class CommodityInsightService:
             
             return {
                 'success': False,
-                'message': f'Error analyzing trends: {str(e)}'
+                'message': f'Error menganalisis trend: {str(e)}'
+            }
+
+    def get_impact_ranking(self):
+        """
+        Get volatility ranking of commodities
+        """
+        try:
+            df = self.load_commodity_data()
+            
+            if df.empty:
+                return {
+                    'success': False,
+                    'error': 'Tidak ada data komoditas tersedia',
+                    'ranking': [],
+                    'total_commodities': 0,
+                    'total_appearances': 0,
+                    'avg_frequency': 0
+                }
+            
+            # Parse commodity impacts for all records
+            all_commodities = []
+            valid_rows = 0
+            for _, row in df.iterrows():
+                if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
+                    valid_rows += 1
+                    commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
+                    for commodity in commodities:
+                        commodity['date'] = row['Tanggal']
+                        commodity['iph'] = row.get('IPH', 0)
+                    all_commodities.extend(commodities)
+            
+            
+            if not all_commodities:
+                return {
+                    'success': False,
+                    'error': 'Tidak ada data dampak komoditas ditemukan',
+                    'ranking': [],
+                    'total_commodities': 0,
+                    'total_appearances': 0,
+                    'avg_frequency': 0
+                }
+            
+            # Convert to DataFrame for analysis
+            commodities_df = pd.DataFrame(all_commodities)
+            commodities_df['date'] = pd.to_datetime(commodities_df['date'])
+            
+            # Calculate volatility for each commodity
+            commodity_stats = {}
+            
+            for commodity_name in commodities_df['name'].unique():
+                commodity_data = commodities_df[commodities_df['name'] == commodity_name]
+                
+                if len(commodity_data) < 2:
+                    continue
+                
+                impacts = commodity_data['impact'].values
+                volatility = impacts.std() if len(impacts) > 1 else 0
+                avg_impact = impacts.mean()
+                frequency = len(commodity_data)
+                
+                # Get category
+                category = commodity_data['category'].iloc[0] if 'category' in commodity_data.columns else 'LAINNYA'
+                
+                commodity_stats[commodity_name] = {
+                    'commodity_name': commodity_name,
+                    'volatility': volatility,
+                    'avg_impact': avg_impact,
+                    'frequency': frequency,
+                    'category': category
+                }
+            
+            # Sort by frequency (highest first) - most impactful commodities
+            sorted_ranking = sorted(commodity_stats.items(), 
+                                  key=lambda x: x[1]['frequency'], 
+                                  reverse=True)
+            
+            # Convert to list format
+            ranking = [item[1] for item in sorted_ranking]
+            
+            # Calculate statistics
+            total_commodities = len(ranking)
+            total_appearances = sum([item['frequency'] for item in ranking])
+            avg_frequency = np.mean([item['frequency'] for item in ranking]) if ranking else 0
+            
+            return {
+                'success': True,
+                'ranking': ranking,
+                'total_commodities': total_commodities,
+                'total_appearances': total_appearances,
+                'avg_frequency': avg_frequency
+            }
+            
+        except Exception as e:
+            print(f"Error in get_impact_ranking: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'ranking': [],
+                'total_commodities': 0,
+                'total_appearances': 0,
+                'avg_frequency': 0
             }
 
     def _generate_enhanced_trend_summary(trends):
@@ -1619,13 +1851,13 @@ class CommodityInsightService:
             
             # Create summary based on IPH and commodities
             if iph_value > 2:
-                summary = f"🔴 **Inflasi Tinggi**: IPH mencapai {iph_value:.2f}% pada {period}"
+                summary = f" **Inflasi Tinggi**: IPH mencapai {iph_value:.2f}% pada {period}"
             elif iph_value > 0:
-                summary = f"🟡 **Inflasi Moderat**: IPH {iph_value:.2f}% pada {period}"
+                summary = f" **Inflasi Moderat**: IPH {iph_value:.2f}% pada {period}"
             elif iph_value < -2:
-                summary = f"🔵 **Deflasi Tinggi**: IPH turun {iph_value:.2f}% pada {period}"
+                summary = f" **Deflasi Tinggi**: IPH turun {iph_value:.2f}% pada {period}"
             else:
-                summary = f"🟢 **Kondisi Stabil**: IPH {iph_value:.2f}% pada {period}"
+                summary = f" **Kondisi Stabil**: IPH {iph_value:.2f}% pada {period}"
             
             # Add top commodity info
             if commodities:
@@ -1674,7 +1906,7 @@ class CommodityInsightService:
         except Exception as e:
             return []
 
-    def _generate_enhanced_trend_summary(self, trends):
+    def _generate_enhanced_trend_summary(self, trends, periods_analyzed=None, total_available=None):
         """Generate enhanced trend summary"""
         if not trends:
             return "No commodity trends available"
@@ -1684,17 +1916,37 @@ class CommodityInsightService:
                         if data.get('trend') == 'increasing' and data.get('trend_strength') == 'strong']
         strong_decreasing = [name for name, data in trends.items() 
                         if data.get('trend') == 'decreasing' and data.get('trend_strength') == 'strong']
+        moderate_increasing = [name for name, data in trends.items() 
+                        if data.get('trend') == 'increasing' and data.get('trend_strength') == 'moderate']
+        moderate_decreasing = [name for name, data in trends.items() 
+                        if data.get('trend') == 'decreasing' and data.get('trend_strength') == 'moderate']
         
         most_volatile = max(trends.items(), key=lambda x: x[1].get('volatility', 0)) if trends else None
         most_consistent = max(trends.items(), key=lambda x: x[1]['appearances']) if trends else None
         
-        summary = "Analisis Trend Komoditas:\n\n"
+        summary = "📊 Analisis Trend Komoditas:\n\n"
         
+        # Add scope information
+        if periods_analyzed and total_available:
+            if periods_analyzed == total_available:
+                summary += f"**Scope**: Semua data ({total_available} periode)\n"
+            else:
+                summary += f"**Scope**: {periods_analyzed} periode terakhir dari {total_available} total\n"
+        
+        summary += f"**Total Komoditas**: {len(trends)} komoditas dianalisis\n\n"
+        
+        # Trend analysis
         if strong_increasing:
-            summary += f"🔴 **Dampak meningkat kuat**: {', '.join(strong_increasing[:3])}\n"
+            summary += f"📈 **Dampak meningkat kuat**: {', '.join(strong_increasing[:3])}\n"
         
         if strong_decreasing:
-            summary += f"🔵 **Dampak menurun kuat**: {', '.join(strong_decreasing[:3])}\n"
+            summary += f"📉 **Dampak menurun kuat**: {', '.join(strong_decreasing[:3])}\n"
+        
+        if moderate_increasing:
+            summary += f"📊 **Dampak meningkat moderat**: {', '.join(moderate_increasing[:3])}\n"
+        
+        if moderate_decreasing:
+            summary += f"📊 **Dampak menurun moderat**: {', '.join(moderate_decreasing[:3])}\n"
         
         if most_volatile:
             summary += f"⚡ **Paling volatile**: {most_volatile[0]} (volatility: {most_volatile[1]['volatility']:.3f})\n"
@@ -1733,124 +1985,100 @@ class CommodityInsightService:
         except Exception as e:
             return []
         
-    def get_commodity_trends(self, commodity_name=None, periods=4):
-        """Enhanced commodity trends analysis dengan better structure"""
+    def get_impact_ranking(self):
+        """
+        Get volatility ranking of commodities
+        """
         try:
             df = self.load_commodity_data()
             
             if df.empty:
                 return {
                     'success': False, 
-                    'message': 'No commodity data available'
+                    'error': 'Tidak ada data komoditas tersedia',
+                    'ranking': [],
+                    'total_commodities': 0,
+                    'total_appearances': 0,
+                    'avg_frequency': 0
                 }
             
-            # Get recent periods
-            df_recent = df.tail(periods * 4)  # Get more data for better analysis
+            # Parse commodity impacts for all records
+            all_commodities = []
+            for _, row in df.iterrows():
+                if pd.notna(row.get('Komoditas_Andil')):
+                    commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
+                    for commodity in commodities:
+                        commodity['date'] = row['Tanggal']
+                        commodity['iph'] = row.get('IPH', 0)
+                    all_commodities.extend(commodities)
             
-            trends = {}
+            if not all_commodities:
+                return {
+                    'success': False,
+                    'error': 'Tidak ada data dampak komoditas ditemukan',
+                    'ranking': [],
+                    'total_commodities': 0,
+                    'total_appearances': 0,
+                    'avg_frequency': 0
+                }
             
-            for _, row in df_recent.iterrows():
-                period_key = f"{row.get('Bulan', 'Unknown')} {row.get('Minggu', 'Unknown')}"
-                commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
+            # Convert to DataFrame for analysis
+            commodities_df = pd.DataFrame(all_commodities)
+            commodities_df['date'] = pd.to_datetime(commodities_df['date'])
+            
+            # Calculate volatility for each commodity
+            commodity_stats = {}
+            
+            for commodity_name in commodities_df['name'].unique():
+                commodity_data = commodities_df[commodities_df['name'] == commodity_name]
                 
-                for comm in commodities:
-                    # Filter by specific commodity if requested
-                    if commodity_name and comm['name'] != commodity_name.upper():
-                        continue
-                    
-                    if comm['name'] not in trends:
-                        trends[comm['name']] = {
-                            'periods': [],
-                            'impacts': [],
-                            'appearances': 0,
-                            'category': comm.get('category', 'LAINNYA'),
-                            'category_icon': comm.get('category_icon', '📦'),
-                            'total_impact': 0,
-                            'trend': 'stable',
-                            'trend_strength': 'weak',
-                            'trend_coefficient': 0.0,
-                            'volatility': 0.0,
-                            'avg_impact': 0.0
-                        }
-                    
-                    trends[comm['name']]['periods'].append(period_key)
-                    trends[comm['name']]['impacts'].append(comm['impact'])
-                    trends[comm['name']]['appearances'] += 1
-                    trends[comm['name']]['total_impact'] += comm['impact']
+                if len(commodity_data) < 2:
+                    continue
+                
+                impacts = commodity_data['impact'].values
+                volatility = impacts.std() if len(impacts) > 1 else 0
+                avg_impact = impacts.mean()
+                frequency = len(commodity_data)
+                
+                # Get category
+                category = commodity_data['category'].iloc[0] if 'category' in commodity_data.columns else 'LAINNYA'
+                
+                commodity_stats[commodity_name] = {
+                    'commodity_name': commodity_name,
+                    'volatility': volatility,
+                    'avg_impact': avg_impact,
+                    'frequency': frequency,
+                    'category': category
+                }
             
-            # Enhanced trend calculation
-            for name, data in trends.items():
-                impacts = data['impacts']
-                if len(impacts) > 1:
-                    # Linear trend coefficient
-                    x = np.arange(len(impacts))
-                    try:
-                        z = np.polyfit(x, impacts, 1)
-                        data['trend_coefficient'] = float(z[0])
-                        
-                        # Trend classification
-                        if abs(z[0]) < 0.01:
-                            data['trend'] = 'stable'
-                            data['trend_strength'] = 'weak'
-                        elif z[0] > 0.05:
-                            data['trend'] = 'increasing'
-                            data['trend_strength'] = 'strong'
-                        elif z[0] > 0.01:
-                            data['trend'] = 'increasing'
-                            data['trend_strength'] = 'moderate'
-                        elif z[0] < -0.05:
-                            data['trend'] = 'decreasing'
-                            data['trend_strength'] = 'strong'
-                        elif z[0] < -0.01:
-                            data['trend'] = 'decreasing'
-                            data['trend_strength'] = 'moderate'
-                        else:
-                            data['trend'] = 'stable'
-                            data['trend_strength'] = 'weak'
-                    except:
-                        data['trend_coefficient'] = 0.0
-                        data['trend'] = 'stable'
-                        data['trend_strength'] = 'weak'
-                    
-                    # Calculate volatility and average
-                    data['volatility'] = float(np.std(impacts))
-                    data['avg_impact'] = float(np.mean(impacts))
-                    
-                else:
-                    data['trend'] = 'insufficient_data'
-                    data['trend_coefficient'] = 0.0
-                    data['trend_strength'] = 'unknown'
-                    data['volatility'] = 0.0
-                    data['avg_impact'] = impacts[0] if impacts else 0.0
+            # Sort by frequency (highest first) - most impactful commodities
+            sorted_ranking = sorted(commodity_stats.items(), 
+                                  key=lambda x: x[1]['frequency'], 
+                                  reverse=True)
             
-            # Sort by total absolute impact
-            sorted_trends = dict(sorted(
-                trends.items(), 
-                key=lambda x: abs(x[1]['total_impact']), 
-                reverse=True
-            ))
+            # Convert to list format
+            ranking = [item[1] for item in sorted_ranking]
             
-            # Generate enhanced summary
-            summary = self._generate_enhanced_trend_summary(sorted_trends)
-            
-            # Generate category trends
-            category_trends = self._analyze_category_trends(sorted_trends)
+            # Calculate statistics
+            total_commodities = len(ranking)
+            total_appearances = sum([item['frequency'] for item in ranking])
+            avg_frequency = np.mean([item['frequency'] for item in ranking]) if ranking else 0
             
             return {
                 'success': True,
-                'periods_analyzed': periods,
-                'commodities_found': len(trends),
-                'commodity_trends': sorted_trends,
-                'summary': summary,
-                'category_trends': category_trends
+                'ranking': ranking,
+                'total_commodities': total_commodities,
+                'total_appearances': total_appearances,
+                'avg_frequency': avg_frequency
             }
             
         except Exception as e:
-            print(f"Error in commodity trends: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
+            print(f"Error in get_impact_ranking: {e}")
             return {
                 'success': False,
-                'message': f'Error analyzing trends: {str(e)}'
+                'error': str(e),
+                'ranking': [],
+                'total_commodities': 0,
+                'total_appearances': 0,
+                'avg_frequency': 0
             }

@@ -70,7 +70,7 @@ class ModelDriftDetector:
 
 
 class ModelManager:
-    """🆕 Database-enabled model manager"""
+    """ Database-enabled model manager"""
     
     def __init__(self, data_path='data/historical_data.csv', models_path='data/models/'):
         self.engine = ForecastingEngine(data_path, models_path)
@@ -81,7 +81,7 @@ class ModelManager:
         print("ModelManager initialized (Database Mode)")
     
     def save_performance_history(self, results):
-        """🆕 Save model performance to database"""
+        """ Save model performance to database"""
         print("Saving performance history to database...")
         
         try:
@@ -132,7 +132,7 @@ class ModelManager:
             print(f"Error saving performance history: {str(e)}")
     
     def _cleanup_old_performance_records(self):
-        """🆕 Keep only last N records per model"""
+        """ Keep only last N records per model"""
         try:
             # Get all model names
             model_names = db.session.query(ModelPerformance.model_name).distinct().all()
@@ -161,7 +161,7 @@ class ModelManager:
             print(f"Error during cleanup: {str(e)}")
     
     def load_performance_history(self):
-        """🆕 Load performance history from database"""
+        """ Load performance history from database"""
         try:
             # Query all performance records ordered by trained_at
             records = ModelPerformance.query.order_by(
@@ -178,7 +178,7 @@ class ModelManager:
             return []
     
     def get_current_best_model(self):
-        """🆕 Get current best model from database"""
+        """ Get current best model from database"""
         try:
             # Get latest best model for each model type
             
@@ -293,7 +293,7 @@ class ModelManager:
     
     def train_and_compare_models(self, df):
         """Train models and compare with previous best (same as before)"""
-        print("🚀 Starting comprehensive model training and comparison...")
+        print(" Starting comprehensive model training and comparison...")
         
         try:
             results, trained_models = self.engine.train_and_evaluate_models(df)
@@ -302,7 +302,7 @@ class ModelManager:
             
             saved_models = self.engine.save_models(trained_models, results)
             
-            # 🆕 Save to database instead of JSON
+            #  Save to database instead of JSON
             self.save_performance_history(results)
             
             training_summary = {
@@ -314,9 +314,9 @@ class ModelManager:
             }
             
             print(f" Training completed successfully!")
-            print(f"   🏆 Best model: {training_summary['best_model']}")
+            print(f"    Best model: {training_summary['best_model']}")
             print(f"    Models trained: {training_summary['total_models_trained']}")
-            print(f"   📈 Improvement: {'Yes' if training_summary['is_improvement'] else 'No'}")
+            print(f"    Improvement: {'Yes' if training_summary['is_improvement'] else 'No'}")
             
             return {
                 'training_results': results,
@@ -327,11 +327,11 @@ class ModelManager:
             }
             
         except Exception as e:
-            print(f"❌ Error in training and comparison: {str(e)}")
+            print(f"Error in training and comparison: {str(e)}")
             raise
     
     def get_model_performance_summary(self):
-        """🆕 Get performance summary from database"""
+        """ Get performance summary from database"""
         try:
             # Get all model names
             model_names = db.session.query(ModelPerformance.model_name).distinct().all()
@@ -371,11 +371,11 @@ class ModelManager:
             return model_summary
             
         except Exception as e:
-            print(f"❌ Error getting model summary: {str(e)}")
+            print(f"Error getting model summary: {str(e)}")
             return {}
     
     def get_training_history_chart_data(self):
-        """🆕 Get training history from database"""
+        """ Get training history from database"""
         try:
             history = self.load_performance_history()
             
@@ -396,7 +396,7 @@ class ModelManager:
             return chart_data
             
         except Exception as e:
-            print(f"❌ Error getting training history: {str(e)}")
+            print(f"Error getting training history: {str(e)}")
             return {}
     
     def check_model_health(self, new_data_df):
@@ -418,7 +418,7 @@ class ModelManager:
                 drift_result = self.drift_detector.detect_drift(X_new, best_model)
                 
                 if drift_result['drift_detected']:
-                    print(f"🚨 DRIFT DETECTED: {drift_result['drift_signals']}")
+                    print(f" DRIFT DETECTED: {drift_result['drift_signals']}")
                     print(f" Drift score: {drift_result['drift_score']:.2f}")
                 
                 return drift_result
@@ -426,7 +426,7 @@ class ModelManager:
             return {'drift_detected': False, 'reason': 'No reference model'}
             
         except Exception as e:
-            print(f"⚠️ Error in drift detection: {str(e)}")
+            print(f"Error in drift detection: {str(e)}")
             return {'drift_detected': False, 'reason': f'Error: {str(e)}'}
 
 

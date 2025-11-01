@@ -92,35 +92,35 @@ class ForecastService:
             with open(forecast_path, 'w') as f:
                 json.dump(forecast_data, f, indent=2)
             
-            print(f"✅ Forecast saved to {forecast_path}")
+            print(f"Forecast saved to {forecast_path}")
             
         except Exception as e:
-            print(f"⚠️ Error saving forecast to file: {e}")
+            print(f"Error saving forecast to file: {e}")
 
     def process_new_data_and_forecast(self, new_data_df, forecast_weeks=8):
         """ENHANCED pipeline with all ML improvements - FIXED ERROR HANDLING"""
         print("=" * 60)
-        print("🚀 STARTING ENHANCED ML PIPELINE")
+        print(" STARTING ENHANCED ML PIPELINE")
         print("=" * 60)
         
         pipeline_start_time = datetime.now()
         
         try:
             # Step 1: Process and merge new data
-            print("\n📥 STEP 1: Processing new data...")
+            print("\n STEP 1: Processing new data...")
             
-            # ✅ FIX: Add specific error handling for database operations
+            # FIX: Add specific error handling for database operations
             try:
                 combined_df, merge_info = self.data_handler.merge_and_save_data(new_data_df)
-                print(f"✅ Data merge successful: {merge_info['total_records']} total records")
+                print(f"Data merge successful: {merge_info['total_records']} total records")
                 
             except Exception as merge_error:
                 error_msg = str(merge_error)
-                print(f"❌ Data merge failed: {error_msg}")
+                print(f"Data merge failed: {error_msg}")
                 
                 # Check if it's a duplicate error (shouldn't happen now, but safety net)
                 if "UNIQUE constraint failed" in error_msg or "IntegrityError" in error_msg:
-                    print("⚠️ Duplicate data detected. Attempting recovery...")
+                    print("Duplicate data detected. Attempting recovery...")
                     
                     # Try to load existing data
                     combined_df = self.data_handler.load_historical_data()
@@ -140,7 +140,7 @@ class ForecastService:
                         'recovery_mode': True
                     }
                     
-                    print(f"⚠️ Recovery mode: Using {len(combined_df)} existing records")
+                    print(f"Recovery mode: Using {len(combined_df)} existing records")
                 else:
                     # Re-raise non-duplicate errors
                     raise
@@ -148,30 +148,30 @@ class ForecastService:
             if combined_df.empty:
                 combined_df = self.data_handler.load_historical_data()
                 
-            print(f"✅ Training with {len(combined_df)} records from database")
+            print(f"Training with {len(combined_df)} records from database")
 
             # Step 1.5: Check for model drift
-            print("\n🔍 STEP 1.5: Checking for model drift...")
+            print("\nSTEP 1.5: Checking for model drift...")
             try:
                 drift_result = self.model_manager.check_model_health(new_data_df)
             except Exception as drift_error:
-                print(f"⚠️ Drift detection failed: {str(drift_error)}")
+                print(f"Drift detection failed: {str(drift_error)}")
                 drift_result = {'drift_detected': False, 'reason': f'Drift check error: {str(drift_error)}'}
             
             force_retrain = drift_result.get('drift_detected', False)
             
             if force_retrain:
-                print(f"⚠️ Drift detected: {drift_result.get('drift_signals', [])}")
-                print("🔄 Forcing model retraining due to drift...")
+                print(f"Drift detected: {drift_result.get('drift_signals', [])}")
+                print("Forcing model retraining due to drift...")
             
             # Step 2: Train and compare models
-            print("\n🤖 STEP 2: Training and comparing models...")
+            print("\n STEP 2: Training and comparing models...")
             current_best = self.model_manager.get_current_best_model()
             
             if force_retrain or not current_best:
                 training_result = self.model_manager.train_and_compare_models(combined_df)
             else:
-                print("✅ Using existing models (no drift detected)")
+                print("Using existing models (no drift detected)")
                 training_result = {
                     'training_results': {},
                     'comparison': {'is_improvement': False, 'new_best_model': current_best},
@@ -179,7 +179,7 @@ class ForecastService:
                 }
             
             # Step 3: Generate forecast with best model
-            print("\n🔮 STEP 3: Generating forecast...")
+            print("\n STEP 3: Generating forecast...")
             best_model = self.model_manager.get_current_best_model()
             
             if not best_model:
@@ -249,19 +249,19 @@ class ForecastService:
             result = clean_data_for_json(result)
             
             print("\n" + "=" * 60)
-            print("✅ ENHANCED PIPELINE COMPLETED!")
-            print(f"   ⏱️ Total time: {pipeline_duration:.2f} seconds")
-            print(f"   📊 Data records: {merge_info['total_records']}")
-            print(f"   🤖 Best model: {best_model_name}")
-            print(f"   📈 Forecast weeks: {forecast_weeks}")
-            print(f"   📉 Avg prediction: {forecast_summary['avg_prediction']:.3f}%")
+            print("ENHANCED PIPELINE COMPLETED!")
+            print(f"   Total time: {pipeline_duration:.2f} seconds")
+            print(f"   Data records: {merge_info['total_records']}")
+            print(f"    Best model: {best_model_name}")
+            print(f"    Forecast weeks: {forecast_weeks}")
+            print(f"    Avg prediction: {forecast_summary['avg_prediction']:.3f}%")
             print("=" * 60)
             
             return result
             
         except Exception as e:
             error_msg = f"Enhanced pipeline failed: {str(e)}"
-            print(f"\n❌ {error_msg}")
+            print(f"\n{error_msg}")
             import traceback
             traceback.print_exc()
             
@@ -300,7 +300,7 @@ class ForecastService:
                 available_models = self.model_manager.engine.get_available_models()
                 model_names = [m['name'].replace(' ', '_') for m in available_models]
                 
-                print(f"   📋 Available models: {model_names}")
+                print(f"    Available models: {model_names}")
                 
                 if model_name not in model_names:
                     print(f"    Model '{model_name}' not found in available models")
@@ -415,11 +415,11 @@ class ForecastService:
         
         try:
             # Load CSV data
-            print(f"📂 Loading data from: {csv_file_path}")
+            print(f" Loading data from: {csv_file_path}")
             df = pd.read_csv(csv_file_path)
             
             print(f" Loaded {len(df)} records from CSV")
-            print(f"   📋 Columns: {list(df.columns)}")
+            print(f"    Columns: {list(df.columns)}")
             
             # Process as new data (this will become historical data)
             result = self.process_new_data_and_forecast(df, forecast_weeks=8)
