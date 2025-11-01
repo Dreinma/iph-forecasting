@@ -60,14 +60,38 @@ data/models/*.pkl
 .DS_Store
 Thumbs.db
 
-# Data backups (uncomment jika tidak ingin backup di git)
-# data/backups/
-# data/db_backups/
+# Data backups (tidak perlu di-commit)
+data/backups/
+data/db_backups/
+data/backups/**/*
+data/db_backups/**/*
 
-# Forecast cache
+# Forecast cache & temporary data
 data/latest_forecast.json
+data/*.json
+!data/*.csv
 
-# Uploads
+# Uploads (keep template file)
 static/uploads/*
 !static/uploads/.gitkeep
+!static/uploads/template_iph_komoditas.csv
+
+# Flask specific
+instance/
+.webassets-cache
+flask_session/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
