@@ -7,11 +7,15 @@ class Config:
     DEBUG = True
     
     #  Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
+    # Default: SQLite untuk development
+    # Untuk MySQL: Set DATABASE_URL environment variable atau gunakan ProductionConfig
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Set True for SQL query debugging
     
-    #  Database Connection Pool
+    #  Database Connection Pool (default untuk SQLite)
+    # MySQL/MariaDB akan override di ProductionConfig
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
         'pool_recycle': 3600,
@@ -94,9 +98,22 @@ class ProductionConfig(Config):
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'production-secret-key-change-this'
     SQLALCHEMY_ECHO = False
     
-    # Production database (example: PostgreSQL)
-    # SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-    #     'postgresql://user:password@localhost/prisma_db'
+    # Production database - MySQL untuk Hostinger
+    # Format: mysql+pymysql://username:password@host:port/database_name
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'mysql+pymysql://root:password@localhost:3306/prisma_db'
+    
+    # MySQL connection pool settings
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+        'max_overflow': 20,
+        'connect_args': {
+            'charset': 'utf8mb4',
+            'sql_mode': 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'
+        }
+    }
 
 class TestingConfig(Config):
     TESTING = True

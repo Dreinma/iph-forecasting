@@ -136,13 +136,7 @@
                         <span class="nav-text ms-2">Dashboard</span>
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint == 'data_control' %}active{% endif %}" 
-                    href="{{ url_for('data_control') }}" title="Kontrol Data">
-                        <i class="fas fa-database"></i>
-                        <span class="nav-text ms-2">Kontrol Data</span>
-                    </a>
-                </li>
+                <!-- Kontrol Data removed - Admin only access via /admin/data-control -->
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint == 'visualization' %}active{% endif %}" 
                     href="{{ url_for('visualization') }}" title="Visualisasi">
@@ -165,6 +159,38 @@
                     </a>
                 </li>
             </ul>
+            
+            <!-- User Menu -->
+            <div class="mt-auto px-3 pb-3">
+                <hr class="text-white-50">
+                {% if current_user.is_authenticated %}
+                    <!-- Admin Logged In -->
+                    <div class="text-white mb-2">
+                        <small class="text-white-50">Logged in as:</small><br>
+                        <strong>{{ current_user.username }}</strong><br>
+                        <span class="badge bg-success">Admin</span>
+                    </div>
+                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link text-white mb-2">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span class="nav-text ms-2">Admin Dashboard</span>
+                    </a>
+                    <a href="{{ url_for('admin.logout') }}" class="nav-link text-white">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="nav-text ms-2">Logout</span>
+                    </a>
+                {% else %}
+                    <!-- Visitor Access - Free, no login needed -->
+                    <div class="text-white mb-2">
+                        <small class="text-white-50">Akses sebagai:</small><br>
+                        <strong>Pengunjung</strong><br>
+                        <span class="badge bg-info">Visitor</span>
+                    </div>
+                    <a href="{{ url_for('admin.login') }}" class="nav-link text-white">
+                        <i class="fas fa-lock me-2"></i>
+                        <span class="nav-text">Login Admin</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 

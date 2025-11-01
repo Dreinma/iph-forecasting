@@ -1,0 +1,228 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Overview sistem dan quick actions{% endblock %}
+
+{% block content %}
+<!-- Quick Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary bg-opacity-10 rounded p-3">
+                            <i class="fas fa-database fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted mb-1">Total Records</h6>
+                        <h4 class="mb-0" id="totalRecords">{{ total_records or 0 }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info bg-opacity-10 rounded p-3">
+                            <i class="fas fa-bell fa-2x text-info"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted mb-1">Active Alerts</h6>
+                        <h4 class="mb-0" id="totalAlerts">{{ active_alerts or 0 }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success bg-opacity-10 rounded p-3">
+                            <i class="fas fa-cogs fa-2x text-success"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted mb-1">Trained Models</h6>
+                        <h4 class="mb-0" id="totalModels">{{ trained_models or 0 }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning bg-opacity-10 rounded p-3">
+                            <i class="fas fa-chart-line fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="text-muted mb-1">System Status</h6>
+                        <h4 class="mb-0">
+                            <span class="badge bg-success" id="systemStatus">Active</span>
+                        </h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bolt text-primary me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.data_control') }}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-upload me-2"></i>Upload Data
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-success w-100" onclick="retrainModels()">
+                            <i class="fas fa-sync-alt me-2"></i>Retrain Models
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.alerts_manage') }}" class="btn btn-outline-warning w-100">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Manage Alerts
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.settings') }}" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-cog me-2"></i>Settings
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activities -->
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history text-info me-2"></i>Recent Activities
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="recentActivities">
+                    {% if recent_activities %}
+                        <div class="list-group list-group-flush">
+                            {% for activity in recent_activities %}
+                            <div class="list-group-item border-0 px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ activity.description }}</h6>
+                                        <small class="text-muted">
+                                            <i class="fas fa-user me-1"></i>{{ activity.username }}
+                                            <span class="ms-2">
+                                                <i class="fas fa-clock me-1"></i>{{ activity.created_at.strftime('%d %b %Y %H:%M') if activity.created_at else '-' }}
+                                            </span>
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-{{ 'primary' if activity.action_type == 'upload' else 'info' if activity.action_type == 'edit' else 'warning' if activity.action_type == 'delete' else 'success' }}">
+                                        {{ activity.action_type|upper }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Belum ada aktivitas baru</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle text-primary me-2"></i>System Info
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-user text-muted me-2"></i>
+                        <strong>Logged in as:</strong><br>
+                        <span class="text-muted">{{ current_user.username if current_user.is_authenticated else 'Guest' }}</span>
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-clock text-muted me-2"></i>
+                        <strong>Last login:</strong><br>
+                        <span class="text-muted" id="lastLogin">
+                            {% if last_login %}
+                                {{ last_login.strftime('%d %b %Y %H:%M') }}
+                            {% else %}
+                                Belum pernah login
+                            {% endif %}
+                        </span>
+                    </li>
+                    <li>
+                        <i class="fas fa-shield-alt text-muted me-2"></i>
+                        <strong>Security:</strong><br>
+                        <span class="badge bg-success">Protected</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function retrainModels() {
+    if (confirm('Apakah Anda yakin ingin retrain semua model? Proses ini mungkin memakan waktu beberapa menit.')) {
+        // TODO: Implement retrain API call
+        alert('Fitur retrain models akan diimplementasikan');
+    }
+}
+
+// Load dashboard data
+document.addEventListener('DOMContentLoaded', function() {
+    // Refresh stats from API
+    fetch('/admin/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const stats = data.stats;
+                // Update stats if needed
+                console.log('Stats loaded:', stats);
+            }
+        })
+        .catch(error => console.error('Error loading stats:', error));
+    
+    console.log('Admin dashboard loaded');
+});
+</script>
+{% endblock %}
+

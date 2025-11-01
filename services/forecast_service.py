@@ -94,6 +94,40 @@ class ForecastService:
             
             print(f"Forecast saved to {forecast_path}")
             
+            # Also save to database
+            try:
+                from app import app
+                from database import ForecastHistory, db
+                
+                with app.app_context():
+                    # Get model performance
+                    from database import ModelPerformance
+                    latest_perf = ModelPerformance.query.filter_by(
+                        model_name=model_name
+                    ).order_by(ModelPerformance.trained_at.desc()).first()
+                    
+                    forecast_history = ForecastHistory(
+                        model_name=model_name,
+                        weeks_forecasted=len(forecast_df),
+                        avg_prediction=float(summary['avg_prediction']),
+                        trend=str(summary['trend']),
+                        volatility=float(summary['volatility']),
+                        min_prediction=float(summary['min_prediction']),
+                        max_prediction=float(summary['max_prediction']),
+                        model_mae=float(latest_perf.mae) if latest_perf else None,
+                        model_rmse=float(latest_perf.rmse) if latest_perf else None,
+                        model_r2=float(latest_perf.r2_score) if latest_perf else None,
+                        forecast_data=json.dumps(forecast_data['forecasts']),
+                        created_by='system'
+                    )
+                    
+                    db.session.add(forecast_history)
+                    db.session.commit()
+                    print(f"Forecast history saved to database (ID: {forecast_history.id})")
+            except Exception as db_error:
+                print(f"WARNING: Could not save forecast to database: {str(db_error)}")
+                # Continue anyway - file save succeeded
+            
         except Exception as e:
             print(f"Error saving forecast to file: {e}")
 

@@ -1,0 +1,400 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}Model Management{% endblock %}
+{% block page_subtitle %}Training, monitoring, dan manajemen model ML{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h5 class="mb-1">Model Management</h5>
+        <p class="text-muted mb-0">Training, monitoring, dan manajemen model machine learning</p>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary" onclick="retrainAllModels()">
+            <i class="fas fa-sync-alt me-2"></i>Retrain All Models
+        </button>
+    </div>
+</div>
+
+<!-- Models Grid -->
+<div class="row g-4 mb-4" id="modelsGrid">
+    <!-- Model cards will be loaded here -->
+    <div class="col-12">
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-2">Memuat daftar model...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Model Performance Chart -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-chart-line text-info me-2"></i>Model Performance History
+        </h6>
+    </div>
+    <div class="card-body">
+        <div id="performanceChart" style="height: 400px;"></div>
+    </div>
+</div>
+
+<!-- Training Configuration -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-cog text-warning me-2"></i>Training Configuration
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="trainingConfigForm">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Forecast Min Weeks</label>
+                    <input type="number" class="form-control" name="forecast_min" value="4" min="1" max="52">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Forecast Max Weeks</label>
+                    <input type="number" class="form-control" name="forecast_max" value="12" min="1" max="52">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Auto-retrain Threshold</label>
+                    <input type="number" class="form-control" name="auto_retrain_threshold" step="0.01" value="0.05">
+                    <small class="text-muted">Model akan auto-retrain jika performance turun di bawah threshold ini</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Performance Threshold</label>
+                    <input type="number" class="form-control" name="performance_threshold" step="0.01" value="0.80">
+                    <small class="text-muted">Minimum performance untuk model dianggap baik</small>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+let performanceChart = null;
+
+async function loadModels() {
+    try {
+        const response = await fetch('/admin/api/models/list');
+        const result = await response.json();
+        
+        if (result.success && result.models) {
+            renderModelsGrid(result.models);
+        } else {
+            showError('Gagal memuat daftar model');
+        }
+    } catch (error) {
+        console.error('Error loading models:', error);
+        showError('Error memuat daftar model: ' + error.message);
+    }
+}
+
+function renderModelsGrid(models) {
+    const grid = document.getElementById('modelsGrid');
+    
+    if (!models || models.length === 0) {
+        grid.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Belum ada model yang di-train. Klik "Retrain All Models" untuk mulai training.
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Group by model name (get latest only)
+    const latestModels = {};
+    for (const model of models) {
+        if (!latestModels[model.model_name] || 
+            new Date(model.trained_at) > new Date(latestModels[model.model_name].trained_at)) {
+            latestModels[model.model_name] = model;
+        }
+    }
+    
+    const modelsArray = Object.values(latestModels);
+    
+    grid.innerHTML = modelsArray.map(model => {
+        const statusColor = model.is_best ? 'success' : 'secondary';
+        const statusText = model.is_best ? 'Best Model' : 'Available';
+        const stats = model.statistics || {};
+        
+        // Calculate overall score
+        const overallScore = calculateModelScore(model);
+        
+        return `
+            <div class="col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">${model.model_name.replace('_', ' ')}</h6>
+                            <span class="badge bg-${statusColor}">${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Overall Score</small>
+                            <h4 class="mb-0 text-primary">${overallScore}%</h4>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <small class="text-muted d-block">MAE</small>
+                                <strong>${(model.mae || 0).toFixed(4)}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">RMSE</small>
+                                <strong>${(model.rmse || 0).toFixed(4)}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">R² Score</small>
+                                <strong>${(model.r2_score || 0).toFixed(4)}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">MAPE</small>
+                                <strong>${(model.mape || 0).toFixed(2)}%</strong>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Trained: ${new Date(model.trained_at).toLocaleDateString('id-ID')}
+                            </small>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-database me-1"></i>
+                                Data size: ${model.data_size || 0} records
+                            </small>
+                        </div>
+                        ${stats.training_count ? `
+                        <div>
+                            <small class="text-muted">
+                                <i class="fas fa-sync-alt me-1"></i>
+                                Training count: ${stats.training_count}
+                            </small>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="card-footer bg-white">
+                        <button class="btn btn-sm btn-outline-primary w-100" onclick="retrainModel('${model.model_name}')">
+                            <i class="fas fa-sync-alt me-1"></i>Retrain This Model
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function calculateModelScore(model) {
+    // Calculate overall score based on metrics
+    const mae = model.mae || 1.0;
+    const r2 = model.r2_score || 0.0;
+    const mape = model.mape || 100.0;
+    
+    // Lower MAE and MAPE are better, higher R2 is better
+    const maeScore = Math.max(0, Math.min(100, (2.0 - Math.min(mae, 2.0)) / 2.0 * 100));
+    const r2Score = Math.max(0, Math.min(100, r2 * 100));
+    const mapeScore = Math.max(0, Math.min(100, (100 - Math.min(mape, 100))));
+    
+    // Weighted average
+    const overall = (maeScore * 0.4 + r2Score * 0.4 + mapeScore * 0.2);
+    return Math.round(overall);
+}
+
+async function loadPerformanceHistory() {
+    try {
+        const response = await fetch('/admin/api/models/performance-history');
+        const result = await response.json();
+        
+        if (result.success && result.chart_data) {
+            renderPerformanceChart(result.chart_data);
+        }
+    } catch (error) {
+        console.error('Error loading performance history:', error);
+    }
+}
+
+function renderPerformanceChart(chartData) {
+    const traces = [];
+    
+    for (const [modelName, data] of Object.entries(chartData)) {
+        if (data.dates && data.mae) {
+            traces.push({
+                x: data.dates,
+                y: data.mae,
+                name: modelName.replace('_', ' ') + ' (MAE)',
+                mode: 'lines+markers',
+                type: 'scatter'
+            });
+        }
+    }
+    
+    const layout = {
+        title: 'Model Performance History (MAE)',
+        xaxis: { title: 'Training Date' },
+        yaxis: { title: 'MAE (Lower is Better)' },
+        hovermode: 'closest',
+        margin: { l: 50, r: 50, t: 50, b: 50 }
+    };
+    
+    Plotly.newPlot('performanceChart', traces, layout, {responsive: true});
+}
+
+async function retrainAllModels() {
+    if (!confirm('Apakah Anda yakin ingin retrain semua model? Proses ini mungkin memakan waktu beberapa menit.')) {
+        return;
+    }
+    
+    try {
+        showLoading('Retraining models...');
+        
+        const response = await fetch('/admin/api/models/retrain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`✅ Models retrained successfully!<br>Best model: ${result.best_model}<br>MAE: ${result.summary.best_mae.toFixed(4)}`, 'success');
+            
+            // Reload models and chart
+            setTimeout(() => {
+                loadModels();
+                loadPerformanceHistory();
+            }, 2000);
+        } else {
+            showAlert(`❌ Error: ${result.error || result.message}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Retrain error:', error);
+        showAlert(`❌ Error: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function retrainModel(modelName) {
+    if (!confirm(`Retrain model ${modelName}? Proses ini mungkin memakan waktu beberapa menit.`)) {
+        return;
+    }
+    
+    try {
+        showLoading(`Retraining ${modelName}...`);
+        
+        const response = await fetch('/admin/api/models/retrain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ model_name: modelName })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`✅ Model ${modelName} retrained successfully!`, 'success');
+            setTimeout(() => {
+                loadModels();
+                loadPerformanceHistory();
+            }, 2000);
+        } else {
+            showAlert(`❌ Error: ${result.error || result.message}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Retrain error:', error);
+        showAlert(`❌ Error: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Training config form
+document.getElementById('trainingConfigForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+        showLoading('Saving configuration...');
+        
+        const response = await fetch('/admin/api/settings/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('✅ Configuration saved successfully!', 'success');
+        } else {
+            showAlert(`❌ Error: ${result.error}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`❌ Error: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+});
+
+// Utility functions
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.getElementById('modelsGrid');
+    if (container) {
+        container.insertAdjacentHTML('beforebegin', alertHtml);
+        setTimeout(() => {
+            const alert = container.previousElementSibling;
+            if (alert && alert.classList.contains('alert')) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+}
+
+function showLoading(message) {
+    // Implement loading indicator
+    console.log('Loading:', message);
+}
+
+function hideLoading() {
+    // Hide loading indicator
+}
+
+function showError(message) {
+    showAlert(message, 'danger');
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadModels();
+    loadPerformanceHistory();
+});
+</script>
+{% endblock %}

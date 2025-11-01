@@ -336,6 +336,14 @@ function displayEconomicAlerts() {
             'impact': 'fa-chart-bar'
         }[alert.type] || 'fa-bell';
         
+        // Priority badge mapping
+        const priorityLabel = {
+            'critical': '🔴 KRITIS',
+            'high': '🟠 TINGGI',
+            'medium': '🟡 SEDANG',
+            'low': '⚪ RENDAH'
+        }[alert.priority] || '⚪ RENDAH';
+        
         html += `
             <div class="alert alert-${priorityClass} border-0 mb-3" role="alert">
                 <div class="d-flex align-items-start">
@@ -343,7 +351,12 @@ function displayEconomicAlerts() {
                         <i class="fas ${icon} fa-lg mt-1"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <h6 class="alert-heading mb-2 fw-bold">${alert.title}</h6>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="alert-heading mb-0 fw-bold">${alert.title}</h6>
+                            <span class="badge bg-${priorityClass} ms-2" title="Prioritas: ${priorityLabel.replace(/[🔴🟠🟡⚪]/g, '').trim()}">
+                                ${priorityLabel}
+                            </span>
+                        </div>
                         <p class="mb-2 text-dark">${alert.message}</p>
                         <small class="text-muted d-flex align-items-center">
                             <i class="fas fa-calendar me-1"></i>

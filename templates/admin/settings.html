@@ -1,0 +1,245 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}System Settings{% endblock %}
+{% block page_subtitle %}Manajemen user admin{% endblock %}
+
+{% block content %}
+<!-- User Management -->
+<div>
+    <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">Admin Users</h6>
+                <a href="{{ url_for('admin.create_admin') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-2"></i>Add Admin User
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            {% if admin_users %}
+                                {% for user in admin_users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email or '-' }}</td>
+                                    <td>
+                                        {% if user.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.last_login %}
+                                            {{ user.last_login.strftime('%d %b %Y %H:%M') }}
+                                        {% else %}
+                                            <span class="text-muted">Belum pernah login</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" data-user-id="{{ user.id }}" onclick="editUser(this.getAttribute('data-user-id'))" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        {% if user.id != current_user.id %}
+                                        <button class="btn btn-sm btn-danger" data-user-id="{{ user.id }}" onclick="deleteUser(this.getAttribute('data-user-id'))" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">Belum ada admin user</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Model Configuration removed - Use Model Management page instead
+
+// Edit user
+function editUser(userId) {
+    // Convert to number if it's a string
+    userId = parseInt(userId);
+    
+    // Get user data from table using data-attribute
+    const button = document.querySelector(`button[data-user-id="${userId}"].btn-info`);
+    const row = button?.closest('tr');
+    if (!row) {
+        showAlert('User data not found', 'danger');
+        return;
+    }
+    
+    const username = row.cells[0].textContent.trim();
+    const email = row.cells[1].textContent.trim();
+    const isActive = row.cells[2].querySelector('.badge').textContent.trim() === 'Active';
+    
+    const modalHtml = `
+        <div class="modal fade" id="editUserModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-edit me-2"></i>Edit User
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editUserForm">
+                            <input type="hidden" id="editUserId" value="${userId}">
+                            <div class="mb-3">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-control" id="editUsername" value="${username}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="editUserEmail" value="${email}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">New Password (leave blank to keep current)</label>
+                                <input type="password" class="form-control" id="editUserPassword" placeholder="Enter new password">
+                                <small class="text-muted">Leave blank if you don't want to change password</small>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editUserActive" ${isActive ? 'checked' : ''}>
+                                <label class="form-check-label" for="editUserActive">Active</label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-primary" onclick="saveUser()">
+                            <i class="fas fa-save me-1"></i>Simpan Perubahan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal
+    const existing = document.getElementById('editUserModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+    modal.show();
+}
+
+async function saveUser() {
+    const userId = document.getElementById('editUserId').value;
+    const data = {
+        username: document.getElementById('editUsername').value,
+        email: document.getElementById('editUserEmail').value,
+        is_active: document.getElementById('editUserActive').checked
+    };
+    
+    const password = document.getElementById('editUserPassword').value;
+    if (password) {
+        data.password = password;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('✅ User berhasil diupdate!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+            modal.hide();
+            
+            // Reload page to refresh user list
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showAlert('❌ Error: ' + (result.error || 'Gagal menyimpan perubahan'), 'danger');
+        }
+    } catch (error) {
+        showAlert('❌ Error: ' + error.message, 'danger');
+    }
+}
+
+// Delete user
+async function deleteUser(userId) {
+    if (!confirm('Apakah Anda yakin ingin menghapus user ini? Tindakan ini tidak dapat dibatalkan.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('✅ User berhasil dihapus!', 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showAlert('❌ Error: ' + (result.error || 'Gagal menghapus user'), 'danger');
+        }
+    } catch (error) {
+        showAlert('❌ Error: ' + error.message, 'danger');
+    }
+}
+
+// Utility functions
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('.container-fluid') || document.body;
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+
+// Load settings on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettingsConfig();
+    console.log('Settings page loaded');
+});
+</script>
+{% endblock %}
+

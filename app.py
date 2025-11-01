@@ -1,4 +1,4 @@
-﻿from flask import Flask, render_template, request, jsonify, redirect, flash
+﻿from flask import Flask, render_template, request, jsonify, redirect, flash, session
 import pandas as pd
 import json
 import os
@@ -13,8 +13,9 @@ from services.visualization_service import VisualizationService
 from services.forecast_service import ForecastService
 from services.commodity_insight_service import CommodityInsightService
 from services.debugger import init_debugger, debugger
-from database import db, IPHData, CommodityData, AdminUser, AlertRule
+from database import db, IPHData, CommodityData, AdminUser, AlertRule, ForecastHistory
 from services.data_handler import DataHandler
+from auth.decorators import admin_required
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -179,6 +180,9 @@ def init_database_and_migrate():
                 create_default_alert_rules()
             else:
                 print(f"SUCCESS: Database sudah ada dengan {iph_count} records")
+                # Always ensure admin user exists and has correct password hash
+                create_default_admin()
+                create_default_alert_rules()
                 
     except Exception as e:
         print(f"ERROR: Error initializing database: {str(e)}")
@@ -353,17 +357,45 @@ def _get_month_number(bulan_str):
 
 def create_default_admin():
     """Create default admin user"""
-    from werkzeug.security import generate_password_hash
+    from auth.utils import hash_password
     
     try:
+        # Use fresh query dengan session refresh
+        db.session.expire_all()
         existing_admin = AdminUser.query.filter_by(username='admin').first()
+        
         if existing_admin:
-            print(" Admin user already exists")
+            print(f" Admin user already exists (ID: {existing_admin.id})")
+            print(f" Current hash format: {'werkzeug' if existing_admin.password_hash and existing_admin.password_hash.startswith('pbkdf2:') else 'bcrypt' if existing_admin.password_hash and existing_admin.password_hash.startswith('$2b$') else 'unknown'}")
+            
+            # FORCE UPDATE - selalu update ke bcrypt untuk memastikan
+            if existing_admin.password_hash and not existing_admin.password_hash.startswith('$2b$'):
+                print(" Updating admin password hash to bcrypt format...")
+                existing_admin.password_hash = hash_password('admin123')
+                existing_admin.is_active = True
+                db.session.commit()
+                db.session.refresh(existing_admin)
+                print(f"SUCCESS: Admin password hash updated to bcrypt")
+            elif not existing_admin.password_hash:
+                print(" Password hash is null, setting new hash...")
+                existing_admin.password_hash = hash_password('admin123')
+                existing_admin.is_active = True
+                db.session.commit()
+                print("SUCCESS: Admin password hash set")
+            else:
+                # Already bcrypt, verify it works
+                from auth.utils import check_password
+                if not check_password(existing_admin.password_hash, 'admin123'):
+                    print(" Password check failed, resetting hash...")
+                    existing_admin.password_hash = hash_password('admin123')
+                    db.session.commit()
+                    print("SUCCESS: Admin password hash reset")
+            
             return True
         
         admin = AdminUser(
             username='admin',
-            password_hash=generate_password_hash('admin123'),
+            password_hash=hash_password('admin123'),
             email='admin@prisma.local',
             is_active=True
         )
@@ -373,6 +405,8 @@ def create_default_admin():
         return True
     except Exception as e:
         print(f"WARNING: Admin creation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def create_default_alert_rules():
@@ -432,6 +466,14 @@ commodity_service = CommodityInsightService()
 # Initialize centralized debugger
 init_debugger(app)
 
+# Initialize Authentication
+from auth import init_auth
+init_auth(app)
+
+# Register Admin Blueprint
+from admin.routes import admin_bp
+app.register_blueprint(admin_bp)
+
 # Diagnostics endpoint to inspect recent events/errors
 @app.route('/api/_debug/recent')
 def api_debug_recent():
@@ -451,7 +493,9 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 @app.route('/')
 def dashboard():
-    """Main dashboard"""
+    """Main dashboard - Public access (visitor) atau Admin"""
+    # Visitor access is free - no login needed
+    # Admin access via /admin/dashboard
     try:
         dashboard_data = forecast_service.get_dashboard_data()
         
@@ -491,26 +535,11 @@ def dashboard():
 
 @app.route('/data-control')
 def data_control():
-    """Data Control page"""
-    try:
-        data_summary = forecast_service.data_handler.get_data_summary()
-        df = forecast_service.data_handler.load_historical_data()
-        
-        historical_records = []
-        if not df.empty:
-            df_sorted = df.sort_values('Tanggal', ascending=False)
-            historical_records = df_sorted[['Tanggal', 'Indikator_Harga']].to_dict('records')
-        
-        return render_template('data_control.html', 
-                             data_summary=data_summary,
-                             historical_records=historical_records,
-                             page_title="Data Control")
-    except Exception as e:
-        flash(f"Error loading data control: {str(e)}", 'error')
-        return render_template('data_control.html', 
-                             data_summary={'total_records': 0},
-                             historical_records=[],
-                             page_title="Data Control")
+    """Data Control page - Redirected to admin only"""
+    from flask_login import current_user
+    from flask import redirect, url_for
+    # Redirect to admin data control page
+    return redirect(url_for('admin.data_control'))
 
 @app.route('/visualization')
 def visualization():
@@ -530,6 +559,7 @@ def alerts():
 # 2. DATA MANAGEMENT APIs
 
 @app.route('/api/upload-data', methods=['POST'])
+@admin_required
 def upload_data():
     """Upload new data and trigger forecasting pipeline - ENHANCED ERROR HANDLING"""
     try:
@@ -641,6 +671,7 @@ def upload_data():
         return jsonify(error_response)
 
 @app.route('/api/add-single-record', methods=['POST'])
+@admin_required
 def add_single_record():
     """Add single IPH record to database (legacy)"""
     try:
@@ -685,6 +716,7 @@ def add_single_record():
         return jsonify({'success': False, 'message': f'Error adding record: {str(e)}'})
 
 @app.route('/api/add-manual-record', methods=['POST'])
+@admin_required
 def add_manual_record():
     """Add manual IPH and commodity record to database"""
     try:
@@ -785,6 +817,7 @@ def add_manual_record():
         return jsonify({'success': False, 'message': f'Error adding record: {str(e)}'})
 
 @app.route('/api/retrain-models', methods=['POST'])
+@admin_required
 def retrain_models():
     try:
         # print(" Retraining models with existing data...")
@@ -1473,6 +1506,7 @@ def api_commodity_alerts():
         }))
 
 @app.route('/api/commodity/upload', methods=['POST'])
+@admin_required
 def upload_commodity_data():
     """Enhanced commodity data upload with comprehensive validation"""
     try:
