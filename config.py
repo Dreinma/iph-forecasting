@@ -1,21 +1,21 @@
 import os
 from datetime import timedelta
+import logging
 
 class Config:
     # Flask Configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'iph-forecasting-secret-key-2024'
     DEBUG = True
     
+    # Session Configuration
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=5)  # Session timeout 5 menit jika tidak ada aktivitas
+    
     #  Database Configuration
-    # Default: SQLite untuk development
-    # Untuk MySQL: Set DATABASE_URL environment variable atau gunakan ProductionConfig
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Set True for SQL query debugging
     
-    #  Database Connection Pool (default untuk SQLite)
-    # MySQL/MariaDB akan override di ProductionConfig
+    #  Database Connection Pool
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
         'pool_recycle': 3600,
@@ -23,20 +23,20 @@ class Config:
         'max_overflow': 20
     }
     
-    # File Upload Configuration
-    UPLOAD_FOLDER = 'static/uploads'
+    # File Upload Configuration - Use absolute paths for production
+    UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static', 'uploads'))
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
     
-    # Data Storage Configuration (Legacy - for backup/export)
-    DATA_FOLDER = 'data'
-    HISTORICAL_DATA_PATH = 'data/historical_data.csv'  # Legacy backup
-    COMMODITY_DATA_PATH = 'data/IPH-Kota-Batu.csv'     # Legacy backup
-    MODELS_PATH = 'data/models/'
-    BACKUPS_PATH = 'data/backups/'
+    # Data Storage Configuration - Use absolute paths for production
+    DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+    HISTORICAL_DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'historical_data.csv'))  # Legacy backup
+    COMMODITY_DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'IPH-Kota-Batu.csv'))     # Legacy backup
+    MODELS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'models'))
+    BACKUPS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'backups'))
     
     #  Database Backup Configuration
-    DB_BACKUP_FOLDER = 'data/db_backups/'
+    DB_BACKUP_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'db_backups'))
     DB_BACKUP_RETENTION_DAYS = 30
     AUTO_BACKUP_ENABLED = True
     
@@ -56,7 +56,13 @@ class Config:
     # Dashboard Configuration
     CHART_HEIGHT = 500
     COMPARISON_CHART_HEIGHT = 400
-    MAX_HISTORICAL_DISPLAY = 60  # Show last 60 periods in chart
+    MAX_HISTORICAL_DISPLAY = 60
+    
+    # Logging Configuration
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()  # DEBUG, INFO, WARNING, ERROR
+    LOG_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
+    LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+    VERBOSE_LOGGING = os.environ.get('VERBOSE_LOGGING', 'false').lower() == 'true'  # Show last 60 periods in chart
     
     #  Cache Configuration
     CACHE_TYPE = 'simple'
@@ -95,25 +101,28 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'production-secret-key-change-this'
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        import secrets
+        SECRET_KEY = secrets.token_urlsafe(32)
     SQLALCHEMY_ECHO = False
     
-    # Production database - MySQL untuk Hostinger
-    # Format: mysql+pymysql://username:password@host:port/database_name
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'mysql+pymysql://root:password@localhost:3306/prisma_db'
+    # Production database - Use environment variable or fallback to SQLite
+    if os.environ.get('DATABASE_URL'):
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    else:
+        # Fallback to SQLite with absolute path
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
     
-    # MySQL connection pool settings
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 10,
-        'pool_recycle': 3600,
-        'pool_pre_ping': True,
-        'max_overflow': 20,
-        'connect_args': {
-            'charset': 'utf8mb4',
-            'sql_mode': 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'
-        }
-    }
+    # Security settings for production
+    # Set SESSION_COOKIE_SECURE = False via env var if not using HTTPS
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=1)  # 1 hour session timeout
+    
+    # Logging for production - default to WARNING to reduce noise
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING').upper()
 
 class TestingConfig(Config):
     TESTING = True

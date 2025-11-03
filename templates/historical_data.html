@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Data Historis IPH - PRISMA{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="pb-3 mb-4 border-bottom">
+    <h1 class="h2 text-gradient mb-1">
+        <i class="fas fa-table me-2"></i>
+        Data Historis IPH
+    </h1>
+    <p class="text-muted mb-0">Lihat semua data historis Indikator Perubahan Harga dalam bentuk tabel</p>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">
+                    <i class="fas fa-search me-2"></i>Cari Data
+                </label>
+                <input type="text" class="form-control" id="searchInput" 
+                       placeholder="Cari berdasarkan bulan, minggu, atau kota..." 
+                       onkeyup="debounceSearch()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Urutkan</label>
+                <select class="form-select" id="sortBy">
+                    <option value="tanggal">Tanggal</option>
+                    <option value="indikator_harga">Nilai IPH</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Urutan</label>
+                <select class="form-select" id="sortOrder">
+                    <option value="desc">Terbaru dulu</option>
+                    <option value="asc">Terlama dulu</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-list me-2"></i>Data Historis
+        </h6>
+        <div>
+            <span class="badge bg-primary" id="totalRecords">Memuat...</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="dataTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>No</th>
+                        <th>Tanggal</th>
+                        <th>Nilai IPH (%)</th>
+                        <th>Bulan</th>
+                        <th>Minggu</th>
+                        <th>Tahun</th>
+                        <th>Kota</th>
+                        <th>Sumber Data</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="text-muted mt-2 mb-0">Memuat data...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Data pagination">
+            <ul class="pagination justify-content-center mt-4" id="pagination">
+                <!-- Pagination will be generated here -->
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let totalPages = 1;
+let searchTimeout;
+
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPage = 1;
+        loadData();
+    }, 500);
+}
+
+function loadData() {
+    const search = document.getElementById('searchInput').value;
+    const sortBy = document.getElementById('sortBy').value;
+    const sortOrder = document.getElementById('sortOrder').value;
+    const perPage = 50;
+    
+    // Show loading
+    document.getElementById('dataTableBody').innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 mb-0">Memuat data...</p>
+            </td>
+        </tr>
+    `;
+    
+    // Build URL
+    const url = new URL('/api/historical-data', window.location.origin);
+    url.searchParams.append('page', currentPage);
+    url.searchParams.append('per_page', perPage);
+    url.searchParams.append('sort_by', sortBy);
+    url.searchParams.append('sort_order', sortOrder);
+    if (search) {
+        url.searchParams.append('search', search);
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTable(data.data.items);
+                renderPagination(data.data.pagination);
+                document.getElementById('totalRecords').textContent = 
+                    `${data.data.pagination.total} records`;
+            } else {
+                showError(data.error || 'Gagal memuat data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Terjadi kesalahan saat memuat data');
+        });
+}
+
+function renderTable(items) {
+    const tbody = document.getElementById('dataTableBody');
+    
+    if (items.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                    <p class="mb-0">Tidak ada data ditemukan</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const startNum = (currentPage - 1) * 50 + 1;
+    tbody.innerHTML = items.map((item, index) => {
+        const rowNum = startNum + index;
+        const iphValue = item.indikator_harga !== null ? item.indikator_harga.toFixed(2) : '-';
+        const iphClass = item.indikator_harga !== null 
+            ? (item.indikator_harga >= 0 ? 'text-success' : 'text-danger')
+            : '';
+        
+        return `
+            <tr>
+                <td>${rowNum}</td>
+                <td>${item.tanggal || '-'}</td>
+                <td class="${iphClass} fw-bold">${iphValue}${item.indikator_harga !== null ? '%' : ''}</td>
+                <td>${item.bulan || '-'}</td>
+                <td>${item.minggu || '-'}</td>
+                <td>${item.tahun || '-'}</td>
+                <td>${item.kab_kota || '-'}</td>
+                <td>
+                    <span class="badge bg-secondary">${item.data_source || 'manual'}</span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderPagination(pagination) {
+    totalPages = pagination.pages || 1;
+    const paginationEl = document.getElementById('pagination');
+    
+    if (totalPages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Previous button
+    html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+    `;
+    
+    // Page numbers
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(1); return false;">1</a></li>`;
+        if (startPage > 2) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${totalPages}); return false;">${totalPages}</a></li>`;
+    }
+    
+    // Next button
+    html += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    `;
+    
+    paginationEl.innerHTML = html;
+}
+
+function changePage(page) {
+    if (page < 1 || page > totalPages || page === currentPage) {
+        return;
+    }
+    currentPage = page;
+    loadData();
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showError(message) {
+    document.getElementById('dataTableBody').innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-4 text-danger">
+                <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                <p class="mb-0">${message}</p>
+            </td>
+        </tr>
+    `;
+}
+
+// Event listeners
+document.getElementById('sortBy').addEventListener('change', () => {
+    currentPage = 1;
+    loadData();
+});
+
+document.getElementById('sortOrder').addEventListener('change', () => {
+    currentPage = 1;
+    loadData();
+});
+
+// Initial load
+loadData();
+</script>
+
+<style>
+/* Responsive table */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem !important;
+    }
+}
+
+/* Table styling */
+#dataTable {
+    font-size: 0.95rem;
+}
+
+#dataTable thead th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#dataTable tbody tr:hover {
+    background-color: #f8f9fa;
+}
+</style>
+
+{% endblock %}
+

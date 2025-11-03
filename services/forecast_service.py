@@ -1,4 +1,5 @@
 import os
+import logging
 from models.model_manager import ModelManager  # Perbaikan: import dari models, bukan services
 from .data_handler import DataHandler
 import pandas as pd
@@ -7,6 +8,8 @@ from datetime import datetime
 import warnings
 import json
 warnings.filterwarnings('ignore')
+
+logger = logging.getLogger(__name__)
 
 def clean_data_for_json(obj):
     """Clean data untuk JSON serialization dengan handling NaN/Inf dan pandas NA"""
@@ -54,9 +57,6 @@ class ForecastService:
         self._alerts_cache = None
         self._alerts_cache_time = None
 
-        print("ForecastService initialized")
-        print("   Model manager ready")
-        print("   Data handler ready")
     
     def _save_forecast_to_file(self, forecast_df, model_name, summary):
         """Save forecast to JSON file untuk di-load oleh chart"""
@@ -92,69 +92,94 @@ class ForecastService:
             with open(forecast_path, 'w') as f:
                 json.dump(forecast_data, f, indent=2)
             
-            print(f"Forecast saved to {forecast_path}")
-            
-            # Also save to database
-            try:
-                from app import app
-                from database import ForecastHistory, db
-                
-                with app.app_context():
-                    # Get model performance
-                    from database import ModelPerformance
-                    latest_perf = ModelPerformance.query.filter_by(
-                        model_name=model_name
-                    ).order_by(ModelPerformance.trained_at.desc()).first()
-                    
-                    forecast_history = ForecastHistory(
-                        model_name=model_name,
-                        weeks_forecasted=len(forecast_df),
-                        avg_prediction=float(summary['avg_prediction']),
-                        trend=str(summary['trend']),
-                        volatility=float(summary['volatility']),
-                        min_prediction=float(summary['min_prediction']),
-                        max_prediction=float(summary['max_prediction']),
-                        model_mae=float(latest_perf.mae) if latest_perf else None,
-                        model_rmse=float(latest_perf.rmse) if latest_perf else None,
-                        model_r2=float(latest_perf.r2_score) if latest_perf else None,
-                        forecast_data=json.dumps(forecast_data['forecasts']),
-                        created_by='system'
-                    )
-                    
-                    db.session.add(forecast_history)
-                    db.session.commit()
-                    print(f"Forecast history saved to database (ID: {forecast_history.id})")
-            except Exception as db_error:
-                print(f"WARNING: Could not save forecast to database: {str(db_error)}")
-                # Continue anyway - file save succeeded
+            logger.debug(f"Forecast saved to {forecast_path}")
             
         except Exception as e:
-            print(f"Error saving forecast to file: {e}")
+            logger.error(f"Error saving forecast to file: {e}")
+
+    def _save_forecast_to_database(self, forecast_df, model_name, summary, forecast_weeks):
+        """Save forecast to ForecastHistory database untuk persistensi"""
+        try:
+            from database import db, ForecastHistory
+            from flask_login import current_user
+            
+            # Prepare forecast data as JSON
+            forecast_data_list = []
+            confidence_intervals_list = []
+            
+            for _, row in forecast_df.iterrows():
+                forecast_data_list.append({
+                    'date': str(row['Tanggal']),
+                    'prediction': float(row['Prediksi']),
+                    'lower_bound': float(row['Batas_Bawah']),
+                    'upper_bound': float(row['Batas_Atas']),
+                    'confidence_width': float(row.get('Confidence_Width', 0))
+                })
+                confidence_intervals_list.append({
+                    'lower': float(row['Batas_Bawah']),
+                    'upper': float(row['Batas_Atas'])
+                })
+            
+            # Calculate trend
+            predictions = [f['prediction'] for f in forecast_data_list]
+            if len(predictions) >= 2:
+                if predictions[-1] > predictions[0]:
+                    trend = 'up'
+                elif predictions[-1] < predictions[0]:
+                    trend = 'down'
+                else:
+                    trend = 'stable'
+            else:
+                trend = 'stable'
+            
+            # Create ForecastHistory record
+            forecast_history = ForecastHistory(
+                model_name=str(model_name),
+                forecast_weeks=forecast_weeks,
+                forecast_data=json.dumps(forecast_data_list),
+                confidence_intervals=json.dumps(confidence_intervals_list),
+                avg_prediction=float(summary['avg_prediction']),
+                trend=trend,
+                min_value=float(summary['min_prediction']),
+                max_value=float(summary['max_prediction']),
+                data_points_used=len(forecast_df),
+                created_by=current_user.username if hasattr(current_user, 'username') and current_user.is_authenticated else 'system'
+            )
+            
+            db.session.add(forecast_history)
+            db.session.commit()
+            
+            logger.debug(f"Forecast saved to database (ID: {forecast_history.id})")
+            
+        except ImportError:
+            # Database not available (testing or standalone mode)
+            logger.debug("Database not available, skipping database save")
+        except Exception as e:
+            logger.error(f"Error saving forecast to database: {e}")
+            # Don't fail the whole process if DB save fails
 
     def process_new_data_and_forecast(self, new_data_df, forecast_weeks=8):
         """ENHANCED pipeline with all ML improvements - FIXED ERROR HANDLING"""
-        print("=" * 60)
-        print(" STARTING ENHANCED ML PIPELINE")
-        print("=" * 60)
+        logger.info("Starting enhanced ML pipeline")
         
         pipeline_start_time = datetime.now()
         
         try:
             # Step 1: Process and merge new data
-            print("\n STEP 1: Processing new data...")
+            logger.debug("Step 1: Processing new data")
             
             # FIX: Add specific error handling for database operations
             try:
                 combined_df, merge_info = self.data_handler.merge_and_save_data(new_data_df)
-                print(f"Data merge successful: {merge_info['total_records']} total records")
+                logger.info(f"Data merge successful: {merge_info['total_records']} total records")
                 
             except Exception as merge_error:
                 error_msg = str(merge_error)
-                print(f"Data merge failed: {error_msg}")
+                logger.error(f"Data merge failed: {error_msg}")
                 
                 # Check if it's a duplicate error (shouldn't happen now, but safety net)
                 if "UNIQUE constraint failed" in error_msg or "IntegrityError" in error_msg:
-                    print("Duplicate data detected. Attempting recovery...")
+                    logger.warning("Duplicate data detected. Attempting recovery...")
                     
                     # Try to load existing data
                     combined_df = self.data_handler.load_historical_data()
@@ -174,7 +199,7 @@ class ForecastService:
                         'recovery_mode': True
                     }
                     
-                    print(f"Recovery mode: Using {len(combined_df)} existing records")
+                    logger.info(f"Recovery mode: Using {len(combined_df)} existing records")
                 else:
                     # Re-raise non-duplicate errors
                     raise
@@ -182,30 +207,30 @@ class ForecastService:
             if combined_df.empty:
                 combined_df = self.data_handler.load_historical_data()
                 
-            print(f"Training with {len(combined_df)} records from database")
+            logger.info(f"Training with {len(combined_df)} records from database")
 
             # Step 1.5: Check for model drift
-            print("\nSTEP 1.5: Checking for model drift...")
+            logger.debug("Checking for model drift")
             try:
                 drift_result = self.model_manager.check_model_health(new_data_df)
             except Exception as drift_error:
-                print(f"Drift detection failed: {str(drift_error)}")
+                logger.warning(f"Drift detection failed: {str(drift_error)}")
                 drift_result = {'drift_detected': False, 'reason': f'Drift check error: {str(drift_error)}'}
             
             force_retrain = drift_result.get('drift_detected', False)
             
             if force_retrain:
-                print(f"Drift detected: {drift_result.get('drift_signals', [])}")
-                print("Forcing model retraining due to drift...")
+                logger.info(f"Drift detected: {drift_result.get('drift_signals', [])}")
+                logger.info("Forcing model retraining due to drift")
             
             # Step 2: Train and compare models
-            print("\n STEP 2: Training and comparing models...")
+            logger.info("Step 2: Training and comparing models")
             current_best = self.model_manager.get_current_best_model()
             
             if force_retrain or not current_best:
                 training_result = self.model_manager.train_and_compare_models(combined_df)
             else:
-                print("Using existing models (no drift detected)")
+                logger.debug("Using existing models (no drift detected)")
                 training_result = {
                     'training_results': {},
                     'comparison': {'is_improvement': False, 'new_best_model': current_best},
@@ -213,7 +238,7 @@ class ForecastService:
                 }
             
             # Step 3: Generate forecast with best model
-            print("\n STEP 3: Generating forecast...")
+            logger.info("Step 3: Generating forecast")
             best_model = self.model_manager.get_current_best_model()
             
             if not best_model:
@@ -282,20 +307,17 @@ class ForecastService:
             # Final cleaning
             result = clean_data_for_json(result)
             
-            print("\n" + "=" * 60)
-            print("ENHANCED PIPELINE COMPLETED!")
-            print(f"   Total time: {pipeline_duration:.2f} seconds")
-            print(f"   Data records: {merge_info['total_records']}")
-            print(f"    Best model: {best_model_name}")
-            print(f"    Forecast weeks: {forecast_weeks}")
-            print(f"    Avg prediction: {forecast_summary['avg_prediction']:.3f}%")
-            print("=" * 60)
+            logger.info(f"Pipeline completed in {pipeline_duration:.2f}s | "
+                       f"Records: {merge_info['total_records']} | "
+                       f"Best model: {best_model_name} | "
+                       f"Forecast: {forecast_weeks} weeks | "
+                       f"Avg prediction: {forecast_summary['avg_prediction']:.3f}%")
             
             return result
             
         except Exception as e:
             error_msg = f"Enhanced pipeline failed: {str(e)}"
-            print(f"\n{error_msg}")
+            logger.error(f"Pipeline failed: {error_msg}")
             import traceback
             traceback.print_exc()
             
@@ -309,10 +331,7 @@ class ForecastService:
 
     def get_current_forecast(self, model_name=None, forecast_weeks=8):
         """Get forecast using current best model or specified model"""
-        print("=" * 80)
-        print(" GET CURRENT FORECAST:")
-        print(f"    Requested model: '{model_name}'")
-        print(f"    Requested weeks: {forecast_weeks}")
+        logger.debug(f"Getting current forecast: model={model_name}, weeks={forecast_weeks}")
         
         try:
             original_model_name = model_name  # Store original request
@@ -326,24 +345,24 @@ class ForecastService:
                         'error': 'No trained models available. Please upload data first.'
                     }
                 model_name = best_model['model_name']
-                print(f"    Using best model: '{model_name}'")
+                logger.debug(f"Using best model: '{model_name}'")
             else:
-                print(f"    Using specified model: '{model_name}'")
+                logger.debug(f"Using specified model: '{model_name}'")
                 
                 # Validate that the specified model exists
                 available_models = self.model_manager.engine.get_available_models()
                 model_names = [m['name'].replace(' ', '_') for m in available_models]
                 
-                print(f"    Available models: {model_names}")
+                logger.debug(f"Available models: {model_names}")
                 
                 if model_name not in model_names:
-                    print(f"    Model '{model_name}' not found in available models")
+                    logger.warning(f"Model '{model_name}' not found in available models")
                     return {
                         'success': False,
                         'error': f'Model "{model_name}" not found. Available models: {", ".join(model_names)}'
                     }
                 else:
-                    print(f"    Model '{model_name}' found in available models")
+                    logger.debug(f"Model '{model_name}' found in available models")
             
             # Validate forecast weeks
             if not (4 <= forecast_weeks <= 12):
@@ -352,19 +371,17 @@ class ForecastService:
                     'error': 'Forecast weeks must be between 4 and 12'
                 }
             
-            print(f"    Calling engine.generate_forecast with model: '{model_name}', weeks: {forecast_weeks}")
+            logger.debug(f"Calling engine.generate_forecast: model='{model_name}', weeks={forecast_weeks}")
             
             # Generate forecast
             forecast_df, model_performance, forecast_summary = self.model_manager.engine.generate_forecast(
                 model_name, forecast_weeks
             )
             
-            print(f"    Forecast generated:")
-            print(f"      - DataFrame shape: {forecast_df.shape}")
-            print(f"      - Model performance keys: {model_performance.keys() if model_performance else 'None'}")
-            print(f"      - Summary keys: {forecast_summary.keys() if forecast_summary else 'None'}")
+            logger.debug(f"Forecast generated: shape={forecast_df.shape}")
             
             self._save_forecast_to_file(forecast_df, model_name, forecast_summary)
+            self._save_forecast_to_database(forecast_df, model_name, forecast_summary, forecast_weeks)
 
             # Clean forecast data for JSON serialization
             forecast_data_clean = []
@@ -390,7 +407,7 @@ class ForecastService:
                         clean_record[key] = value
                 forecast_data_clean.append(clean_record)
             
-            print(f"    Cleaned forecast data: {len(forecast_data_clean)} records")
+            logger.debug(f"Cleaned forecast: {len(forecast_data_clean)} records")
             
             result = {
                 'success': True,
@@ -417,21 +434,13 @@ class ForecastService:
             
             #  PERBAIKAN UTAMA: Simpan forecast terbaru di memory
             self._latest_forecast = result['forecast'].copy()
-            print(f"    Latest forecast saved in memory: {self._latest_forecast['model_name']}")
-            
-            print(f"    Final result prepared:")
-            print(f"      - Original request: '{original_model_name}'")
-            print(f"      - Model name in result: '{result['forecast']['model_name']}'")
-            print(f"      - Weeks in result: {result['forecast']['weeks_forecasted']}")
-            print(f"      - Success: {result['success']}")
-            print("=" * 80)
+            logger.debug(f"Latest forecast saved in memory: {self._latest_forecast['model_name']}")
             
             return result
             
         except Exception as e:
             error_msg = f"Error generating forecast: {str(e)}"
-            print(f"    Exception occurred: {error_msg}")
-            print("=" * 80)
+            logger.error(f"Exception in get_current_forecast: {error_msg}")
             
             import traceback
             traceback.print_exc()
@@ -444,34 +453,28 @@ class ForecastService:
             
     def initialize_from_csv(self, csv_file_path):
         """Initialize system with CSV data (for first-time setup)"""
-        print(" INITIALIZING SYSTEM WITH CSV DATA")
-        print("=" * 50)
+        logger.info("Initializing system with CSV data")
         
         try:
             # Load CSV data
-            print(f" Loading data from: {csv_file_path}")
+            logger.info(f"Loading data from: {csv_file_path}")
             df = pd.read_csv(csv_file_path)
             
-            print(f" Loaded {len(df)} records from CSV")
-            print(f"    Columns: {list(df.columns)}")
+            logger.info(f"Loaded {len(df)} records from CSV")
             
             # Process as new data (this will become historical data)
             result = self.process_new_data_and_forecast(df, forecast_weeks=8)
             
             if result['success']:
-                print("\n SYSTEM INITIALIZATION COMPLETED!")
-                print("    Data processed and stored")
-                print("    Models trained and saved")
-                print("    Initial forecast generated")
-                print("    Dashboard ready for use")
+                logger.info("System initialization completed: data processed, models trained, forecast generated")
             else:
-                print(f"\n INITIALIZATION FAILED: {result['error']}")
+                logger.error(f"Initialization failed: {result['error']}")
             
             return result
                 
         except Exception as e:
             error_msg = f"Error initializing from CSV: {str(e)}"
-            print(f" {error_msg}")
+            logger.error(error_msg)
             
             return {
                 'success': False, 
@@ -481,7 +484,7 @@ class ForecastService:
     
     def get_dashboard_data(self):
         """Get all data needed for dashboard display"""
-        print(" Collecting dashboard data...")
+        logger.debug("Collecting dashboard data")
         
         try:
             # Get data summary
@@ -496,10 +499,10 @@ class ForecastService:
             #  PERBAIKAN UTAMA: Prioritaskan latest forecast dari memory
             current_forecast = None
             if self._latest_forecast:
-                print(f"    Using latest forecast from memory: {self._latest_forecast['model_name']}")
+                logger.debug(f"Using latest forecast from memory: {self._latest_forecast['model_name']}")
                 current_forecast = self._latest_forecast
             elif best_model:
-                print(f"    No latest forecast, using best model forecast")
+                logger.debug("No latest forecast, using best model forecast")
                 forecast_result = self.get_current_forecast(best_model['model_name'], 8)
                 if forecast_result['success']:
                     current_forecast = forecast_result['forecast']
@@ -522,12 +525,12 @@ class ForecastService:
                 'system_status': self._get_system_status()
             }
             
-            print(" Dashboard data collected successfully")
+            logger.debug("Dashboard data collected successfully")
             return dashboard_data
             
         except Exception as e:
             error_msg = f"Error collecting dashboard data: {str(e)}"
-            print(f" {error_msg}")
+            logger.error(f"Pipeline error: {error_msg}")
             
             return {
                 'success': False,
@@ -588,7 +591,7 @@ class ForecastService:
     
     def retrain_models_only(self):
         """Retrain models with existing data without new data upload"""
-        print(" Retraining models with existing data...")
+        logger.info("Retraining models with existing data")
         
         try:
             # Load existing data
@@ -634,7 +637,7 @@ class ForecastService:
             
             #  PERBAIKAN: Clear latest forecast agar tidak conflict
             self._latest_forecast = None
-            print("    Cleared latest forecast from memory (will use retrained best model)")
+            logger.debug("Cleared latest forecast from memory")
             
             result = {
                 'success': True,
@@ -651,14 +654,13 @@ class ForecastService:
                 }
             }
             
-            print(f" Models retrained successfully!")
-            print(f"    Best model: {best_model_name}")
+            logger.info(f"Models retrained successfully. Best model: {best_model_name}")
             
             return result
             
         except Exception as e:
             error_msg = f"Error retraining models: {str(e)}"
-            print(f" {error_msg}")
+            logger.error(error_msg)
             
             return {
                 'success': False,
@@ -688,7 +690,7 @@ class ForecastService:
     def clear_latest_forecast(self):
         """Clear latest forecast from memory (useful for testing or reset)"""
         self._latest_forecast = None
-        print(" Latest forecast cleared from memory")
+        logger.debug("Latest forecast cleared from memory")
         
     def get_latest_forecast_info(self):
         """Get info about latest forecast in memory (for debugging)"""
@@ -912,10 +914,10 @@ class ForecastService:
             current_time = datetime.now()
             if (self._alerts_cache and self._alerts_cache_time and 
                 (current_time - self._alerts_cache_time).seconds < 300):
-                print(" Using cached alerts")
+                logger.debug("Using cached alerts")
                 return self._alerts_cache
             
-            print(" Generating fresh alerts")
+            logger.debug("Generating fresh alerts")
 
             alerts = []
             
@@ -1139,7 +1141,7 @@ class ForecastService:
             return result
 
         except Exception as e:
-            print(f" Error generating economic alerts: {str(e)}")
+            logger.error(f"Error generating economic alerts: {str(e)}")
             return {
                 'success': False,
                 'alerts': [],

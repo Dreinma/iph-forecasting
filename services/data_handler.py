@@ -3,11 +3,14 @@ import numpy as np
 import os
 import shutil
 import calendar
+import logging
 from datetime import datetime, timedelta, date
 from database import db, IPHData, CommodityData
 from sqlalchemy import func, and_, or_
 import warnings
 warnings.filterwarnings('ignore')
+
+logger = logging.getLogger(__name__)
 
 class DataHandler:
     """Enhanced handler for data operations with database support"""
@@ -16,8 +19,7 @@ class DataHandler:
         self.backup_path = backup_path
         os.makedirs(self.backup_path, exist_ok=True)
         
-        print(f"DataHandler initialized (Database Mode)")
-        print(f"   Backup path: {self.backup_path}")
+        logger.debug(f"DataHandler initialized (backup: {self.backup_path})")
     
     def _anchor_date(self, d: date) -> date:
         """Normalize a given date to nearest weekly anchor (1, 8, 15, 22, 29) within same month."""
@@ -33,22 +35,14 @@ class DataHandler:
     def load_historical_data(self):
         """Load historical data from database"""
         try:
-            print(f"[DB] load_historical_data() called")
-
-            # Check database connection
-            print(f"[DB] Querying IPHData table...")
+            logger.debug("Loading historical data from database")
 
             # Query all IPH data ordered by date
             query = IPHData.query.order_by(IPHData.tanggal).all()
-            
-            print(f"[DB] Query executed: {len(query)} records found")
 
             if not query:
-                print(f"[DB] No records in database!")
+                logger.warning("No records found in database")
                 return pd.DataFrame()
-                   
-            # Convert to DataFrame
-            print(f"[DB] Converting {len(query)} records to DataFrame...")
 
             # Convert to DataFrame with fields known to exist in schema
             data = []
@@ -69,50 +63,37 @@ class DataHandler:
                         'Last_Updated': getattr(record, 'updated_at', None)
                     }
                     data.append(row)
-                    
-                    if i < 3:  # Print first 3 records
-                        print(f"   Record {i+1}: {row['Tanggal']} = {row['Indikator_Harga']}")
                         
                 except Exception as row_error:
-                    print(f"   WARNING: Error processing record {i}: {str(row_error)}")
+                    logger.warning(f"Error processing record {i}: {str(row_error)}")
                     continue
             
-            print(f"[DB] Converted {len(data)} records")
-            
             df = pd.DataFrame(data)
-            print(f"[DB] DataFrame shape: {df.shape}")
 
             # Ensure proper data types
             df['Tanggal'] = pd.to_datetime(df['Tanggal'])
             df['Indikator_Harga'] = pd.to_numeric(df['Indikator_Harga'], errors='coerce')
             
-            print(f"[DB] Data types converted")
-            print(f"[DB] Date range: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
-            print(f"[DB] IPH range: {df['Indikator_Harga'].min():.4f} to {df['Indikator_Harga'].max():.4f}")            
-            print(f"{'='*60}\n")
+            logger.info(f"Loaded {len(df)} records | "
+                       f"Date: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')} | "
+                       f"IPH: {df['Indikator_Harga'].min():.2f} to {df['Indikator_Harga'].max():.2f}")
             return df
             
         except Exception as e:
-            print(f"[DB] EXCEPTION: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            print(f"{'='*60}\n")
+            logger.error(f"Error loading historical data: {str(e)}", exc_info=True)
             return pd.DataFrame()
     
     def validate_new_data(self, df):
         """Validate new data format and content (same as before)"""
-        print(" Validating new data...")
-        
         if df.empty:
-            raise ValueError(" Data is empty")
+            raise ValueError("Data is empty")
         
-        print(f" Original shape: {df.shape}")
-        print(f" Original columns: {list(df.columns)}")
+        original_size = len(df)
         
         # Check for completely empty rows
         empty_rows = df.isnull().all(axis=1).sum()
         if empty_rows > 0:
-            print(f" Removing {empty_rows} completely empty rows")
+            logger.debug(f"Removing {empty_rows} empty rows")
             df = df.dropna(how='all')
         
         # Map common column variations to standard names
@@ -130,11 +111,11 @@ class DataHandler:
         for old_name, new_name in column_mapping.items():
             if old_name in df.columns:
                 df = df.rename(columns={old_name: new_name})
-                print(f" Renamed column '{old_name}' to '{new_name}'")
+                logger.debug(f"Renamed column: {old_name} -> {new_name}")
         
         # Special handling for IPH Kota Batu format
         if 'Tanggal' not in df.columns and 'Bulan' in df.columns and 'Minggu ke-' in df.columns:
-            print(" Creating Tanggal column from Bulan and Minggu...")
+            logger.debug("Creating Tanggal column from Bulan and Minggu")
             df = self._create_date_from_bulan_minggu(df)
         
         # Check required columns
@@ -142,9 +123,7 @@ class DataHandler:
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
             available_cols = list(df.columns)
-            raise ValueError(f" Missing required columns: {missing_cols}. Available columns: {available_cols}")
-        
-        print(f" Required columns found: {required_columns}")
+            raise ValueError(f"Missing required columns: {missing_cols}. Available: {available_cols}")
         
         # Validate and convert date column
         try:
@@ -153,16 +132,14 @@ class DataHandler:
             invalid_dates = df['Tanggal'].isna().sum()
             
             if invalid_dates > 0:
-                print(f" Found {invalid_dates}/{original_dates} invalid dates, removing...")
+                logger.debug(f"Removed {invalid_dates} invalid dates")
                 df = df.dropna(subset=['Tanggal'])
                 
             if df.empty:
-                raise ValueError(" No valid dates found in data")
+                raise ValueError("No valid dates found")
                 
-            print(f" Date validation: {len(df)}/{original_dates} valid dates")
-            
         except Exception as e:
-            raise ValueError(f" Error processing dates: {str(e)}")
+            raise ValueError(f"Error processing dates: {str(e)}")
         
         # Validate and convert numeric column
         try:
@@ -171,37 +148,34 @@ class DataHandler:
             invalid_values = df['Indikator_Harga'].isna().sum()
             
             if invalid_values > 0:
-                print(f" Found {invalid_values}/{original_values} invalid numeric values, removing...")
+                logger.debug(f"Removed {invalid_values} invalid numeric values")
                 df = df.dropna(subset=['Indikator_Harga'])
                 
             if df.empty:
-                raise ValueError(" No valid numeric values found")
+                raise ValueError("No valid numeric values found")
                 
-            print(f" Numeric validation: {len(df)}/{original_values} valid values")
-            
         except Exception as e:
-            raise ValueError(f" Error processing numeric values: {str(e)}")
+            raise ValueError(f"Error processing numeric values: {str(e)}")
         
         # Check for reasonable value ranges
         iph_values = df['Indikator_Harga']
         extreme_values = ((iph_values < -50) | (iph_values > 50)).sum()
         
         if extreme_values > 0:
-            print(f" Warning: {extreme_values} extreme IPH values (>50% or <-50%)")
+            logger.warning(f"{extreme_values} extreme IPH values detected (>50% or <-50%)")
             
         # Sort by date
         df = df.sort_values('Tanggal').reset_index(drop=True)
         
-        print(f" Validation complete: {len(df)} valid records")
-        print(f"    IPH range: {iph_values.min():.2f}% to {iph_values.max():.2f}%")
-        print(f"    Date range: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
+        # Summary log
+        logger.info(f"Validated: {len(df)}/{original_size} records | "
+                   f"IPH: {iph_values.min():.2f}% to {iph_values.max():.2f}% | "
+                   f"Date: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
         
         return df
 
     def merge_and_save_data(self, new_data_df):
         """ Merge new data with database and save - FIXED DUPLICATE DETECTION"""
-        print("Starting database merge process...")
-        
         # Validate new data
         validated_df = self.validate_new_data(new_data_df.copy())
         
@@ -211,7 +185,7 @@ class DataHandler:
         try:
             # Get existing data count
             existing_count = IPHData.query.count()
-            print(f"Existing records in database: {existing_count}")
+            logger.debug(f"Existing records: {existing_count}")
             
             # Process and insert new records
             new_records = 0
@@ -225,7 +199,7 @@ class DataHandler:
                     # Normalize to weekly anchor (1, 8, 15, 22, 29)
                     anchored = self._anchor_date(date_value)
                     if anchored != date_value:
-                        print(f"   Normalized date {date_value} -> {anchored}")
+                        logger.debug(f"Normalized date {date_value} -> {anchored}")
                         date_value = anchored
                     bulan_val = str(row['Bulan']) if 'Bulan' in row and pd.notna(row['Bulan']) else None
                     minggu_val = str(row['Minggu']) if 'Minggu' in row and pd.notna(row['Minggu']) else None
@@ -236,7 +210,7 @@ class DataHandler:
 
                     if existing_record:
                         # Update existing record
-                        print(f"   Updating existing record: {date_value}")
+                        logger.debug(f"Updating existing record: {date_value}")
                         existing_record.indikator_harga = float(row['Indikator_Harga'])
                         existing_record.updated_at = datetime.utcnow()
                         
@@ -254,7 +228,7 @@ class DataHandler:
                         duplicate_dates.append(date_value)
                     else:
                         # Create new record
-                        print(f"    Adding new record: {date_value}")
+                        logger.debug(f"Adding new record: {date_value}")
                         
                         # Extract tahun from bulan if not provided
                         tahun_val = None
@@ -307,7 +281,7 @@ class DataHandler:
             
             # Commit all changes at once
             db.session.commit()
-            print(f"Database changes committed successfully")
+            logger.debug("Database changes committed")
             
             # Get final count
             final_count = IPHData.query.count()
@@ -323,8 +297,7 @@ class DataHandler:
                 'backup_created': backup_info is not None
             }
             
-            print(f"Database merge completed successfully:")
-            print(f"   {existing_count} existing + {new_records} new + {updated_records} updated = {final_count} total")
+            logger.info(f"Data merged: {existing_count} existing + {new_records} new + {updated_records} updated = {final_count} total")
             
             # Return combined data as DataFrame
             combined_df = self.load_historical_data()
@@ -333,13 +306,13 @@ class DataHandler:
             
         except Exception as e:
             db.session.rollback()
-            print(f"Error during merge: {str(e)}")
+            logger.error(f"Merge error: {str(e)}")
             import traceback
             traceback.print_exc()
             
             # Attempt to restore from backup if available
             if backup_info:
-                print("Database rollback executed. Backup available if needed.")
+                logger.warning("Database rollback executed")
             
             raise Exception(f"Database merge failed: {str(e)}")
 
@@ -354,7 +327,7 @@ class DataHandler:
             df = self.load_historical_data()
             
             if df.empty:
-                print(" No data to backup")
+                logger.debug("No data to backup")
                 return None
             
             # Save to CSV
@@ -367,11 +340,11 @@ class DataHandler:
                 f.write(f"Records backed up: {len(df)}\n")
                 f.write(f"Date range: {df['Tanggal'].min()} to {df['Tanggal'].max()}\n")
             
-            print(f" Database backed up to {backup_filename}")
+            logger.debug(f"Database backed up to {backup_filename}")
             return backup_filepath
             
         except Exception as e:
-            print(f" Error backing up database: {str(e)}")
+            logger.warning(f"Backup failed: {str(e)}")
             return None
     
     def get_data_summary(self):
@@ -448,7 +421,7 @@ class DataHandler:
             return summary
             
         except Exception as e:
-            print(f" Error getting data summary: {str(e)}")
+            logger.error(f"Error getting data summary: {str(e)}")
             return {
                 'total_records': 0,
                 'error': str(e)
@@ -554,6 +527,6 @@ class DataHandler:
         
         df = df.drop(['Year', 'Month', 'Week'], axis=1)
         
-        print(f" Created Tanggal column from Bulan and Minggu")
+        logger.debug("Created Tanggal column from Bulan and Minggu")
         
         return df

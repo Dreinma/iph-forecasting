@@ -11,7 +11,10 @@ import pickle
 import os
 from datetime import datetime, timedelta
 import warnings
+import logging
 warnings.filterwarnings('ignore')
+
+logger = logging.getLogger(__name__)
 
 class XGBoostAdvanced(BaseEstimator, RegressorMixin):
     """Advanced XGBoost model with optimized parameters for time series forecasting"""
@@ -843,7 +846,7 @@ class ForecastingEngine:
     
     def forecast_multistep(self, model, last_features, n_steps):
         """Enhanced forecasting with better uncertainty estimation"""
-        print(f" Generating {n_steps}-step forecast with enhanced uncertainty...")
+        logger.debug(f"Generating {n_steps}-step forecast with enhanced uncertainty")
         
         predictions = []
         uncertainties = []
@@ -883,7 +886,7 @@ class ForecastingEngine:
         lower_bounds = [pred - conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
         upper_bounds = [pred + conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
         
-        print(f" Enhanced forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(uncertainties):.3f}")
+        logger.debug(f"Enhanced forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(uncertainties):.3f}")
         
         return {
             'predictions': np.array(predictions),
@@ -927,10 +930,7 @@ class ForecastingEngine:
      
     def generate_forecast(self, model_name, forecast_weeks=8):
         """Generate forecast using specified model - FIXED VERSION"""
-        print("=" * 100)
-        print(f"FORECASTING ENGINE - GENERATE FORECAST:")
-        print(f"    Requested model: '{model_name}'")
-        print(f"    Requested weeks: {forecast_weeks}")
+        logger.debug(f"Forecasting engine - Generate forecast: model='{model_name}', weeks={forecast_weeks}")
         
         # Set seed untuk konsistensi
         np.random.seed(42)

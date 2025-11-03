@@ -186,6 +186,8 @@ class AdminUser(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    reset_token = db.Column(db.String(255), nullable=True)  # Token untuk reset password
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)  # Waktu kadaluarsa token
     
     def __repr__(self):
         return f'<AdminUser {self.username}>'
@@ -305,33 +307,34 @@ class AlertRule(db.Model):
 
 
 class ActivityLog(db.Model):
-    """Model untuk activity log admin - untuk audit trail"""
+    """Model untuk activity log / audit trail"""
     __tablename__ = 'activity_logs'
     
     id = db.Column(db.Integer, primary_key=True)
     
     # User info
     user_id = db.Column(db.Integer, db.ForeignKey('admin_users.id'), nullable=True)
-    username = db.Column(db.String(50), nullable=False)  # Denormalized untuk performa
+    username = db.Column(db.String(100), nullable=False)
     
     # Activity info
-    action_type = db.Column(db.String(50), nullable=False, index=True)  # 'upload', 'edit', 'delete', 'train', etc.
-    entity_type = db.Column(db.String(50), nullable=False, index=True)  # 'data', 'model', 'alert', etc.
-    entity_id = db.Column(db.Integer, nullable=True)  # ID dari entity yang di-actions
+    action_type = db.Column(db.String(50), nullable=False, index=True)  # 'train', 'upload', 'delete', 'edit', etc.
+    entity_type = db.Column(db.String(50), nullable=False)  # 'model', 'data', 'alert', etc.
+    description = db.Column(db.Text)
     
-    # Activity details
-    description = db.Column(db.Text, nullable=False)
-    ip_address = db.Column(db.String(50))
-    user_agent = db.Column(db.String(255))
+    # Additional metadata (stored as JSON)
+    activity_metadata = db.Column(db.Text)  # JSON string for additional info (metadata is reserved in SQLAlchemy)
     
     # Timestamp
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
-    # Relationship
-    user = db.relationship('AdminUser', backref='activities')
+    # Indexes
+    __table_args__ = (
+        db.Index('idx_activity_user', 'user_id', 'created_at'),
+        db.Index('idx_activity_type', 'action_type', 'created_at'),
+    )
     
     def __repr__(self):
-        return f'<ActivityLog {self.username}: {self.action_type} {self.entity_type}>'
+        return f'<ActivityLog {self.action_type} by {self.username}>'
     
     def to_dict(self):
         return {
@@ -340,73 +343,66 @@ class ActivityLog(db.Model):
             'username': self.username,
             'action_type': self.action_type,
             'entity_type': self.entity_type,
-            'entity_id': self.entity_id,
             'description': self.description,
-            'ip_address': self.ip_address,
-            'user_agent': self.user_agent,
+            'metadata': json.loads(self.activity_metadata) if self.activity_metadata else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 
 class ForecastHistory(db.Model):
-    """Model untuk menyimpan history forecast yang pernah dibuat"""
+    """Model untuk menyimpan riwayat forecast yang telah dibuat"""
     __tablename__ = 'forecast_history'
     
     id = db.Column(db.Integer, primary_key=True)
     
-    # Forecast metadata
+    # Forecast info
     model_name = db.Column(db.String(100), nullable=False, index=True)
-    weeks_forecasted = db.Column(db.Integer, nullable=False)
-    
-    # Forecast summary
-    avg_prediction = db.Column(db.Float)
-    trend = db.Column(db.String(20))  # 'Naik', 'Turun', 'Stable'
-    volatility = db.Column(db.Float)
-    min_prediction = db.Column(db.Float)
-    max_prediction = db.Column(db.Float)
-    
-    # Model performance saat forecast dibuat
-    model_mae = db.Column(db.Float)
-    model_rmse = db.Column(db.Float)
-    model_r2 = db.Column(db.Float)
+    forecast_weeks = db.Column(db.Integer, nullable=False)  # Jumlah minggu yang di-forecast
     
     # Forecast data (stored as JSON)
-    forecast_data = db.Column(db.Text)  # JSON array of forecast points
+    forecast_data = db.Column(db.Text)  # JSON array of forecast values
+    confidence_intervals = db.Column(db.Text)  # JSON array of confidence intervals
     
-    # User info (optional - bisa dibuat oleh system atau admin)
-    created_by = db.Column(db.String(100))  # username atau 'system'
+    # Statistics
+    avg_prediction = db.Column(db.Float)  # Rata-rata nilai prediksi
+    trend = db.Column(db.String(20))  # 'up', 'down', 'stable'
+    min_value = db.Column(db.Float)
+    max_value = db.Column(db.Float)
+    
+    # Performance info (if validation available)
+    validation_mae = db.Column(db.Float)
+    validation_rmse = db.Column(db.Float)
+    
+    # Metadata
+    data_points_used = db.Column(db.Integer)  # Jumlah data yang digunakan untuk training
+    created_by = db.Column(db.String(100))  # Username atau 'system'
+    
+    # Timestamp
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Indexes
     __table_args__ = (
         db.Index('idx_forecast_model_date', 'model_name', 'created_at'),
-        db.Index('idx_forecast_created', 'created_at'),
+        db.Index('idx_forecast_date', 'created_at'),
     )
     
     def __repr__(self):
-        return f'<ForecastHistory {self.model_name}: {self.weeks_forecasted} weeks at {self.created_at}>'
+        return f'<ForecastHistory {self.model_name}: {self.forecast_weeks} weeks>'
     
     def to_dict(self):
-        forecast_data_parsed = None
-        if self.forecast_data:
-            try:
-                forecast_data_parsed = json.loads(self.forecast_data)
-            except:
-                pass
-        
         return {
             'id': self.id,
             'model_name': self.model_name,
-            'weeks_forecasted': self.weeks_forecasted,
+            'forecast_weeks': self.forecast_weeks,
+            'forecast_data': json.loads(self.forecast_data) if self.forecast_data else None,
+            'confidence_intervals': json.loads(self.confidence_intervals) if self.confidence_intervals else None,
             'avg_prediction': float(self.avg_prediction) if self.avg_prediction else None,
             'trend': self.trend,
-            'volatility': float(self.volatility) if self.volatility else None,
-            'min_prediction': float(self.min_prediction) if self.min_prediction else None,
-            'max_prediction': float(self.max_prediction) if self.max_prediction else None,
-            'model_mae': float(self.model_mae) if self.model_mae else None,
-            'model_rmse': float(self.model_rmse) if self.model_rmse else None,
-            'model_r2': float(self.model_r2) if self.model_r2 else None,
-            'forecast_data': forecast_data_parsed,
+            'min_value': float(self.min_value) if self.min_value else None,
+            'max_value': float(self.max_value) if self.max_value else None,
+            'validation_mae': float(self.validation_mae) if self.validation_mae else None,
+            'validation_rmse': float(self.validation_rmse) if self.validation_rmse else None,
+            'data_points_used': self.data_points_used,
             'created_by': self.created_by,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
@@ -430,6 +426,7 @@ def init_db(app):
         print(f"   - {AdminUser.__tablename__}")
         print(f"   - {AlertRule.__tablename__}")
         print(f"   - {ActivityLog.__tablename__}")
+        print(f"   - {ForecastHistory.__tablename__}")
 
 
 def get_db_stats():

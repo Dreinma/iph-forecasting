@@ -3,8 +3,9 @@ Forms untuk authentication
 """
 
 from flask_wtf import FlaskForm
+from flask import current_app
 from wtforms import StringField, PasswordField, BooleanField
-from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
 from database import AdminUser
 
 class LoginForm(FlaskForm):
@@ -40,8 +41,6 @@ class CreateAdminForm(FlaskForm):
         Length(min=3, max=50, message='Username harus 3-50 karakter')
     ])
     email = StringField('Email', validators=[
-        DataRequired(message='Email harus diisi'),
-        Email(message='Format email tidak valid'),
         Length(max=100, message='Email maksimal 100 karakter')
     ])
     password = PasswordField('Password', validators=[
@@ -53,16 +52,24 @@ class CreateAdminForm(FlaskForm):
         EqualTo('password', message='Password tidak cocok')
     ])
     
-    def validate_username(self, field):
-        """Validate unique username"""
-        user = AdminUser.query.filter_by(username=field.data).first()
-        if user:
-            raise ValidationError('Username sudah digunakan')
-    
-    def validate_email(self, field):
-        """Validate unique email"""
-        if field.data:
-            user = AdminUser.query.filter_by(email=field.data).first()
-            if user:
-                raise ValidationError('Email sudah digunakan')
+    # Note: Username and email uniqueness validation is done in route handler
+    # to avoid app context issues during form initialization
+
+class ForgotPasswordForm(FlaskForm):
+    """Form untuk forgot password"""
+    email = StringField('Email', validators=[
+        DataRequired(message='Email harus diisi'),
+        Length(max=100, message='Email maksimal 100 karakter')
+    ])
+
+class ResetPasswordForm(FlaskForm):
+    """Form untuk reset password"""
+    password = PasswordField('Password Baru', validators=[
+        DataRequired(message='Password baru harus diisi'),
+        Length(min=8, message='Password minimal 8 karakter')
+    ])
+    confirm_password = PasswordField('Konfirmasi Password Baru', validators=[
+        DataRequired(message='Konfirmasi password harus diisi'),
+        EqualTo('password', message='Password tidak cocok')
+    ])
 

@@ -60,23 +60,7 @@ data/models/*.pkl
 .DS_Store
 Thumbs.db
 
-# Data backups (tidak perlu di-commit)
-data/backups/
-data/db_backups/
-data/backups/**/*
-data/db_backups/**/*
-
-# Forecast cache & temporary data
-data/latest_forecast.json
-data/*.json
-!data/*.csv
-
-# Uploads (keep template file)
-static/uploads/*
-!static/uploads/.gitkeep
-!static/uploads/template_iph_komoditas.csv
-
-# Flask specific
+# Flask
 instance/
 .webassets-cache
 flask_session/
@@ -94,4 +78,20 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Data backups
+data/backups/
+data/db_backups/
+data/backups/**/*
+data/db_backups/**/*
+
+# Forecast cache & data files
+data/latest_forecast.json
+data/*.json
+!data/*.csv
+
+# Uploads
+static/uploads/*
+!static/uploads/.gitkeep
+!static/uploads/template_iph_komoditas.csv
 

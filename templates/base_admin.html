@@ -74,6 +74,92 @@
             display: none;
         }
         
+        .admin-sidebar.collapsed .brand-text {
+            display: none;
+        }
+        
+        .admin-sidebar.collapsed .brand-section .btn {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .admin-sidebar.collapsed .nav-section small {
+            display: none;
+        }
+        
+        .admin-sidebar .nav-link {
+            position: relative;
+        }
+        
+        .admin-sidebar.collapsed .nav-link {
+            justify-content: center;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        
+        .admin-sidebar.collapsed .nav-link i {
+            margin-right: 0;
+        }
+        
+        /* Tooltip for collapsed sidebar */
+        .admin-sidebar.collapsed .nav-link::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: calc(100% + 15px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease 0.1s;
+            z-index: 1001;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .admin-sidebar.collapsed .nav-link::before {
+            content: '';
+            position: absolute;
+            left: calc(100% + 5px);
+            top: 50%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: rgba(0, 0, 0, 0.95);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease 0.1s;
+            z-index: 1002;
+        }
+        
+        .admin-sidebar.collapsed .nav-link:hover::after,
+        .admin-sidebar.collapsed .nav-link:hover::before {
+            opacity: 1;
+        }
+        
+        /* Toggle button improvements */
+        .admin-sidebar .brand-section .btn {
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem;
+            border-radius: 6px;
+        }
+        
+        .admin-sidebar .brand-section .btn:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .admin-sidebar.collapsed .brand-section .btn i {
+            transform: rotate(180deg);
+        }
+        
         .admin-main-content {
             margin-left: 280px;
             transition: all 0.3s ease;
@@ -101,11 +187,238 @@
             font-weight: 600;
             margin-left: 0.5rem;
         }
+        
+        /* Mobile Hamburger Menu Button */
+        .admin-mobile-menu-btn {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1002;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Mobile Overlay */
+        .admin-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        
+        .admin-sidebar-overlay.show {
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            .admin-mobile-menu-btn {
+                display: block;
+            }
+            
+            .admin-sidebar {
+                transform: translateX(-100%);
+                z-index: 1001;
+                width: 260px;
+            }
+            
+            .admin-sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .admin-main-content {
+                margin-left: 0 !important;
+                padding-top: 70px;
+            }
+            
+            .admin-header {
+                padding: 1rem !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            .admin-header h4 {
+                font-size: 1.25rem !important;
+            }
+            
+            .admin-header .d-flex {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 1rem;
+            }
+            
+            .admin-header .dropdown {
+                width: 100%;
+            }
+            
+            .admin-header .dropdown-toggle {
+                width: 100%;
+            }
+            
+            .container-fluid {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+            
+            /* Make all tables responsive */
+            .table-responsive {
+                display: block;
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Make buttons stack on mobile */
+            .d-grid.gap-2.d-md-flex {
+                flex-direction: column;
+            }
+            
+            /* Make form columns stack */
+            .row.g-3 .col-md-6,
+            .row.g-4 .col-md-6,
+            .row.g-3 .col-md-4,
+            .row.g-4 .col-md-4,
+            .row.g-3 .col-md-3,
+            .row.g-4 .col-md-3 {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+            
+            /* Card padding adjustments */
+            .card-body {
+                padding: 1rem !important;
+            }
+            
+            /* Page headers */
+            .d-flex.justify-content-between {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 1rem;
+            }
+            
+            .d-flex.justify-content-between > div:last-child {
+                width: 100%;
+            }
+            
+            .d-flex.justify-content-between > div:last-child button {
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .admin-main-content {
+                padding-top: 60px;
+            }
+            
+            .admin-header h4 {
+                font-size: 1.1rem !important;
+            }
+            
+            .admin-header small {
+                font-size: 0.75rem !important;
+            }
+            
+            .admin-badge {
+                font-size: 0.65rem !important;
+                padding: 0.2rem 0.5rem !important;
+            }
+            
+            /* Smaller padding for very small screens */
+            .container-fluid {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+            
+            .card-body {
+                padding: 0.75rem !important;
+            }
+            
+            /* Stack all columns on very small screens */
+            .row.g-3 > [class*="col-"],
+            .row.g-4 > [class*="col-"] {
+                width: 100%;
+                margin-bottom: 0.75rem;
+            }
+            
+            /* Make buttons full width on very small screens only */
+            .btn:not(.btn-sm):not(.btn-lg) {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+            
+            .btn:not(.btn-sm):not(.btn-lg):last-child {
+                margin-bottom: 0;
+            }
+            
+            /* Smaller text on mobile */
+            h5 {
+                font-size: 1.1rem !important;
+            }
+            
+            h6 {
+                font-size: 0.95rem !important;
+            }
+            
+            /* Smaller icons on mobile */
+            .fa-2x {
+                font-size: 1.5rem !important;
+            }
+            
+            /* Adjust card icons */
+            .bg-opacity-10 {
+                padding: 0.75rem !important;
+            }
+        }
+        
+        /* General responsive adjustments */
+        @media (max-width: 768px) {
+            /* Make modals full width on mobile */
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: calc(100% - 1rem);
+            }
+            
+            /* Stack form groups */
+            .form-group {
+                margin-bottom: 1rem;
+            }
+            
+            /* Better spacing for stats cards */
+            .row.g-4 > div {
+                margin-bottom: 1rem;
+            }
+            
+            /* Better table display */
+            .table {
+                font-size: 0.875rem;
+            }
+            
+            .table th,
+            .table td {
+                padding: 0.5rem !important;
+                white-space: nowrap;
+            }
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Mobile Menu Button -->
+    <button class="admin-mobile-menu-btn" onclick="toggleAdminMobileSidebar()" id="adminMobileMenuBtn">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="admin-sidebar-overlay" id="adminSidebarOverlay" onclick="toggleAdminMobileSidebar()"></div>
+    
     <!-- Admin Sidebar -->
     {% include 'components/_admin_nav.html' %}
     
@@ -129,7 +442,7 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-key me-2"></i>Change Password</a></li>
+                            <li><a class="dropdown-item" href="/admin/change-password" id="changePasswordLink" data-route="admin.change_password"><i class="fas fa-key me-2"></i>Change Password</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="{{ url_for('admin.logout') }}">
                                 <i class="fas fa-sign-out-alt me-2"></i>Logout
@@ -165,13 +478,180 @@
     
     <!-- Sidebar Toggle Script -->
     <script>
+        // Initialize sidebar state from localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('adminSidebar');
+            const mainContent = document.getElementById('adminMainContent');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            // Load saved state (only for desktop)
+            if (window.innerWidth > 768) {
+                const savedState = localStorage.getItem('adminSidebarCollapsed');
+                if (savedState === 'true') {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('sidebar-collapsed');
+                    if (toggleIcon) {
+                        toggleIcon.style.transform = 'rotate(180deg)';
+                    }
+                }
+            }
+        });
+        
         function toggleAdminSidebar() {
             const sidebar = document.getElementById('adminSidebar');
             const mainContent = document.getElementById('adminMainContent');
+            const toggleIcon = document.getElementById('toggleIcon');
             
-            sidebar.classList.toggle('collapsed');
-            mainContent.classList.toggle('sidebar-collapsed');
+            // Only toggle collapse on desktop
+            if (window.innerWidth > 768) {
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                
+                if (isCollapsed) {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('sidebar-collapsed');
+                    localStorage.setItem('adminSidebarCollapsed', 'false');
+                    if (toggleIcon) {
+                        toggleIcon.style.transform = 'rotate(0deg)';
+                    }
+                } else {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('sidebar-collapsed');
+                    localStorage.setItem('adminSidebarCollapsed', 'true');
+                    if (toggleIcon) {
+                        toggleIcon.style.transform = 'rotate(180deg)';
+                    }
+                }
+            }
         }
+        
+        // Mobile sidebar toggle
+        function toggleAdminMobileSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('adminSidebarOverlay');
+            const menuBtn = document.getElementById('adminMobileMenuBtn');
+            
+            const isShowing = sidebar.classList.contains('show');
+            
+            if (isShowing) {
+                sidebar.classList.remove('show');
+                overlay.classList.remove('show');
+                menuBtn.querySelector('i').className = 'fas fa-bars';
+                document.body.style.overflow = '';
+            } else {
+                sidebar.classList.add('show');
+                overlay.classList.add('show');
+                menuBtn.querySelector('i').className = 'fas fa-times';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('adminSidebarOverlay');
+            const menuBtn = document.getElementById('adminMobileMenuBtn');
+            
+            if (window.innerWidth <= 768) {
+                const isClickInsideSidebar = sidebar.contains(event.target);
+                const isClickOnMenuBtn = menuBtn && menuBtn.contains(event.target);
+                
+                if (!isClickInsideSidebar && !isClickOnMenuBtn && sidebar.classList.contains('show')) {
+                    sidebar.classList.remove('show');
+                    overlay.classList.remove('show');
+                    if (menuBtn) {
+                        menuBtn.querySelector('i').className = 'fas fa-bars';
+                    }
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('adminSidebarOverlay');
+            const menuBtn = document.getElementById('adminMobileMenuBtn');
+            
+            if (window.innerWidth > 768) {
+                // Desktop mode - restore saved state
+                sidebar.classList.remove('show');
+                if (overlay) overlay.classList.remove('show');
+                if (menuBtn) {
+                    menuBtn.querySelector('i').className = 'fas fa-bars';
+                }
+                document.body.style.overflow = '';
+                
+                // Apply saved collapsed state
+                const savedState = localStorage.getItem('adminSidebarCollapsed');
+                const mainContent = document.getElementById('adminMainContent');
+                const toggleIcon = document.getElementById('toggleIcon');
+                
+                if (savedState === 'true') {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('sidebar-collapsed');
+                    if (toggleIcon) {
+                        toggleIcon.style.transform = 'rotate(180deg)';
+                    }
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('sidebar-collapsed');
+                    if (toggleIcon) {
+                        toggleIcon.style.transform = 'rotate(0deg)';
+                    }
+                }
+            } else {
+                // Mobile mode - always reset
+                sidebar.classList.remove('collapsed');
+                const mainContent = document.getElementById('adminMainContent');
+                if (mainContent) {
+                    mainContent.classList.remove('sidebar-collapsed');
+                }
+            }
+        });
+        
+        // Prevent body scroll when mobile sidebar is open
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('adminSidebar');
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        if (window.innerWidth <= 768) {
+                            if (sidebar.classList.contains('show')) {
+                                document.body.style.overflow = 'hidden';
+                            } else {
+                                document.body.style.overflow = '';
+                            }
+                        }
+                    }
+                });
+            });
+            
+            observer.observe(sidebar, { attributes: true });
+        });
+        
+        // Ensure Change Password link works correctly - prevent any interference
+        document.addEventListener('DOMContentLoaded', function() {
+            const changePasswordLink = document.getElementById('changePasswordLink');
+            if (changePasswordLink) {
+                // Remove any existing event listeners by cloning
+                const newLink = changePasswordLink.cloneNode(true);
+                changePasswordLink.parentNode.replaceChild(newLink, changePasswordLink);
+                
+                // Add explicit click handler
+                newLink.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    console.log('Change Password clicked, href:', href);
+                    if (href && href !== '#' && !href.includes('forecast')) {
+                        window.location.href = href;
+                    } else {
+                        // Fallback - construct URL manually
+                        window.location.href = '/admin/change-password';
+                    }
+                }, true); // Use capture phase to ensure it fires first
+            }
+        });
     </script>
     
     <!-- Page-specific scripts -->

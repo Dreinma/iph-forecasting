@@ -228,11 +228,16 @@ class CommodityInsightService:
                     df[col] = df[col].str.strip()
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Enhanced date creation
-        df['Tanggal'] = df.apply(lambda row: self._create_robust_date(
-            row.get('Bulan', ''), 
-            row.get('Minggu', '')
-        ), axis=1)
+        # Enhanced date creation - use existing Tanggal if available, otherwise create from Bulan/Minggu
+        if 'Tanggal' not in df.columns or df['Tanggal'].isna().all():
+            df['Tanggal'] = df.apply(lambda row: self._create_robust_date(
+                row.get('Bulan', ''), 
+                row.get('Minggu', '')
+            ), axis=1)
+        else:
+            # Convert existing Tanggal to datetime if it's string
+            if df['Tanggal'].dtype == 'object':
+                df['Tanggal'] = pd.to_datetime(df['Tanggal'], errors='coerce')
         
         # Remove rows with invalid dates
         df = df.dropna(subset=['Tanggal'])
@@ -734,11 +739,28 @@ class CommodityInsightService:
             # Use exact or startswith match (more strict than contains)
             month_clean_normalized = month_clean.replace("'", "").strip()
             
-            # Match bulan yang dimulai dengan nama bulan yang dicari (exact prefix match)
-            df_filtered = df_filtered[
-                (df_filtered['Bulan_Normalized'].str.startswith(month_clean_normalized, na=False)) |
-                (df_filtered['Bulan'].str.lower().str.startswith(month_clean, na=False))
-            ]
+            # Enhanced matching: handle various formats like "Mei'23", "Mei 23", "Mei", etc.
+            # Strategy: extract first word from bulan and compare with month name
+            import re
+            def month_matches(bulan_str, month_name):
+                if pd.isna(bulan_str):
+                    return False
+                bulan_lower = str(bulan_str).lower().strip()
+                # Extract first word (month name) before any apostrophe, space, or number
+                first_word = re.match(r'^([a-z]+)', bulan_lower)
+                if first_word:
+                    extracted_month = first_word.group(1)
+                    return extracted_month == month_name
+                return False
+            
+            # Apply flexible matching
+            month_match_mask = df_filtered['Bulan'].apply(
+                lambda x: month_matches(x, month_clean_normalized)
+            )
+            normalized_match_mask = df_filtered['Bulan_Normalized'].str.startswith(month_clean_normalized, na=False)
+            direct_match_mask = df_filtered['Bulan'].str.lower().str.startswith(month_clean, na=False)
+            
+            df_filtered = df_filtered[month_match_mask | normalized_match_mask | direct_match_mask]
             
             print(f" After month filter ({month}): {len(df_filtered)} records")
             

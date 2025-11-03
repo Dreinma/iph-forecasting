@@ -5,13 +5,13 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h5 class="mb-1">Forecast Management</h5>
         <p class="text-muted mb-0">History dan analitik forecast yang pernah dibuat</p>
     </div>
-    <div>
-        <button type="button" class="btn btn-outline-secondary" onclick="exportForecastHistory()">
+    <div class="w-100 w-md-auto">
+        <button type="button" class="btn btn-outline-secondary w-100 w-md-auto" onclick="exportForecastHistory()">
             <i class="fas fa-download me-2"></i>Export History
         </button>
     </div>
@@ -19,7 +19,7 @@
 
 <!-- Forecast Statistics -->
 <div class="row g-4 mb-4">
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <h6 class="text-muted mb-2">Total Forecasts</h6>
@@ -27,7 +27,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <h6 class="text-muted mb-2">This Month</h6>
@@ -35,7 +35,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <h6 class="text-muted mb-2">Most Used Model</h6>

@@ -6,9 +6,13 @@ CATATAN: Routes ini belum diintegrasikan ke app.py
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from auth.decorators import admin_required
-from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm
-from auth.utils import check_password, update_last_login, create_admin_user
+from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm, ForgotPasswordForm, ResetPasswordForm
+from auth.utils import check_password, update_last_login, create_admin_user, hash_password
 from database import db, AdminUser
+from datetime import datetime, timedelta
+import os
+import secrets
+import hashlib
 
 # Create admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -45,16 +49,8 @@ def login():
             logger.error(f"Login attempt with null password hash: {form.username.data}")
         else:
             # Check password
-            # Debug: Print info untuk troubleshooting
-            print(f"\n=== DEBUG LOGIN ===")
-            print(f"Username: {form.username.data}")
-            print(f"Password length: {len(form.password.data) if form.password.data else 0}")
-            print(f"Password hash (first 30): {user.password_hash[:30] if user.password_hash else 'None'}...")
-            print(f"Hash format: {'bcrypt' if user.password_hash and user.password_hash.startswith('$2b$') else 'werkzeug' if user.password_hash and user.password_hash.startswith('pbkdf2:') else 'unknown'}")
-            
             password_check = check_password(user.password_hash, form.password.data)
-            print(f"Password check result: {password_check}")
-            print(f"===================\n")
+            logger.debug(f"Login attempt: username={form.username.data}, success={password_check}")
             
             if password_check:
                 # Login successful
@@ -68,7 +64,11 @@ def login():
                 login_user(flask_user, remember=form.remember_me.data)
                 update_last_login(user.id)
                 
+                # Set session as permanent and initialize last_activity
+                session.permanent = True
                 session['user_role'] = 'admin'
+                session['last_activity'] = datetime.utcnow().isoformat()
+                
                 flash('Login berhasil!', 'success')
                 
                 # Redirect to next page or admin dashboard
@@ -88,6 +88,151 @@ def logout():
     session.pop('user_role', None)
     flash('Anda telah logout.', 'info')
     return redirect(url_for('admin.login'))
+
+@admin_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Forgot password page"""
+    form = ForgotPasswordForm()
+    
+    if form.validate_on_submit():
+        email = form.email.data.strip()
+        user = AdminUser.query.filter_by(email=email).first()
+        
+        if user and user.email:
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            user.reset_token = hashlib.sha256(reset_token.encode()).hexdigest()
+            user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)  # Token valid 1 jam
+            db.session.commit()
+            
+            # Log token untuk development (HAPUS DI PRODUCTION!)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Reset token generated for user: {user.username}")
+            logger.info(f"Reset URL: {url_for('admin.reset_password', token=reset_token, _external=True)}")
+            
+            flash(f'Link reset password telah dibuat! Token: {reset_token[:20]}... (cek log untuk full URL)', 'info')
+            flash(f'URL Reset: {url_for("admin.reset_password", token=reset_token, _external=True)}', 'info')
+        else:
+            # Jangan reveal bahwa email tidak ada (security)
+            flash('Jika email terdaftar, link reset password akan dikirim ke email tersebut.', 'info')
+    
+    return render_template('admin/forgot_password.html', form=form)
+
+@admin_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Reset password dengan token"""
+    form = ResetPasswordForm()
+    
+    # Hash token untuk dicocokkan dengan database
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    user = AdminUser.query.filter_by(reset_token=token_hash).first()
+    
+    if not user:
+        flash('Token reset password tidak valid atau sudah digunakan.', 'danger')
+        return redirect(url_for('admin.login'))
+    
+    # Check token expiry
+    if user.reset_token_expiry and user.reset_token_expiry < datetime.utcnow():
+        flash('Token reset password sudah kadaluarsa. Silakan request reset password lagi.', 'danger')
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        return redirect(url_for('admin.forgot_password'))
+    
+    if form.validate_on_submit():
+        # Update password
+        from auth.utils import hash_password
+        user.password_hash = hash_password(form.password.data)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        flash('Password berhasil direset! Silakan login dengan password baru.', 'success')
+        return redirect(url_for('admin.login'))
+    
+    return render_template('admin/reset_password.html', form=form, token=token)
+
+@admin_bp.route('/change-password', methods=['GET', 'POST'])
+@admin_required
+def change_password():
+    """Change password untuk admin yang sedang login"""
+    form = ChangePasswordForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Get current user
+            admin_user = AdminUser.query.get(current_user.id)
+            if not admin_user:
+                flash('User tidak ditemukan', 'danger')
+                return redirect(url_for('admin.dashboard'))
+            
+            # Verify current password
+            if not check_password(admin_user.password_hash, form.current_password.data):
+                flash('Password saat ini salah', 'danger')
+                return render_template('admin/change_password.html', form=form)
+            
+            # Check if new password is same as current
+            if check_password(admin_user.password_hash, form.new_password.data):
+                flash('Password baru harus berbeda dengan password saat ini', 'warning')
+                return render_template('admin/change_password.html', form=form)
+            
+            # Update password
+            admin_user.password_hash = hash_password(form.new_password.data)
+            db.session.commit()
+            
+            flash('Password berhasil diubah!', 'success')
+            return redirect(url_for('admin.dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error: {str(e)}', 'danger')
+            return render_template('admin/change_password.html', form=form)
+    
+    return render_template('admin/change_password.html', form=form)
+
+@admin_bp.route('/change-password-api', methods=['POST'])
+@admin_required
+def change_password_api():
+    """API endpoint untuk change password via AJAX"""
+    try:
+        data = request.get_json()
+        current_password = data.get('current_password', '').strip()
+        new_password = data.get('new_password', '').strip()
+        confirm_password = data.get('confirm_password', '').strip()
+        
+        # Validation
+        if not current_password or not new_password or not confirm_password:
+            return jsonify({'success': False, 'error': 'Semua field harus diisi'}), 400
+        
+        if len(new_password) < 8:
+            return jsonify({'success': False, 'error': 'Password minimal 8 karakter'}), 400
+        
+        if new_password != confirm_password:
+            return jsonify({'success': False, 'error': 'Password baru dan konfirmasi tidak cocok'}), 400
+        
+        # Get current user
+        admin_user = AdminUser.query.get(current_user.id)
+        if not admin_user:
+            return jsonify({'success': False, 'error': 'User tidak ditemukan'}), 404
+        
+        # Verify current password
+        if not check_password(admin_user.password_hash, current_password):
+            return jsonify({'success': False, 'error': 'Password saat ini salah'}), 400
+        
+        # Check if new password is same as current
+        if check_password(admin_user.password_hash, new_password):
+            return jsonify({'success': False, 'error': 'Password baru harus berbeda dengan password saat ini'}), 400
+        
+        # Update password
+        admin_user.password_hash = hash_password(new_password)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Password berhasil diubah!'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Error: {str(e)}'}), 500
 
 @admin_bp.route('/dashboard')
 @admin_required
@@ -162,23 +307,103 @@ def settings():
 def create_admin():
     """Create new admin user"""
     from auth.forms import CreateAdminForm
+    from auth.utils import create_admin_user
+    import logging
+    import traceback
     
-    form = CreateAdminForm()
+    logger = logging.getLogger(__name__)
     
-    if form.validate_on_submit():
-        admin_user, message = create_admin_user(
-            form.username.data,
-            form.password.data,
-            form.email.data if form.email.data else None
-        )
+    try:
+        form = CreateAdminForm()
         
-        if admin_user:
-            flash(f'Admin user "{form.username.data}" berhasil dibuat!', 'success')
-            return redirect(url_for('admin.settings'))
-        else:
-            flash(f'Error: {message}', 'danger')
+        if request.method == 'POST':
+            logger.info(f"=== CREATE ADMIN POST REQUEST ===")
+            logger.info(f"Form data received: username={request.form.get('username', 'N/A')}, email={request.form.get('email', 'N/A')}")
+            logger.info(f"CSRF token present: {'csrf_token' in request.form}")
+            
+            # Validate form
+            if form.validate_on_submit():
+                logger.debug("Form validation passed")
+                try:
+                    # Additional validation: check username uniqueness
+                    from database import AdminUser
+                    existing_username = AdminUser.query.filter_by(username=form.username.data).first()
+                    if existing_username:
+                        flash(f'Username "{form.username.data}" sudah digunakan. Silakan pilih username lain.', 'danger')
+                        logger.warning(f"Username already exists: {form.username.data}")
+                    else:
+                        # Check email uniqueness if email is provided
+                        email_value = form.email.data.strip() if form.email.data else None
+                        if email_value:
+                            existing_email = AdminUser.query.filter_by(email=email_value).first()
+                            if existing_email:
+                                flash(f'Email/Identifier "{email_value}" sudah digunakan. Silakan gunakan yang lain.', 'danger')
+                                logger.warning(f"Email already exists: {email_value}")
+                            else:
+                                # All validations passed, create user
+                                admin_user, message = create_admin_user(
+                                    form.username.data,
+                                    form.password.data,
+                                    email_value
+                                )
+                                
+                                if admin_user:
+                                    flash(f'Admin user "{form.username.data}" berhasil dibuat!', 'success')
+                                    logger.info(f"Admin user created: {form.username.data}")
+                                    return redirect(url_for('admin.settings'))
+                                else:
+                                    flash(f'Error: {message}', 'danger')
+                                    logger.warning(f"Failed to create admin user: {message}")
+                        else:
+                            # No email provided - that's OK, email is optional
+                            admin_user, message = create_admin_user(
+                                form.username.data,
+                                form.password.data,
+                                None
+                            )
+                            
+                            if admin_user:
+                                flash(f'Admin user "{form.username.data}" berhasil dibuat!', 'success')
+                                logger.info(f"Admin user created: {form.username.data}")
+                                return redirect(url_for('admin.settings'))
+                            else:
+                                flash(f'Error: {message}', 'danger')
+                                logger.warning(f"Failed to create admin user: {message}")
+                except Exception as e:
+                    error_detail = traceback.format_exc()
+                    logger.error(f"Error creating admin user: {str(e)}\n{error_detail}")
+                    flash(f'Error saat membuat admin user: {str(e)}', 'danger')
+            else:
+                # Form validation failed
+                logger.warning(f"=== FORM VALIDATION FAILED ===")
+                logger.warning(f"Form errors: {form.errors}")
+                logger.warning(f"Form data: username={form.username.data if form.username.data else 'EMPTY'}, email={form.email.data if form.email.data else 'EMPTY'}")
+                
+                error_messages = []
+                for field, errors in form.errors.items():
+                    field_label = getattr(form, field).label.text if hasattr(form, field) else field
+                    for error in errors:
+                        error_msg = f"{field_label}: {error}"
+                        error_messages.append(error_msg)
+                        logger.warning(f"  - {error_msg}")
+                
+                if error_messages:
+                    flash(f'Validation error: {"; ".join(error_messages)}', 'danger')
+                else:
+                    flash('Form validation failed. Silakan cek input Anda.', 'danger')
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        logger.error(f"Unexpected error in create_admin: {str(e)}\n{error_detail}")
+        flash(f'Unexpected error: {str(e)}', 'danger')
     
-    return render_template('admin/create_admin.html', form=form, page_title="Create Admin User")
+    # Return form for GET or if POST had errors
+    try:
+        if 'form' not in locals():
+            form = CreateAdminForm()
+        return render_template('admin/create_admin.html', form=form, page_title="Create Admin User")
+    except Exception as e:
+        logger.error(f"Error rendering template: {str(e)}", exc_info=True)
+        return f"Error: {str(e)}", 500
 
 # ==================== API ROUTES ====================
 
@@ -792,6 +1017,40 @@ def api_settings_config():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/api/settings/app', methods=['GET', 'POST'])
+@admin_required
+def api_app_settings():
+    """API untuk application settings"""
+    try:
+        if request.method == 'GET':
+            # Get from session or default values
+            return jsonify({
+                'success': True,
+                'settings': {
+                    'app_name': 'PRISMA',  # Read-only, always 'PRISMA'
+                    'timezone': session.get('timezone', 'Asia/Jakarta'),
+                    'date_format': session.get('date_format', 'DD/MM/YYYY'),
+                    'time_format': session.get('time_format', '24h'),
+                    'items_per_page': session.get('items_per_page', 25),
+                    'refresh_interval': session.get('refresh_interval', 300)
+                }
+            })
+        else:
+            # Save to session (in production, save to database)
+            # Note: app_name is read-only and cannot be changed
+            data = request.get_json()
+            for key in ['timezone', 'date_format', 'time_format', 'items_per_page', 'refresh_interval']:
+                if key in data:
+                    session[key] = data[key]
+            
+            # Ignore app_name if sent - it's read-only
+            if 'app_name' in data:
+                del data['app_name']
+            
+            return jsonify({'success': True, 'message': 'Application settings saved'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/api/users/<int:user_id>', methods=['PUT', 'DELETE'])
 @admin_required
 def api_manage_user(user_id):
@@ -839,5 +1098,439 @@ def api_manage_user(user_id):
         return jsonify({'success': True, 'user': user.to_dict()})
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== BACKUP & RESTORE APIs ====================
+
+@admin_bp.route('/api/backup/create', methods=['POST'])
+@admin_required
+def api_create_backup():
+    """API untuk membuat database backup"""
+    import shutil
+    import zipfile
+    from datetime import datetime
+    from config import Config
+    
+    try:
+        data = request.get_json() or {}
+        include_models = data.get('include_models', True)
+        include_uploads = data.get('include_uploads', True)
+        
+        # Create backup directory if not exists
+        os.makedirs(Config.DB_BACKUP_FOLDER, exist_ok=True)
+        
+        # Backup filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'backup_{timestamp}.zip'
+        backup_path = os.path.join(Config.DB_BACKUP_FOLDER, backup_filename)
+        
+        # Create ZIP file
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Backup database
+            db_path = Config.SQLALCHEMY_DATABASE_URI.replace('sqlite:///', '')
+            if os.path.exists(db_path):
+                zipf.write(db_path, 'database.db')
+            
+            # Backup models if requested
+            if include_models and os.path.exists(Config.MODELS_PATH):
+                for root, dirs, files in os.walk(Config.MODELS_PATH):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arc_name = os.path.relpath(file_path, Config.MODELS_PATH)
+                        zipf.write(file_path, f'models/{arc_name}')
+            
+            # Backup uploads if requested
+            if include_uploads and os.path.exists(Config.UPLOAD_FOLDER):
+                for root, dirs, files in os.walk(Config.UPLOAD_FOLDER):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arc_name = os.path.relpath(file_path, Config.UPLOAD_FOLDER)
+                        zipf.write(file_path, f'uploads/{arc_name}')
+        
+        file_size = os.path.getsize(backup_path)
+        
+        return jsonify({
+            'success': True,
+            'backup_file': backup_filename,
+            'size': file_size,
+            'created_at': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/backup/list')
+@admin_required
+def api_list_backups():
+    """API untuk list semua backup files"""
+    import os
+    from datetime import datetime
+    from config import Config
+    
+    try:
+        backups = []
+        backup_folder = Config.DB_BACKUP_FOLDER
+        
+        if os.path.exists(backup_folder):
+            for filename in os.listdir(backup_folder):
+                if filename.endswith('.zip'):
+                    file_path = os.path.join(backup_folder, filename)
+                    stat = os.stat(file_path)
+                    backups.append({
+                        'filename': filename,
+                        'size': stat.st_size,
+                        'created_at': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    })
+        
+        # Sort by created_at descending
+        backups.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return jsonify({'success': True, 'backups': backups})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/backup/download/<filename>')
+@admin_required
+def api_download_backup(filename):
+    """API untuk download backup file"""
+    from flask import send_file
+    from config import Config
+    
+    try:
+        backup_path = os.path.join(Config.DB_BACKUP_FOLDER, filename)
+        if not os.path.exists(backup_path):
+            return jsonify({'success': False, 'error': 'Backup file not found'}), 404
+        
+        return send_file(backup_path, as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/backup/delete/<filename>', methods=['DELETE'])
+@admin_required
+def api_delete_backup(filename):
+    """API untuk delete backup file"""
+    from config import Config
+    
+    try:
+        backup_path = os.path.join(Config.DB_BACKUP_FOLDER, filename)
+        if not os.path.exists(backup_path):
+            return jsonify({'success': False, 'error': 'Backup file not found'}), 404
+        
+        os.remove(backup_path)
+        return jsonify({'success': True, 'message': 'Backup deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/backup/restore', methods=['POST'])
+@admin_required
+def api_restore_backup():
+    """API untuk restore dari backup"""
+    import zipfile
+    import shutil
+    from config import Config
+    
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'success': False, 'error': 'Filename required'}), 400
+        
+        backup_path = os.path.join(Config.DB_BACKUP_FOLDER, filename)
+        if not os.path.exists(backup_path):
+            return jsonify({'success': False, 'error': 'Backup file not found'}), 404
+        
+        # Extract backup
+        with zipfile.ZipFile(backup_path, 'r') as zipf:
+            zipf.extractall(Config.DATA_FOLDER)
+        
+        # Move database to correct location if extracted
+        extracted_db = os.path.join(Config.DATA_FOLDER, 'database.db')
+        db_path = Config.SQLALCHEMY_DATABASE_URI.replace('sqlite:///', '')
+        if os.path.exists(extracted_db):
+            # Backup current database first
+            current_backup = db_path + '.pre_restore'
+            if os.path.exists(db_path):
+                shutil.copy2(db_path, current_backup)
+            # Move extracted database
+            shutil.move(extracted_db, db_path)
+        
+        return jsonify({'success': True, 'message': 'Restore completed. Please restart the application.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== AUDIT LOG APIs ====================
+
+@admin_bp.route('/api/audit/logs')
+@admin_required
+def api_audit_logs():
+    """API untuk audit logs dengan filter dan pagination"""
+    from database import ActivityLog
+    from datetime import datetime
+    from sqlalchemy import and_
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 25, type=int)
+        action_type = request.args.get('action_type', '')
+        username = request.args.get('username', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        
+        logger.debug(f"Audit logs request: page={page}, limit={limit}, action={action_type}, user={username}")
+        
+        query = ActivityLog.query
+        
+        # Apply filters
+        if action_type:
+            query = query.filter(ActivityLog.action_type == action_type)
+        if username:
+            query = query.filter(ActivityLog.username == username)
+        if date_from:
+            try:
+                date_from_dt = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(ActivityLog.created_at >= date_from_dt)
+            except Exception as e:
+                logger.warning(f"Invalid date_from format: {date_from}, error: {e}")
+                pass
+        if date_to:
+            try:
+                date_to_dt = datetime.strptime(date_to, '%Y-%m-%d')
+                # Add one day to include the entire day
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59)
+                query = query.filter(ActivityLog.created_at <= date_to_dt)
+            except Exception as e:
+                logger.warning(f"Invalid date_to format: {date_to}, error: {e}")
+                pass
+        
+        # Get total count
+        total = query.count()
+        logger.debug(f"Total audit logs found: {total}")
+        
+        # Paginate
+        pagination = query.order_by(ActivityLog.created_at.desc()).paginate(
+            page=page, per_page=limit, error_out=False
+        )
+        
+        activities = [activity.to_dict() for activity in pagination.items]
+        logger.debug(f"Returning {len(activities)} activities for page {page}")
+        
+        return jsonify({
+            'success': True,
+            'activities': activities,
+            'total': total,
+            'page': page,
+            'pages': pagination.pages if pagination.pages else 1
+        })
+    except Exception as e:
+        logger.error(f"Error in api_audit_logs: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/audit/users')
+@admin_required
+def api_audit_users():
+    """API untuk mendapatkan daftar unique users dari audit log"""
+    from database import ActivityLog
+    from sqlalchemy import distinct
+    
+    try:
+        users = db.session.query(distinct(ActivityLog.username)).all()
+        user_list = [user[0] for user in users if user[0]]
+        
+        return jsonify({'success': True, 'users': user_list})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/audit/export')
+@admin_required
+def api_export_audit_logs():
+    """API untuk export audit logs ke CSV"""
+    from database import ActivityLog
+    from flask import send_file
+    import csv
+    import io
+    from datetime import datetime
+    
+    try:
+        action_type = request.args.get('action_type', '')
+        username = request.args.get('username', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        
+        query = ActivityLog.query
+        
+        if action_type:
+            query = query.filter(ActivityLog.action_type == action_type)
+        if username:
+            query = query.filter(ActivityLog.username == username)
+        if date_from:
+            try:
+                date_from_dt = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(ActivityLog.created_at >= date_from_dt)
+            except:
+                pass
+        if date_to:
+            try:
+                date_to_dt = datetime.strptime(date_to, '%Y-%m-%d')
+                query = query.filter(ActivityLog.created_at <= date_to_dt)
+            except:
+                pass
+        
+        activities = query.order_by(ActivityLog.created_at.desc()).all()
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Timestamp', 'User', 'Action Type', 'Entity Type', 'Description'])
+        
+        for activity in activities:
+            writer.writerow([
+                activity.created_at.strftime('%Y-%m-%d %H:%M:%S') if activity.created_at else '',
+                activity.username or 'system',
+                activity.action_type or '',
+                activity.entity_type or '',
+                activity.description or ''
+            ])
+        
+        # Create file response
+        output.seek(0)
+        mem = io.BytesIO()
+        mem.write(output.getvalue().encode('utf-8'))
+        mem.seek(0)
+        
+        filename = f'audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        return send_file(
+            mem,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== SYSTEM MONITORING APIs ====================
+
+@admin_bp.route('/api/system/db-stats')
+@admin_required
+def api_db_stats():
+    """API untuk database statistics"""
+    from database import get_db_stats, ForecastHistory
+    
+    try:
+        stats = get_db_stats()
+        
+        # Add forecast history count
+        stats['forecast_history'] = ForecastHistory.query.count()
+        
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/system/health')
+@admin_required
+def api_system_health():
+    """API untuk system health status"""
+    import os
+    from datetime import datetime
+    
+    try:
+        # Database connection check
+        try:
+            db.session.execute(db.text('SELECT 1'))
+            db_status = 'connected'
+        except:
+            db_status = 'disconnected'
+        
+        # Try to import psutil
+        try:
+            import psutil
+            psutil_available = True
+        except ImportError:
+            psutil_available = False
+        
+        # Get system info if psutil is available
+        if psutil_available:
+            try:
+                memory = psutil.virtual_memory()
+                process = psutil.Process(os.getpid())
+                uptime_seconds = int((datetime.now().timestamp() - process.create_time()))
+                memory_used = memory.used
+                memory_total = memory.total
+                memory_percent = memory.percent
+            except Exception:
+                # Fallback if psutil fails
+                psutil_available = False
+        
+        if not psutil_available:
+            # psutil not available, return minimal info
+            uptime_seconds = 0
+            memory_used = 0
+            memory_total = 0
+            memory_percent = 0
+        
+        # Determine health status
+        health_status = 'healthy'
+        if db_status != 'connected':
+            health_status = 'critical'
+        elif psutil_available and memory_percent > 90:
+            health_status = 'warning'
+        
+        return jsonify({
+            'success': True,
+            'health': {
+                'status': health_status,
+                'database': db_status,
+                'uptime_seconds': uptime_seconds,
+                'server_time': datetime.now().isoformat(),
+                'memory_used': memory_used,
+                'memory_total': memory_total,
+                'memory_percent': memory_percent
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/system/storage')
+@admin_required
+def api_system_storage():
+    """API untuk storage information"""
+    import os
+    from config import Config
+    
+    try:
+        def get_folder_size(folder_path):
+            total = 0
+            if os.path.exists(folder_path):
+                for dirpath, dirnames, filenames in os.walk(folder_path):
+                    for filename in filenames:
+                        filepath = os.path.join(dirpath, filename)
+                        try:
+                            total += os.path.getsize(filepath)
+                        except:
+                            pass
+            return total
+        
+        # Database size
+        db_path = Config.SQLALCHEMY_DATABASE_URI.replace('sqlite:///', '')
+        database_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        
+        # Models size
+        models_size = get_folder_size(Config.MODELS_PATH)
+        
+        # Backups size
+        backups_size = get_folder_size(Config.DB_BACKUP_FOLDER)
+        
+        return jsonify({
+            'success': True,
+            'storage': {
+                'database_size': database_size,
+                'models_size': models_size,
+                'backups_size': backups_size,
+                'total_size': database_size + models_size + backups_size
+            }
+        })
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

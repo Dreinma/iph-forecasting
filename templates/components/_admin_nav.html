@@ -7,82 +7,51 @@
                 <i class="fas fa-chart-line text-white me-2" style="font-size: 1.5rem;"></i>
                 <span class="text-white fw-bold brand-text">PRISMA</span>
             </div>
-            <button class="btn btn-sm text-white" onclick="toggleAdminSidebar()" title="Toggle Sidebar">
-                <i class="fas fa-chevron-left" id="toggleIcon"></i>
+            <button class="btn btn-sm text-white" onclick="toggleAdminSidebar()" title="Toggle Sidebar" id="sidebarToggleBtn">
+                <i class="fas fa-chevron-left" id="toggleIcon" style="transition: transform 0.3s ease;"></i>
             </button>
         </div>
     </div>
     
     <!-- Navigation Sections -->
     <nav class="nav-section">
-        <!-- Public Pages -->
-        <div class="px-3 py-2">
-            <small class="text-white-50 text-uppercase">Public</small>
-        </div>
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link" href="/">
-                    <i class="fas fa-home"></i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/visualization">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Visualisasi</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/commodity-insights">
-                    <i class="fas fa-seedling"></i>
-                    <span>Commodity Insights</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/alerts">
-                    <i class="fas fa-bell"></i>
-                    <span>Alerts</span>
-                </a>
-            </li>
-        </ul>
-        
         <!-- Admin Pages -->
         <div class="px-3 py-2 mt-3">
             <small class="text-white-50 text-uppercase">Admin Panel</small>
         </div>
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('admin.dashboard') }}">
+                <a class="nav-link active" href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard Admin">
                     <i class="fas fa-tachometer-alt"></i>
                     <span>Dashboard Admin</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('admin.data_control') }}">
+                <a class="nav-link" href="{{ url_for('admin.data_control') }}" data-tooltip="Data Management">
                     <i class="fas fa-database"></i>
                     <span>Data Management</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('admin.models') }}">
+                <a class="nav-link" href="{{ url_for('admin.models') }}" data-tooltip="Model Management">
                     <i class="fas fa-cogs"></i>
                     <span>Model Management</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('admin.forecast') }}">
+                <a class="nav-link" href="{{ url_for('admin.forecast') }}" data-tooltip="Forecast Management">
                     <i class="fas fa-project-diagram"></i>
                     <span>Forecast Management</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('admin.alerts_manage') }}">
+                <a class="nav-link" href="{{ url_for('admin.alerts_manage') }}" data-tooltip="Alert Management">
                     <i class="fas fa-exclamation-triangle"></i>
                     <span>Alert Management</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('admin.settings') }}">
+                <a class="nav-link" href="{{ url_for('admin.settings') }}" data-tooltip="Settings">
                     <i class="fas fa-sliders-h"></i>
                     <span>Settings</span>
                 </a>
