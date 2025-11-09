@@ -10,8 +10,17 @@ class Config:
     # Session Configuration
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=5)  # Session timeout 5 menit jika tidak ada aktivitas
     
+    # Kredensial database Laragon Anda
+    DB_USER = "root"
+    DB_PASS = ""  # Passwordnya kosong
+    DB_HOST = "127.0.0.1" # Ini adalah localhost
+    DB_PORT = "3306"
+    DB_NAME = "prisma_db" # <-- GANTI INI dengan nama DB yang Anda impor
+
+
     #  Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+                            f'mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Set True for SQL query debugging
     
