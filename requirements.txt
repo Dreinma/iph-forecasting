@@ -9,8 +9,6 @@ plotly
 Werkzeug
 openpyxl
 python-dateutil
-scipy
-statsmodels
 Flask-Login
 Flask-WTF
 WTForms
@@ -18,3 +16,5 @@ bcrypt
 psutil
 email-validator
 gunicorn
+PyMySQL
+pytz
