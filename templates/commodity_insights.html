@@ -31,54 +31,13 @@
         </div>
     </div>
 </div>
-
-<!-- Monthly Analysis -->
-<div class="card mb-4 border-0 shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-bar text-info me-2"></i>
-                    Analisis Bulanan
-                </h5>
-                <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" id="monthSelector" style="width: auto;">
-                <option value="Januari">Januari</option>
-                <option value="Februari">Februari</option>
-                <option value="Maret">Maret</option>
-                <option value="April">April</option>
-                <option value="Mei">Mei</option>
-                <option value="Juni">Juni</option>
-                <option value="Juli">Juli</option>
-                <option value="Agustus">Agustus</option>
-                <option value="September">September</option>
-                <option value="Oktober">Oktober</option>
-                <option value="November">November</option>
-                <option value="Desember">Desember</option>
-                    </select>
-                    <select class="form-select form-select-sm" id="yearSelector" style="width: auto;">
-                <option value="2023">2023</option>
-                        <option value="2024">2024</option>
-                        <option value="2025">2025</option>
-                    </select>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="monthlyAnalysis">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-info" role="status">
-                    <span class="visually-hidden">Memuat...</span>
-                        </div>
-                        <p class="mt-2 text-muted">Memuat analisis bulanan...</p>
-                </div>
-            </div>
-        </div>
-    </div>
     
 <!-- Commodity Trends -->
 <div class="card mb-4 border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
                     <i class="fas fa-trending-up text-success me-2"></i>
-                    Trend Komoditas
+                    Analisis Tren Komoditas
                 </h5>
         <div class="d-flex align-items-center gap-2">
             <div class="d-flex align-items-center gap-2">
@@ -116,17 +75,29 @@
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h5 class="card-title mb-0">
             <i class="fas fa-chart-bar text-primary me-2"></i>
-            Ranking Komoditas Paling Berpengaruh
+            Top 5 Komoditas Paling Berpengaruh
                 </h5>
+        <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-sm" id="rankingStartMonth" style="width: auto;">
+                    <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option><option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option><option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+                </select>
+                <select class="form-select form-select-sm" id="rankingStartYear" style="width: auto;">
+                    <option>2023</option><option>2024</option><option>2025</option>
+                </select>
+                <span class="text-muted small">s/d</span>
+                <select class="form-select form-select-sm" id="rankingEndMonth" style="width: auto;">
+                    <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option><option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option><option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+                </select>
+                <select class="form-select form-select-sm" id="rankingEndYear" style="width: auto;">
+                    <option>2023</option><option>2024</option><option>2025</option>
+                </select>
+                <button class="btn btn-sm btn-primary" id="applyRankingWindowBtn">Terapkan</button>
+            </div>
+        </div>
             </div>
             <div class="card-body">
-        <div id="impactRanking">
-                    <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Memuat...</span>
-                        </div>
-                <p class="mt-2 text-muted">Menganalisis ranking komoditas paling berpengaruh...</p>
-            </div>
+        <div id="impactRanking" style="height: 400px;">
         </div>
     </div>
 </div>
@@ -145,17 +116,18 @@ let dataLoadingStatus = {
     monthly: false,
     trends: false,
     alerts: false,
-    seasonal: false
+    seasonal: false,
+    impact: false
 };
 
-// Enhanced error handling untuk API calls
+// --- 1. FUNGSI API & HELPER ---
 async function safeApiCall(url, defaultValue = null) {
     try {
         console.log(`🌐 Calling API: ${url}`);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(url, {
             signal: controller.signal,
             headers: {
@@ -190,31 +162,73 @@ async function safeApiCall(url, defaultValue = null) {
     }
 }
 
+function formatCommodityName(rawName) {
+    if (!rawName) return '';
+    try {
+        return String(rawName).replace(/_/g, ' ').toLowerCase();
+    } catch (_) {
+        return rawName;
+    }
+}
+
+function getTrendConfig(trend, strength) {
+    const configs = {
+        'increasing': { icon: '📈', text: 'Naik', color: strength === 'strong' ? 'danger' : 'warning' },
+        'decreasing': { icon: '📉', text: 'Turun', color: strength === 'strong' ? 'success' : 'info' },
+        'stable': { icon: '➡️', text: 'Stabil', color: 'secondary' },
+        'insufficient_data': { icon: '?', text: 'Data Kurang', color: 'secondary' }
+    };
+    return configs[trend] || configs['stable'];
+}
+
+function showLoading(containerId, message, spinnerColor = 'primary') {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-${spinnerColor}" role="status">
+                    <span class="visually-hidden">Memuat...</span>
+                </div>
+                <p class="text-muted mt-2">${message}</p>
+            </div>`;
+    }
+}
+
+function showError(containerId, message, onRetryFunction = null) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        const retryButton = onRetryFunction
+            ? `<button class="btn btn-outline-danger btn-sm mt-2" onclick="${onRetryFunction}"><i class="fas fa-redo me-1"></i>Coba Lagi</button>`
+            : '';
+        container.innerHTML = `
+            <div class="alert alert-danger border-0">
+                <div class="d-flex align-items-start">
+                    <div class="me-3"><i class="fas fa-exclamation-triangle fa-lg"></i></div>
+                    <div>
+                        <h6 class="mb-1">Error</h6>
+                        <small>${message}</small>
+                        ${retryButton}
+                    </div>
+                </div>
+            </div>`;
+    }
+}
+
+// --- 2. FUNGSI RENDER (INSIGHT MINGGU INI) ---
 async function loadCurrentWeekInsights() {
-    console.log('📅 Loading enhanced current week insights...');
-    
-    const container = document.getElementById('currentWeekInsights');
+    console.log('📅 Memuat Insight Minggu Ini...');
+    const containerId = 'currentWeekInsights';
+    showLoading(containerId, 'Memuat insight minggu ini...', 'primary');
     
     try {
         const data = await safeApiCall('/api/commodity/current-week');
-        
-        if (data.success) {
-            
-            const html = renderEnhancedCurrentWeekInsights(data);
-            container.innerHTML = html;
-            
-            dataLoadingStatus.currentWeek = true;
-            updateDataStatus();
-            
+        if (data.success && data.iph_analysis) {
+            document.getElementById(containerId).innerHTML = renderEnhancedCurrentWeekInsights(data);
         } else {
-            
-            container.innerHTML = renderCurrentWeekError(data);
+            showError(containerId, data.message || 'Data minggu ini tidak tersedia.', 'loadCurrentWeekInsights()');
         }
-        
     } catch (error) {
-        console.error('❌ Error loading current week insights:', error);
-        
-        container.innerHTML = renderCurrentWeekNetworkError(error);
+        showError(containerId, error.message, 'loadCurrentWeekInsights()');
     }
 }
 
@@ -228,6 +242,7 @@ function renderEnhancedCurrentWeekInsights(data) {
             const y = new Date(period.tanggal).getFullYear();
             if (!isNaN(y)) return y;
         }
+
         // Try to parse trailing `'YY` from bulan
         const m = String(period?.bulan || '').match(/['`](\d{2})$/);
         if (m) return 2000 + parseInt(m[1], 10);
@@ -237,19 +252,14 @@ function renderEnhancedCurrentWeekInsights(data) {
     const weekNum = parseInt(String(period?.minggu || '').toString().replace(/\D/g,'')) || period?.minggu || '';
     const prettyPeriod = `${cleanMonth} ${deriveYear()} Minggu ${weekNum}`;
     
-    const year = (period && period.tanggal) ? new Date(period.tanggal).getFullYear() : (new Date()).getFullYear();
     return `
-        <!-- Clean Layout -->
         <div class="row g-4">
-            <!-- IPH Summary -->
             <div class="col-md-4">
                 <div class="text-center">
                     <div class="mb-3">
                         <h4 class="text-muted mb-1">${prettyPeriod}</h4>
                         <small class="text-muted">${period.kota}</small>
                     </div>
-                    
-                    <!-- Simplified IPH Display -->
                     <div class="mb-3">
                         <div class="h2 fw-bold text-${iph.color} mb-2">
                             ${iph.value > 0 ? '+' : ''}${iph.value.toFixed(2)}%
@@ -258,14 +268,8 @@ function renderEnhancedCurrentWeekInsights(data) {
                     </div>
                 </div>
             </div>
-            
-            <!-- Top Commodities -->
             <div class="col-md-8">
-                <h6 class="mb-3 text-dark">
-                        <i class="fas fa-chart-line me-2"></i>
-                    Komoditas Berpengaruh
-                    </h6>
-                    
+                <h6 class="mb-3 text-dark"><i class="fas fa-chart-line me-2"></i>Komoditas Berpengaruh</h6>
                 <div class="row g-2">
                     ${commodities.significant_positive && commodities.significant_positive.length > 0 ? `
                         ${commodities.significant_positive.slice(0, 3).map(c => `
@@ -273,34 +277,30 @@ function renderEnhancedCurrentWeekInsights(data) {
                                 <div class="card border-success border-opacity-50">
                                     <div class="card-body py-2 px-3">
                                         <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                <div class="fw-medium small">${formatCommodityName(c.name)}</div>
-                                                
-                                                </div>
+                                            <div><div class="fw-medium small">${formatCommodityName(c.name)}</div></div>
                                             <span class="badge bg-success">+${c.impact.toFixed(2)}%</span>
-                                            </div>
                                         </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                    ` : ''}
-                    
-                    ${commodities.significant_negative && commodities.significant_negative.length > 0 ? `
-                        ${commodities.significant_negative.slice(0, 3).map(c => `
-            <div class="col-md-4">
-                                <div class="card border-danger border-opacity-50">
-                            <div class="card-body py-2 px-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                                <div class="fw-medium small">${formatCommodityName(c.name)}</div>
-                                                
-                                        </div>
-                                            <span class="badge bg-danger">${c.impact.toFixed(2)}%</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                    ` : ''}
+                    ${commodities.significant_negative && commodities.significant_negative.length > 0 ? `
+                        ${commodities.significant_negative.slice(0, 3).map(c => `
+                            <div class="col-md-4">
+                                <div class="card border-danger border-opacity-50">
+                                    <div class="card-body py-2 px-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div><div class="fw-medium small">${formatCommodityName(c.name)}</div></div>
+                                            <span class="badge bg-danger">${c.impact.toFixed(2)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    ` : ''}
+                    ${(commodities.significant_positive.length === 0 && commodities.significant_negative.length === 0) ? `
+                        <div class="col-12"><small class="text-muted">Tidak ada komoditas berpengaruh signifikan minggu ini.</small></div>
                     ` : ''}
                 </div>
             </div>
@@ -308,69 +308,40 @@ function renderEnhancedCurrentWeekInsights(data) {
     `;
 }
 
-// PERBAIKI FUNGSI TREND KOMODITAS
-async function loadCommodityTrends(periods = 4) {
-    console.log(`📈 Loading enhanced commodity trends for ${periods} periods...`);
-    
-    const container = document.getElementById('commodityTrends');
-    
-    container.innerHTML = `
-        <div class="text-center py-3">
-            <div class="spinner-border text-success" role="status"></div>
-            <p class="mt-2 text-muted">Menganalisis trend ${periods} periode...</p>
-        </div>
-    `;
+// --- 3. FUNGSI RENDER (TREN KOMODITAS) ---
+async function loadCommodityTrends() {
+    console.log(`📈 Memuat Tren Komoditas...`);
+    const containerId = 'commodityTrends';
+    showLoading(containerId, 'Menganalisis tren komoditas...', 'success');
     
     try {
-        const map = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
-        const sm = document.getElementById('trendStartMonth') ? document.getElementById('trendStartMonth').value : '';
-        const sy = document.getElementById('trendStartYear') ? document.getElementById('trendStartYear').value : '';
-        const em = document.getElementById('trendEndMonth') ? document.getElementById('trendEndMonth').value : '';
-        const ey = document.getElementById('trendEndYear') ? document.getElementById('trendEndYear').value : '';
-        let params = `periods=${periods}`;
-        if (sm && sy) params += `&start_key=${sy}-${(map[sm]||sm.padStart(2,'0'))}`;
-        if (em && ey) params += `&end_key=${ey}-${(map[em]||em.padStart(2,'0'))}`;
-        const data = await safeApiCall(`/api/commodity/trends?${params}`);
+        const { params, rangeText } = getFilterParams('trend');
         
-        if (data.success) {
-            if (data.commodity_trends && Object.keys(data.commodity_trends).length > 0) {
-            const html = renderEnhancedCommodityTrends(data, periods);
-            container.innerHTML = html;
-            dataLoadingStatus.trends = true;
-            } else if (data.data_availability === 'no_commodity_data') {
-                // Tampilkan peringatan yang rapi dengan periode terpilih
-                const map = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
-                const sm = document.getElementById('trendStartMonth')?.value;
-                const sy = document.getElementById('trendStartYear')?.value;
-                const em = document.getElementById('trendEndMonth')?.value;
-                const ey = document.getElementById('trendEndYear')?.value;
-                const rangeText = (sm && sy && em && ey) ? `${sm} ${sy} – ${em} ${ey}` : `${periods} periode terakhir`;
-                container.innerHTML = `
-                    <div class="alert alert-warning border-0">
-                        <div class="d-flex align-items-start">
-                            <div class="me-3"><i class="fas fa-info-circle fa-lg text-warning"></i></div>
-                            <div>
-                                <h6 class="mb-1">Data Komoditas Tidak Tersedia</h6>
-                                <small class="text-muted d-block mb-1">Periode: ${rangeText}</small>
-                                <div class="small text-dark">${data.summary || 'Tidak ditemukan data komoditas pada rentang ini. Coba pilih rentang lain yang memiliki data.'}</div>
-                            </div>
+        if (params.length < 2) { 
+            console.warn("Parameter filter tren kosong, menunggu init...");
+            return; 
+        }
+
+        const data = await safeApiCall(`/api/commodity/trends?${params.join('&')}`);
+        
+        if (data.success && data.commodity_trends && Object.keys(data.commodity_trends).length > 0) {
+            document.getElementById(containerId).innerHTML = renderEnhancedCommodityTrends(data);
+        } else {
+            document.getElementById(containerId).innerHTML = `
+                <div class="alert alert-warning border-0">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3"><i class="fas fa-info-circle fa-lg text-warning"></i></div>
+                        <div>
+                            <h6 class="mb-1">Data Komoditas Tidak Tersedia</h6>
+                            <small class="text-muted d-block mb-1">Periode: ${rangeText}</small>
+                            <div class="small text-dark">${data.summary || 'Tidak ditemukan data komoditas pada rentang ini.'}</div>
                         </div>
                     </div>
-                `;
-        } else {
-                container.innerHTML = renderTrendsError(data, periods);
-            }
-        } else {
-            container.innerHTML = renderTrendsError(data, periods);
+                </div>`;
         }
-        
     } catch (error) {
-        console.error('❌ Error loading commodity trends:', error);
-        
-        container.innerHTML = renderTrendsNetworkError(error, periods);
+        showError(containerId, error.message, 'loadCommodityTrends()');
     }
-    
-    updateDataStatus();
 }
 
 // PERBAIKI FUNGSI RENDER COMMODITY TRENDS
@@ -383,32 +354,23 @@ function renderEnhancedCommodityTrends(data, periods) {
             </div>
         `;
     }
-    
-    const trends = Object.entries(data.commodity_trends).slice(0, 8);
+    const trends = Object.entries(data.commodity_trends).slice(0, 8); // Tampilkan top 8
     
     return `
-        <!-- Trends Header -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <small class="text-muted">${data.commodities_found || 0} komoditas • ${data.periods_analyzed || periods} periode</small>
+            <small class="text-muted">${data.commodities_found || 0} komoditas • ${data.periods_analyzed || 0} periode</small>
             <span class="badge bg-light text-dark">${trends.length} ditampilkan</span>
         </div>
-        
-        <!-- Enhanced Trends Cards Grid -->
         <div class="row g-3 mb-3">
             ${trends.map(([name, info], index) => {
-                // Safe access to nested properties
                 const trend = info.trend || 'stable';
                 const trend_strength = info.trend_strength || 'weak';
-                const total_impact = info.total_impact || 0;
                 const appearances = info.appearances || 0;
-                const avg_impact = info.avg_impact || 0;
-                const volatility = info.volatility || 0;
-                const trend_coefficient = info.trend_coefficient || 0;
-                const category = info.category || 'LAINNYA';
-                
+                const total_impact = info.total_impact || 0;
+                // PERBAIKAN BUG 'trendConfig'
                 const trendConfig = getTrendConfig(trend, trend_strength);
-                const impactConfig = getImpactConfig(total_impact);
-                
+                const dark = (['secondary','light'].includes(trendConfig.color) ? 'text-dark' : '');
+
                 return `
                     <div class="col-md-6">
                         <div class="card h-100 ${index === 0 ? 'border-primary border-2' : 'border-light'}">
@@ -419,7 +381,7 @@ function renderEnhancedCommodityTrends(data, periods) {
                                     <h6 class="mb-0 fw-bold">${formatCommodityName(name)}</h6>
                                 </div>
                                 <div class="mt-2">
-                                    ${(() => { const dark = (['secondary','light'].includes(trendConfig.color) ? 'text-dark' : ''); return `<span class=\"badge bg-${trendConfig.color} ${dark}\">${trendConfig.icon} ${trendConfig.text}</span>`; })()}
+                                    <span class="badge bg-${trendConfig.color} ${dark}">${trendConfig.icon} ${trendConfig.text}</span>
                                     <small class="text-muted ms-2">${appearances}x kemunculan</small>
                                 </div>
                             </div>
@@ -429,9 +391,6 @@ function renderEnhancedCommodityTrends(data, periods) {
             }).join('')}
         </div>
         
-        
-        
-        <!-- Simple Statistics -->
         <div class="row mt-3">
             <div class="col-md-4">
                 <div class="text-center p-2 bg-success bg-opacity-10 rounded">
@@ -454,6 +413,263 @@ function renderEnhancedCommodityTrends(data, periods) {
         </div>
     `;
 }
+
+// --- 4. FUNGSI RENDER (TOP 5 KOMODITAS) ---
+async function loadImpactRanking() {
+    console.log('📊 Loading impact ranking...');
+    const containerId = 'impactRanking';
+
+    try {
+        const { params, rangeText } = getFilterParams('ranking');
+        
+        if (params.length < 2) { 
+            console.warn("Parameter filter ranking kosong, menunggu init...");
+            return; 
+        }
+
+        const data = await safeApiCall('/api/commodity/impact-ranking');
+        
+        if (data.success && data.box_plot_data && data.box_plot_data.length > 0) {
+            renderImpactRankingBoxPlot(data, rangeText);            
+        } else {
+            document.getElementById(containerId).innerHTML = `
+                <div class="alert alert-light border-0">
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">Tidak Ada Data Komoditas</h6>
+                        <p class="mb-0 small text-muted">${data.error || 'Belum ada data komoditas yang dapat dianalisis untuk rentang waktu ini.'}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        showError(containerId, error.message, 'loadImpactRanking()');
+    }
+    
+    // Update loading status
+    dataLoadingStatus.impact = true;
+}
+
+function renderImpactRankingBoxPlot(data, rangeText) {
+    const container = document.getElementById('impactRanking');
+    
+    // Data untuk Plotly (sudah diformat oleh backend)
+    const plotlyData = data.box_plot_data;
+    
+    // Tambahkan kustomisasi pada data
+    plotlyData.forEach(trace => {
+        trace.name = formatCommodityName(trace.name);
+        // Hapus text kustom agar hover default Plotly (yang menampilkan Q1, Median, Q3) berfungsi
+        delete trace.text; 
+    });
+    
+    const layout = {
+        title: {
+            text: `Top 5 Komoditas Paling Berpengaruh<br><sup>Periode: ${rangeText}</sup>`,
+            font: { size: 18 }
+        },
+
+        yaxis: {
+            title: 'Nilai Dampak IPH (%)',
+            zeroline: true,
+            zerolinecolor: '#c0c0c0',
+            zerolinewidth: 2
+        },
+        xaxis: {
+            title: 'Komoditas',
+            categoryorder: 'array',
+            categoryarray: plotlyData.map(d => d.name)
+        },
+        margin: { t: 60, b: 50, l: 60, r: 20 },
+        hovermode: 'closest',
+        showlegend: false
+    };
+
+    Plotly.newPlot(container, plotlyData, layout, {responsive: true});
+}
+
+// --- 5. FUNGSI UTAMA (SETUP DAN INISIALISASI) ---
+function getFilterParams(prefix) {
+    const monthMap = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
+    const smEl = document.getElementById(`${prefix}StartMonth`);
+    const syEl = document.getElementById(`${prefix}StartYear`);
+    const emEl = document.getElementById(`${prefix}EndMonth`);
+    const eyEl = document.getElementById(`${prefix}EndYear`);
+
+    if (!smEl || !syEl || !emEl || !eyEl) {
+        console.error(`Elemen filter untuk prefix "${prefix}" tidak ditemukan.`);
+        return { params: [], rangeText: 'Error' };
+    }
+
+    const sm = smEl.value;
+    const sy = syEl.value;
+    const em = emEl.value;
+    const ey = eyEl.value;
+    
+    let params = [];
+    if (sm && sy && monthMap[sm]) {
+        params.push(`start_key=${sy}-${monthMap[sm]}`);
+    } else {
+        console.warn(`Filter ${prefix} (Start) tidak lengkap/valid: ${sm} ${sy}`);
+    }
+
+    if (em && ey && monthMap[em]) {
+        params.push(`end_key=${ey}-${monthMap[em]}`);
+    } else {
+         console.warn(`Filter ${prefix} (End) tidak lengkap/valid: ${em} ${ey}`);
+    }
+    
+    // Pastikan kedua parameter ada
+    if (params.length !== 2) {
+        console.warn(`Filter ${prefix} tidak lengkap. Mengembalikan params kosong.`);
+        return { params: [], rangeText: 'Memuat...' };
+    }
+    
+    const rangeText = (sm && sy && em && ey) ? `${sm} ${sy} – ${em} ${ey}` : 'Rentang Waktu Error';
+    
+    return { params, rangeText};
+}
+
+function validateDateRange(smElId, syElId, emElId, eyElId, containerId) {
+    const monthMap = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
+    const smEl = document.getElementById(smElId);
+    const syEl = document.getElementById(syElId);
+    const emEl = document.getElementById(emElId);
+    const eyEl = document.getElementById(eyElId);
+    
+    if (!smEl || !syEl || !emEl || !eyEl) return false; 
+    
+    const sm = smEl.value;
+    const sy = syEl.value;
+    const em = emEl.value;
+    const ey = eyEl.value;
+    
+    if (sm && sy && em && ey && monthMap[sm] && monthMap[em]) {
+        const startYm = parseInt(`${sy}${monthMap[sm]}`);
+        const endYm = parseInt(`${ey}${monthMap[em]}`);
+        
+        if (startYm > endYm) {
+            showError(containerId, 'Rentang Waktu Tidak Valid: Tanggal mulai harus lebih awal dari tanggal akhir.');
+            [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.add('is-invalid'); });
+            setTimeout(() => { [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.remove('is-invalid'); }); }, 2000);
+            return false;
+        }
+    }
+    return true;
+}
+
+function setupEventListeners() {
+    
+    // Fungsi async untuk mengisi default dan memuat data awal
+    (async function initDefaults(){
+        try {
+            console.log("Memulai initDefaults, mengambil periode...");
+            const json = await safeApiCall('/api/data/available-periods');
+            
+            if (json.success && json.periods && json.periods.length > 0) {
+                console.log("Periode diterima, mengisi dropdown...");
+                const last = json.periods[json.periods.length - 1];
+                const prev = json.periods[Math.max(0, json.periods.length - 3)]; // 3 bulan lalu
+                const monthMap = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                
+                // Konversi bulan dari angka ke nama
+                const startMonth = monthMap[(prev.month || (parseInt(prev.key.split('-')[1])||1))-1] || 'Januari';
+                const startYear = String(prev.year || parseInt(prev.key.split('-')[0]) || '');
+                const endMonth = monthMap[(last.month || (parseInt(last.key.split('-')[1])||1))-1] || 'Januari';
+                const endYear = String(last.year || parseInt(last.key.split('-')[0]) || '');
+
+                // Terapkan ke filter Trend
+                ['trendStartMonth', 'rankingStartMonth'].forEach(id => { 
+                    if(document.getElementById(id)) document.getElementById(id).value = startMonth; 
+                });
+                ['trendStartYear', 'rankingStartYear'].forEach(id => { 
+                    if(document.getElementById(id)) document.getElementById(id).value = startYear; 
+                });
+                ['trendEndMonth', 'rankingEndMonth'].forEach(id => { 
+                    if(document.getElementById(id)) document.getElementById(id).value = endMonth; 
+                });
+                ['trendEndYear', 'rankingEndYear'].forEach(id => { 
+                    if(document.getElementById(id)) document.getElementById(id).value = endYear; 
+                });
+                console.log(`Dropdown diisi: ${startMonth} ${startYear} s/d ${endMonth} ${endYear}`);
+                
+                // Muat data awal SETELAH dropdown diisi
+                loadCommodityTrends();
+                loadImpactRanking();
+                return;
+            }
+        } catch (e) {
+             console.error("Gagal initDefaults:", e);
+        }
+        
+        // Fallback jika API gagal
+        console.warn("Gagal mengambil periode, memuat dengan parameter default (mungkin gagal).");
+        loadCommodityTrends();
+        loadImpactRanking();
+    })();
+
+    // Listener untuk filter Trend
+    document.getElementById('applyTrendWindowBtn')?.addEventListener('click', function() {
+        if (!validateDateRange('trendStartMonth', 'trendStartYear', 'trendEndMonth', 'trendEndYear', 'commodityTrends')) {
+            return;
+        }
+        loadCommodityTrends(); // Akan membaca filter
+    });
+
+    // Listener untuk filter Ranking
+    document.getElementById('applyRankingWindowBtn')?.addEventListener('click', function() {
+        if (!validateDateRange('rankingStartMonth', 'rankingStartYear', 'rankingEndMonth', 'rankingEndYear', 'impactRanking')) {
+            return;
+        }
+        loadImpactRanking(); // Akan membaca filter
+    });
+}
+
+async function checkCommodityDataAvailability() {
+    try {
+        const response = await fetch('/api/commodity/data-status');
+        const data = await response.json();
+        
+        if (!data.success || !data.has_data) {
+            showSystemAlert(
+                'Tidak ada data komoditas ditemukan. Harap unggah data komoditas untuk mengaktifkan insights.',
+                'warning'
+            );
+        }
+    } catch (error) {
+        console.log('Could not check data availability:', error);
+    }
+}
+
+// --- 6. INISIALISASI HALAMAN ---
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Halaman Insight Komoditas (v4) Dimuat');
+    
+    checkCommodityDataAvailability();
+    
+    // setupEventListeners akan mengisi dropdown dan KEMUDIAN memicu
+    // loadCommodityTrends() dan loadImpactRanking()
+    setupEventListeners(); 
+    
+    // Insight minggu ini bisa berjalan paralel
+    loadCurrentWeekInsights();
+    
+    // HAPUS refreshInsights() DARI SINI UNTUK MENGHINDARI RACE CONDITION
+    // refreshInsights(); 
+    
+    // Setup auto-refresh
+    setInterval(() => {
+        console.log('⏰ Auto-refreshing commodity insights...');
+        loadCurrentWeekInsights();
+        loadCommodityTrends();
+        loadImpactRanking();
+    }, 5 * 60 * 1000); // 5 menit
+});
+
+
+
 
 // PERBAIKI FUNGSI SEASONAL PATTERNS
 async function loadSeasonalPatterns(view = 'overview') {
@@ -491,7 +707,6 @@ async function loadSeasonalPatterns(view = 'overview') {
         container.innerHTML = renderSeasonalPatternsNetworkError(error, view);
     }
     
-    updateDataStatus();
 }
 
 // PERBAIKI FUNGSI RENDER SEASONAL PATTERNS
@@ -1265,7 +1480,6 @@ async function loadMonthlyAnalysis(month = 'Juni', year = '2024') {
         container.innerHTML = renderMonthlyAnalysisNetworkError(error, month);
     }
     
-    updateDataStatus();
 }
 
 function renderEnhancedMonthlyAnalysis(data) {
@@ -1394,7 +1608,6 @@ async function loadVolatilityAlerts(threshold = 0.05) {
         container.innerHTML = renderVolatilityAlertsNetworkError(error, threshold);
     }
     
-    updateDataStatus();
 }
 
 function renderEnhancedVolatilityAlerts(data, threshold) {
@@ -1623,25 +1836,15 @@ function refreshInsights() {
     // Reset status
     dataLoadingStatus = {
         currentWeek: false,
-        monthly: false,
         trends: false,
         impact: false
     };
-    
-    // Update status badge
-    
+        
     // Load all insights
     loadCurrentWeekInsights();
-    loadMonthlyAnalysis();
-    loadCommodityTrends(currentTrendPeriod);
-    loadImpactRanking();
+
     
     showAlert('Refreshing commodity insights...', 'info');
-}
-
-// Data status monitoring
-function updateDataStatus() {
-    // Status tracking removed for cleaner UI
 }
 
 
@@ -1668,256 +1871,6 @@ function showAlert(message, type) {
     }, 5000);
 }
 
-
-// Load Impact Ranking
-async function loadImpactRanking() {
-    console.log('📊 Loading impact ranking...');
-    
-    const container = document.getElementById('impactRanking');
-    
-    container.innerHTML = `
-        <div class="text-center py-3">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 text-muted">Menganalisis ranking komoditas paling berpengaruh...</p>
-        </div>
-    `;
-    
-    try {
-        const data = await safeApiCall('/api/commodity/impact-ranking');
-        
-        if (data.success && data.ranking && data.ranking.length > 0) {
-            
-            const html = renderImpactRanking(data);
-            container.innerHTML = html;
-            
-        } else {
-            
-            container.innerHTML = `
-                <div class="alert alert-light border-0">
-                    <div class="text-center py-3">
-                        <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
-                        <h6 class="text-muted">Tidak Ada Data Komoditas</h6>
-                        <p class="mb-0 small text-muted">Belum ada data komoditas yang dapat dianalisis</p>
-                    </div>
-                </div>
-            `;
-        }
-        
-    } catch (error) {
-        console.error('❌ Error loading impact ranking:', error);
-        
-        container.innerHTML = `
-            <div class="alert alert-danger border-0">
-                <h6><i class="fas fa-exclamation-triangle me-2"></i>Error Memuat Data</h6>
-                <p class="mb-2">Gagal memuat ranking komoditas: ${error.message}</p>
-                <button class="btn btn-outline-danger btn-sm" onclick="loadImpactRanking()">
-                    <i class="fas fa-redo me-1"></i>Coba Lagi
-                </button>
-            </div>
-        `;
-    }
-    
-    // Update loading status
-    dataLoadingStatus.impact = true;
-    updateDataStatus();
-}
-
-function renderImpactRanking(data) {
-    const ranking = data.ranking.slice(0, 10); // Top 10
-    const maxFrequency = Math.max(...ranking.map(item => item.frequency));
-    
-    return `
-        <!-- Impact Ranking Bar Chart -->
-        <div class="mb-4">
-            ${ranking.map((item, index) => {
-                const percentage = (item.frequency / maxFrequency) * 100;
-                const barColor = index < 3 ? 'bg-primary' : index < 6 ? 'bg-info' : 'bg-secondary';
-                
-                return `
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <div class="d-flex align-items-center">
-                                <span class="badge ${index < 3 ? 'bg-warning' : 'bg-light text-dark'} me-2" style="min-width: 30px;">
-                                    ${index + 1}
-                                </span>
-                                <div>
-                                    <div class="fw-medium">${formatCommodityName(item.commodity_name)}</div>
-                                    <small class="text-muted">${item.frequency}x muncul</small>
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold text-primary">${item.frequency}</div>
-                                <small class="text-muted">frekuensi</small>
-                            </div>
-                        </div>
-                        <div class="progress" style="height: 8px;">
-                            <div class="progress-bar ${barColor}" 
-                                 role="progressbar" 
-                                 style="width: ${percentage}%"
-                                 aria-valuenow="${item.frequency}" 
-                                 aria-valuemin="0" 
-                                 aria-valuemax="${maxFrequency}">
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-        </div>
-        
-        <!-- Summary -->
-        <div class="alert alert-light border-0 py-2 mt-3">
-            <div class="row text-center">
-                <div class="col-4">
-                    <div class="fw-bold text-primary">${data.total_commodities || 0}</div>
-                    <small class="text-muted">Total Komoditas</small>
-                </div>
-                <div class="col-4">
-                    <div class="fw-bold text-info">${data.total_appearances || 0}</div>
-                    <small class="text-muted">Total Muncul</small>
-                </div>
-                <div class="col-4">
-                    <div class="fw-bold text-success">${data.avg_frequency ? data.avg_frequency.toFixed(1) : 'Tidak Ada'}</div>
-                    <small class="text-muted">Rata-rata</small>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Commodity Insights page initialized');
-    
-    // Check if we have commodity data
-    checkCommodityDataAvailability();
-    
-    // Add event listeners for dropdowns and radio buttons
-    setupEventListeners();
-    
-    // Load all insights
-    refreshInsights();
-    
-    // Auto-refresh every 5 minutes
-    setInterval(() => {
-        console.log('⏰ Auto-refreshing commodity insights...');
-        refreshInsights();
-    }, 5 * 60 * 1000);
-});
-
-// Setup event listeners for dropdowns and radio buttons
-function setupEventListeners() {
-    // Month selector dropdown
-    const monthSelector = document.getElementById('monthSelector');
-    const yearSelector = document.getElementById('yearSelector');
-    
-    if (monthSelector) {
-        monthSelector.addEventListener('change', function() {
-            const selectedMonth = this.value;
-            const selectedYear = yearSelector ? yearSelector.value : '2024';
-            loadMonthlyAnalysis(selectedMonth, selectedYear);
-        });
-    }
-    
-    if (yearSelector) {
-        yearSelector.addEventListener('change', function() {
-            const selectedYear = this.value;
-            const selectedMonth = monthSelector ? monthSelector.value : 'Juni';
-            loadMonthlyAnalysis(selectedMonth, selectedYear);
-        });
-    }
-    
-    // Trend period radio buttons
-    // Default 3 bulan terakhir untuk selector rentang
-    (async function initTrendDefaults(){
-        try {
-            const resp = await fetch('/api/data/available-periods');
-            const json = await resp.json();
-            if (json.success && json.periods && json.periods.length >= 3) {
-                const last = json.periods[json.periods.length - 1];
-                const prev2 = json.periods[json.periods.length - 3];
-                const monthMap = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-                const smEl = document.getElementById('trendStartMonth');
-                const syEl = document.getElementById('trendStartYear');
-                const emEl = document.getElementById('trendEndMonth');
-                const eyEl = document.getElementById('trendEndYear');
-                if (smEl && syEl && emEl && eyEl) {
-                    smEl.value = monthMap[(prev2.month || (parseInt(prev2.key.split('-')[1])||1))-1] || 'Januari';
-                    syEl.value = String(prev2.year || parseInt(prev2.key.split('-')[0]) || '');
-                    emEl.value = monthMap[(last.month || (parseInt(last.key.split('-')[1])||1))-1] || 'Januari';
-                    eyEl.value = String(last.year || parseInt(last.key.split('-')[0]) || '');
-                }
-                // Muat tren untuk rentang default
-                loadCommodityTrends(999);
-                return;
-            }
-        } catch {}
-        // fallback
-        loadCommodityTrends(12);
-    })();
-
-    const applyTrendBtn = document.getElementById('applyTrendWindowBtn');
-    if (applyTrendBtn) {
-        applyTrendBtn.addEventListener('click', function() {
-            // Validasi rentang waktu (start <= end)
-            const monthMap = {Januari:'01', Februari:'02', Maret:'03', April:'04', Mei:'05', Juni:'06', Juli:'07', Agustus:'08', September:'09', Oktober:'10', November:'11', Desember:'12'};
-            const smEl = document.getElementById('trendStartMonth');
-            const syEl = document.getElementById('trendStartYear');
-            const emEl = document.getElementById('trendEndMonth');
-            const eyEl = document.getElementById('trendEndYear');
-            const sm = smEl ? smEl.value : '';
-            const sy = syEl ? syEl.value : '';
-            const em = emEl ? emEl.value : '';
-            const ey = eyEl ? eyEl.value : '';
-            if (sm && sy && em && ey) {
-                const startYm = parseInt(`${sy}${monthMap[sm] || sm.padStart(2,'0')}`);
-                const endYm = parseInt(`${ey}${monthMap[em] || em.padStart(2,'0')}`);
-                if (startYm > endYm) {
-                    // Tampilkan peringatan dan jangan lanjut
-                    const container = document.getElementById('commodityTrends');
-                    if (container) {
-                        container.innerHTML = `
-                            <div class="alert alert-danger border-0">
-                                <div class="d-flex align-items-start">
-                                    <div class="me-3"><i class="fas fa-exclamation-triangle fa-lg"></i></div>
-                                    <div>
-                                        <h6 class="mb-1">Rentang Waktu Tidak Valid</h6>
-                                        <small class="text-muted">Tanggal mulai harus lebih awal atau sama dengan tanggal akhir.</small>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    // Tambahkan highlight pada input
-                    [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.add('is-invalid'); });
-                    setTimeout(() => { [smEl, syEl, emEl, eyEl].forEach(el => { if (el) el.classList.remove('is-invalid'); }); }, 2000);
-                    return;
-                }
-            }
-            // gunakan 999 agar backend mengambil penuh berdasarkan rentang
-            loadCommodityTrends(999);
-        });
-    }
-}
-
-// Check commodity data availability
-async function checkCommodityDataAvailability() {
-    try {
-        const response = await fetch('/api/commodity/data-status');
-        const data = await response.json();
-        
-        if (!data.success || !data.has_data) {
-            showSystemAlert(
-                'Tidak ada data komoditas ditemukan. Harap unggah data komoditas untuk mengaktifkan insights.',
-                'warning'
-            );
-        }
-    } catch (error) {
-        console.log('Could not check data availability:', error);
-    }
-}
-
 function showSystemAlert(message, type) {
     const alertPanel = document.getElementById('systemStatusAlert');
     alertPanel.innerHTML = `
@@ -1932,6 +1885,7 @@ function showSystemAlert(message, type) {
     `;
     alertPanel.style.display = 'block';
 }
+
 </script>
 
 <style>

@@ -1706,7 +1706,7 @@ class CommodityInsightService:
                 'message': f'Error menganalisis trend: {str(e)}'
             }
 
-    def get_impact_ranking(self):
+    def get_impact_ranking(self, start_key=None, end_key=None):
         """
         Get volatility ranking of commodities
         """
@@ -1717,12 +1717,42 @@ class CommodityInsightService:
                 return {
                     'success': False,
                     'error': 'Tidak ada data komoditas tersedia',
-                    'ranking': [],
-                    'total_commodities': 0,
-                    'total_appearances': 0,
-                    'avg_frequency': 0
-                }
+                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0                
+                    }
             
+            df_filtered = df.copy()
+            if start_key or end_key:
+                try:
+                    df_filtered['year'] = pd.to_datetime(df_filtered['Tanggal']).dt.year
+                    df_filtered['month'] = pd.to_datetime(df_filtered['Tanggal']).dt.month
+                    df_filtered['_ym'] = df_filtered['year'] * 100 + df_filtered['month']
+                    start_ym = None
+                    end_ym = None
+                    if start_key:
+                        sy, sm = [int(x) for x in str(start_key).split('-')[:2]]
+                        start_ym = sy * 100 + sm
+                    if end_key:
+                        ey, em = [int(x) for x in str(end_key).split('-')[:2]]
+                        end_ym = ey * 100 + em
+
+                    if start_ym is not None and end_ym is not None:
+                        df_filtered = df_filtered[(df_filtered['_ym'] >= start_ym) & (df_filtered['_ym'] <= end_ym)]
+                    elif start_ym is not None:
+                        df_filtered = df_filtered[df_filtered['_ym'] >= start_ym]
+                    elif end_ym is not None:
+                        df_filtered = df_filtered[df_filtered['_ym'] <= end_ym]
+                except Exception as e:
+                    print(f"Error filtering dates in get_impact_ranking: {e}")
+                    # Jika error, gunakan semua data
+                    df_filtered = df.copy()
+            
+            if df_filtered.empty:
+                return {
+                    'success': False, 
+                    'error': 'Tidak ada data komoditas untuk rentang waktu yang dipilih',
+                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0
+                }
+
             # Parse commodity impacts for all records
             all_commodities = []
             valid_rows = 0
@@ -1741,56 +1771,57 @@ class CommodityInsightService:
                     'success': False,
                     'error': 'Tidak ada data dampak komoditas ditemukan',
                     'ranking': [],
-                    'total_commodities': 0,
-                    'total_appearances': 0,
-                    'avg_frequency': 0
+                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0
                 }
             
             # Convert to DataFrame for analysis
             commodities_df = pd.DataFrame(all_commodities)
-            commodities_df['date'] = pd.to_datetime(commodities_df['date'])
             
-            # Calculate volatility for each commodity
-            commodity_stats = {}
+            # 1. Group by commodity and get the list of raw impacts
+            commodity_groups = commodities_df.groupby('name')['impact'].apply(list)
             
-            for commodity_name in commodities_df['name'].unique():
-                commodity_data = commodities_df[commodities_df['name'] == commodity_name]
-                
-                if len(commodity_data) < 2:
-                    continue
-                
-                impacts = commodity_data['impact'].values
-                volatility = impacts.std() if len(impacts) > 1 else 0
-                avg_impact = impacts.mean()
-                frequency = len(commodity_data)
-                
-                # Get category
-                category = commodity_data['category'].iloc[0] if 'category' in commodity_data.columns else 'LAINNYA'
-                
-                commodity_stats[commodity_name] = {
-                    'commodity_name': commodity_name,
-                    'volatility': volatility,
-                    'avg_impact': avg_impact,
-                    'frequency': frequency,
-                    'category': category
-                }
+            # 2. Get frequency (count) for each
+            commodity_frequency = commodities_df.groupby('name').size()
             
-            # Sort by frequency (highest first) - most impactful commodities
-            sorted_ranking = sorted(commodity_stats.items(), 
-                                  key=lambda x: x[1]['frequency'], 
-                                  reverse=True)
+            # 3. Combine into a list of dicts
+            ranking_data = []
+            for name, impacts in commodity_groups.items():
+                if name in commodity_frequency:
+                    ranking_data.append({
+                        'name': name,
+                        'impacts': impacts,
+                        'frequency': int(commodity_frequency[name])
+                    })
             
-            # Convert to list format
-            ranking = [item[1] for item in sorted_ranking]
+            # 4. Sort by frequency (most impactful)
+            ranking_data.sort(key=lambda x: x['frequency'], reverse=True)
+            
+            # 5. Get Top 5
+            top_5_data = ranking_data[:5]
+            
+            # 6. Format for Plotly box plot
+            box_plot_data = []
+            for item in top_5_data:
+                box_plot_data.append({
+                    'name': item['name'].replace('_', ' ').lower(),
+                    'y': item['impacts'],
+                    'type': 'box',
+                    'boxpoints': 'all', # Tampilkan semua data point
+                    'jitter': 0.3,      # Beri sedikit sebaran
+                    'pointpos': -1.8,   # Posisikan data point
+                    'marker': {'size': 4, 'opacity': 0.7, 'color': '#0d6efd'},
+                    'line': {'color': '#0d6efd'},
+                    'text': f"Freq: {item['frequency']}<br>Mean: {np.mean(item['impacts']):.2f}"
+                })
             
             # Calculate statistics
-            total_commodities = len(ranking)
-            total_appearances = sum([item['frequency'] for item in ranking])
-            avg_frequency = np.mean([item['frequency'] for item in ranking]) if ranking else 0
-            
+            total_commodities = len(ranking_data)
+            total_appearances = sum([item['frequency'] for item in ranking_data])
+            avg_frequency = np.mean([item['frequency'] for item in ranking_data]) if ranking_data else 0
+
             return {
                 'success': True,
-                'ranking': ranking,
+                'box_plot_data': box_plot_data,
                 'total_commodities': total_commodities,
                 'total_appearances': total_appearances,
                 'avg_frequency': avg_frequency
@@ -1802,6 +1833,7 @@ class CommodityInsightService:
                 'success': False,
                 'error': str(e),
                 'ranking': [],
+                'box_plot_data': [],
                 'total_commodities': 0,
                 'total_appearances': 0,
                 'avg_frequency': 0
@@ -2007,100 +2039,3 @@ class CommodityInsightService:
         except Exception as e:
             return []
         
-    def get_impact_ranking(self):
-        """
-        Get volatility ranking of commodities
-        """
-        try:
-            df = self.load_commodity_data()
-            
-            if df.empty:
-                return {
-                    'success': False, 
-                    'error': 'Tidak ada data komoditas tersedia',
-                    'ranking': [],
-                    'total_commodities': 0,
-                    'total_appearances': 0,
-                    'avg_frequency': 0
-                }
-            
-            # Parse commodity impacts for all records
-            all_commodities = []
-            for _, row in df.iterrows():
-                if pd.notna(row.get('Komoditas_Andil')):
-                    commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
-                    for commodity in commodities:
-                        commodity['date'] = row['Tanggal']
-                        commodity['iph'] = row.get('IPH', 0)
-                    all_commodities.extend(commodities)
-            
-            if not all_commodities:
-                return {
-                    'success': False,
-                    'error': 'Tidak ada data dampak komoditas ditemukan',
-                    'ranking': [],
-                    'total_commodities': 0,
-                    'total_appearances': 0,
-                    'avg_frequency': 0
-                }
-            
-            # Convert to DataFrame for analysis
-            commodities_df = pd.DataFrame(all_commodities)
-            commodities_df['date'] = pd.to_datetime(commodities_df['date'])
-            
-            # Calculate volatility for each commodity
-            commodity_stats = {}
-            
-            for commodity_name in commodities_df['name'].unique():
-                commodity_data = commodities_df[commodities_df['name'] == commodity_name]
-                
-                if len(commodity_data) < 2:
-                    continue
-                
-                impacts = commodity_data['impact'].values
-                volatility = impacts.std() if len(impacts) > 1 else 0
-                avg_impact = impacts.mean()
-                frequency = len(commodity_data)
-                
-                # Get category
-                category = commodity_data['category'].iloc[0] if 'category' in commodity_data.columns else 'LAINNYA'
-                
-                commodity_stats[commodity_name] = {
-                    'commodity_name': commodity_name,
-                    'volatility': volatility,
-                    'avg_impact': avg_impact,
-                    'frequency': frequency,
-                    'category': category
-                }
-            
-            # Sort by frequency (highest first) - most impactful commodities
-            sorted_ranking = sorted(commodity_stats.items(), 
-                                  key=lambda x: x[1]['frequency'], 
-                                  reverse=True)
-            
-            # Convert to list format
-            ranking = [item[1] for item in sorted_ranking]
-            
-            # Calculate statistics
-            total_commodities = len(ranking)
-            total_appearances = sum([item['frequency'] for item in ranking])
-            avg_frequency = np.mean([item['frequency'] for item in ranking]) if ranking else 0
-            
-            return {
-                'success': True,
-                'ranking': ranking,
-                'total_commodities': total_commodities,
-                'total_appearances': total_appearances,
-                'avg_frequency': avg_frequency
-            }
-            
-        except Exception as e:
-            print(f"Error in get_impact_ranking: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'ranking': [],
-                'total_commodities': 0,
-                'total_appearances': 0,
-                'avg_frequency': 0
-            }
