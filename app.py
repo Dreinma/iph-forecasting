@@ -1847,24 +1847,23 @@ def api_commodity_impact_ranking():
         start_key = request.args.get('start_key')
         end_key = request.args.get('end_key')
         
-        # Get impact ranking from commodity service
         ranking_data = commodity_service.get_impact_ranking(start_key=start_key, end_key=end_key)
 
         return jsonify(clean_for_json({
             'success': True,
-            'box_plot_data': ranking_data.get('box_plot_data', []),
+            'bar_chart_data': ranking_data.get('bar_chart_data', {}),
             'total_commodities': ranking_data.get('total_commodities', 0),
             'total_appearances': ranking_data.get('total_appearances', 0),
             'avg_frequency': ranking_data.get('avg_frequency', 0),
             'message': 'Impact ranking retrieved successfully'
-        })) 
-        
+        }))
+
     except Exception as e:
         logger.error(f"ERROR: Impact ranking error: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),
-            'box_plot_data': []
+            'bar_chart_data': {}
         }), 500
 
 # 6. ALERTS APIs

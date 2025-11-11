@@ -428,9 +428,9 @@ async function loadImpactRanking() {
         }
 
         const data = await safeApiCall('/api/commodity/impact-ranking');
-        
-        if (data.success && data.box_plot_data && data.box_plot_data.length > 0) {
-            renderImpactRankingBoxPlot(data, rangeText);            
+
+        if (data.success && data.bar_chart_data && data.bar_chart_data.x && data.bar_chart_data.x.length > 0) {
+            renderImpactRankingBarChart(data, rangeText);
         } else {
             document.getElementById(containerId).innerHTML = `
                 <div class="alert alert-light border-0">
@@ -451,37 +451,30 @@ async function loadImpactRanking() {
     dataLoadingStatus.impact = true;
 }
 
-function renderImpactRankingBoxPlot(data, rangeText) {
+function renderImpactRankingBarChart(data, rangeText) {
     const container = document.getElementById('impactRanking');
     
     // Data untuk Plotly (sudah diformat oleh backend)
-    const plotlyData = data.box_plot_data;
-    
-    // Tambahkan kustomisasi pada data
-    plotlyData.forEach(trace => {
-        trace.name = formatCommodityName(trace.name);
-        // Hapus text kustom agar hover default Plotly (yang menampilkan Q1, Median, Q3) berfungsi
-        delete trace.text; 
-    });
-    
-    const layout = {
-        title: {
-            text: `Top 5 Komoditas Paling Berpengaruh<br><sup>Periode: ${rangeText}</sup>`,
-            font: { size: 18 }
-        },
+    const plotlyData = [data.bar_chart_data];
 
+    plotlyData[0].width = 0.6; 
+    plotlyData[0].text = plotlyData[0].y.map(val => `${val} kemunculan`); 
+    plotlyData[0].hoverinfo = 'text+x';
+    const layout = {
+title: {
+            text: `Top 5 Komoditas Paling Sering Muncul<br><span style="font-size: 0.8em; color: #6c757d;">(${rangeText})</span>`,
+            font: {
+                size: 18,
+            },
+            x: 0.5, 
+            xanchor: 'center'
+        },
         yaxis: {
-            title: 'Nilai Dampak IPH (%)',
-            zeroline: true,
-            zerolinecolor: '#c0c0c0',
-            zerolinewidth: 2
+            title: 'Jumlah Kemunculan (Frekuensi)'
         },
         xaxis: {
-            title: 'Komoditas',
-            categoryorder: 'array',
-            categoryarray: plotlyData.map(d => d.name)
+            title: 'Komoditas'
         },
-        margin: { t: 60, b: 50, l: 60, r: 20 },
         hovermode: 'closest',
         showlegend: false
     };
@@ -646,20 +639,12 @@ async function checkCommodityDataAvailability() {
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Halaman Insight Komoditas (v4) Dimuat');
-    
     checkCommodityDataAvailability();
     
-    // setupEventListeners akan mengisi dropdown dan KEMUDIAN memicu
-    // loadCommodityTrends() dan loadImpactRanking()
     setupEventListeners(); 
     
-    // Insight minggu ini bisa berjalan paralel
     loadCurrentWeekInsights();
     
-    // HAPUS refreshInsights() DARI SINI UNTUK MENGHINDARI RACE CONDITION
-    // refreshInsights(); 
-    
-    // Setup auto-refresh
     setInterval(() => {
         console.log('⏰ Auto-refreshing commodity insights...');
         loadCurrentWeekInsights();
@@ -667,7 +652,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadImpactRanking();
     }, 5 * 60 * 1000); // 5 menit
 });
-
 
 
 
@@ -1836,13 +1820,15 @@ function refreshInsights() {
     // Reset status
     dataLoadingStatus = {
         currentWeek: false,
+        monthly: false,
         trends: false,
         impact: false
     };
         
     // Load all insights
     loadCurrentWeekInsights();
-
+    loadCommodityTrends();
+    loadImpactRanking();
     
     showAlert('Refreshing commodity insights...', 'info');
 }

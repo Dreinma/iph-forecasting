@@ -1755,73 +1755,45 @@ class CommodityInsightService:
 
             # Parse commodity impacts for all records
             all_commodities = []
-            valid_rows = 0
-            for _, row in df.iterrows():
+            for _, row in df_filtered.iterrows():
                 if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
-                    valid_rows += 1
                     commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
-                    for commodity in commodities:
-                        commodity['date'] = row['Tanggal']
-                        commodity['iph'] = row.get('IPH', 0)
                     all_commodities.extend(commodities)
             
-            
             if not all_commodities:
-                return {
-                    'success': False,
-                    'error': 'Tidak ada data dampak komoditas ditemukan',
-                    'ranking': [],
-                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0
-                }
+                return {'success': False, 'error': 'Tidak ada data dampak komoditas ditemukan di rentang ini', 'bar_chart_data': {}}
             
             # Convert to DataFrame for analysis
             commodities_df = pd.DataFrame(all_commodities)
             
-            # 1. Group by commodity and get the list of raw impacts
-            commodity_groups = commodities_df.groupby('name')['impact'].apply(list)
-            
-            # 2. Get frequency (count) for each
+            # 1. Hitung frekuensi (sudah benar)
             commodity_frequency = commodities_df.groupby('name').size()
             
-            # 3. Combine into a list of dicts
-            ranking_data = []
-            for name, impacts in commodity_groups.items():
-                if name in commodity_frequency:
-                    ranking_data.append({
-                        'name': name,
-                        'impacts': impacts,
-                        'frequency': int(commodity_frequency[name])
-                    })
+            # 2. Urutkan berdasarkan frekuensi (paling sering muncul)
+            sorted_frequency = commodity_frequency.sort_values(ascending=False)
             
-            # 4. Sort by frequency (most impactful)
-            ranking_data.sort(key=lambda x: x['frequency'], reverse=True)
+            # 3. Ambil Top 5
+            top_5_data = sorted_frequency.head(5)
             
-            # 5. Get Top 5
-            top_5_data = ranking_data[:5]
-            
-            # 6. Format for Plotly box plot
-            box_plot_data = []
-            for item in top_5_data:
-                box_plot_data.append({
-                    'name': item['name'].replace('_', ' ').lower(),
-                    'y': item['impacts'],
-                    'type': 'box',
-                    'boxpoints': 'all', # Tampilkan semua data point
-                    'jitter': 0.3,      # Beri sedikit sebaran
-                    'pointpos': -1.8,   # Posisikan data point
-                    'marker': {'size': 4, 'opacity': 0.7, 'color': '#0d6efd'},
-                    'line': {'color': '#0d6efd'},
-                    'text': f"Freq: {item['frequency']}<br>Mean: {np.mean(item['impacts']):.2f}"
-                })
-            
-            # Calculate statistics
-            total_commodities = len(ranking_data)
-            total_appearances = sum([item['frequency'] for item in ranking_data])
-            avg_frequency = np.mean([item['frequency'] for item in ranking_data]) if ranking_data else 0
+            # 4. Format untuk Plotly bar chart
+            bar_chart_data = {
+                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in top_5_data.index], # Nama Komoditas
+                'y': [int(freq) for freq in top_5_data.values], # Frekuensi
+                'type': 'bar',
+                'name': 'Frekuensi Kemunculan',
+                'marker': {
+                    'color': '#0d6efd', # Warna biru primer
+                    'opacity': 0.8
+                }
+            }
 
+            # Calculate statistics
+            total_commodities = len(commodity_frequency)
+            total_appearances = int(commodity_frequency.sum())
+            avg_frequency = float(commodity_frequency.mean()) if not commodity_frequency.empty else 0
             return {
                 'success': True,
-                'box_plot_data': box_plot_data,
+                'bar_chart_data': bar_chart_data,
                 'total_commodities': total_commodities,
                 'total_appearances': total_appearances,
                 'avg_frequency': avg_frequency
