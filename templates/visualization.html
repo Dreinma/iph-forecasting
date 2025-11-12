@@ -286,29 +286,10 @@
             <div class="col-12">
                 <div class="alert alert-info">
                     <h6><i class="fas fa-info-circle me-2"></i>Analisis Performa Model Machine Learning</h6>
-                    <p class="mb-0">Bandingkan akurasi semua model ML, lihat trend performa, dan pantau stabilitas prediksi IPH dari waktu ke waktu.</p>
+                    <p class="mb-0">Bandingkan akurasi semua model ML dan pantau stabilitas prediksi IPH dari waktu ke waktu.</p>
                 </div>
             </div>
-            
-            <!-- Accuracy Trends -->
-            <div class="col-12">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-gradient-primary text-white">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>
-                            Trend Akurasi Model (MAE, RMSE, R²)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="accuracyTrendsChart" style="height: 450px;">
-                            <div class="text-center py-5">
-                                <div class="spinner-border text-primary"></div>
-                                <p class="mt-2 text-muted">Memuat trend akurasi...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>    
+ 
             
             <!-- Model Performance Metrics -->
             <div class="col-12">
@@ -1207,18 +1188,6 @@
             console.log('📊 Model performance response:', data);
             
             if (data.success && data.charts) {
-                // Load accuracy trends
-                if (data.charts.accuracy_trends) {
-                    document.getElementById('accuracyTrendsChart').innerHTML = '';
-                    Plotly.newPlot('accuracyTrendsChart', 
-                        data.charts.accuracy_trends.data, 
-                        data.charts.accuracy_trends.layout, {
-                        responsive: true,
-                        displayModeBar: true
-                    });
-                }
-                
-                // Charts removed - forecast vs actual and model drift charts no longer needed
                 
                 // Update stats (existing code...)
                 if (data.stats) {
@@ -1233,12 +1202,7 @@
                     const statusElement = document.getElementById('modelStatus');
                     statusElement.textContent = status;
                     statusElement.className = `h5 ${statusColor}`;
-                    
-                    // Load model performance grid if available
-                    console.log('🔍 Checking model performance grid...');
-                    console.log('data.stats:', data.stats);
-                    console.log('modelPerformanceGrid element:', document.getElementById('modelPerformanceGrid'));
-                    
+      
                     if (data.stats && document.getElementById('modelPerformanceGrid')) {
                         console.log('✅ Calling updateModelPerformanceGrid...');
                         updateModelPerformanceGrid(data.stats);
