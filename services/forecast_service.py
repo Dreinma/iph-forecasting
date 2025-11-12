@@ -906,228 +906,189 @@ class ForecastService:
             
         except Exception as e:
             return {'success': False, 'error': str(e), 'alerts': []}
-        
+            
     def get_real_economic_alerts(self):
-        """Generate real-time economic alerts based on historical data and forecasting"""
+        """
+        MODIFIED: Generate real-time economic alerts, statistics, and dynamic recommendations.
+        """
         try:
-
             current_time = datetime.now()
+            # Cek cache
             if (self._alerts_cache and self._alerts_cache_time and 
-                (current_time - self._alerts_cache_time).seconds < 300):
-                logger.debug("Using cached alerts")
+                (current_time - self._alerts_cache_time).seconds < 300): # Cache 5 menit
+                logger.debug("Using cached alerts and recommendations")
                 return self._alerts_cache
             
-            logger.debug("Generating fresh alerts")
-
+            logger.debug("Generating fresh alerts and recommendations")
             alerts = []
+            recommendations = [] # List baru untuk rekomendasi
             
-            # Load historical data
+            # 1. Load Data
             df = self.data_handler.load_historical_data()
             if df.empty or len(df) < 10:
-                return {
-                    'success': False,
-                    'alerts': [],
-                    'message': 'Insufficient data for alert generation'
-                }
+                return {'success': False, 'alerts': [], 'recommendations': [], 'statistics': {}, 'message': 'Insufficient data'}
             
-            # Get current forecast
-            forecast_result = self.get_current_forecast()
-            forecast_data = None
-            if forecast_result['success']:
-                forecast_data = forecast_result['forecast']['data']
-            
-            # Sort data by date
             df['Tanggal'] = pd.to_datetime(df['Tanggal'])
-            df = df.sort_values('Tanggal').reset_index(drop=True)  
-
-            np.random.seed(42)
-
-            # Calculate statistical thresholds
-            recent_data = df.tail(30)  
-            mean_iph = df['Indikator_Harga'].mean()
-            std_iph = df['Indikator_Harga'].std()
+            df = df.sort_values('Tanggal').reset_index(drop=True)
+            
             latest_iph = df['Indikator_Harga'].iloc[-1]
             latest_date = df['Tanggal'].iloc[-1]
             
-            # 1. PRICE SPIKE ALERT
-            if len(df) >= 7:
-                week_ago_iph = df['Indikator_Harga'].iloc[-7]
-                weekly_change = ((latest_iph - week_ago_iph) / week_ago_iph) * 100
-                
-                if abs(weekly_change) > 2.0:  # More than 2% change
-                    alert_type = 'spike' if weekly_change > 0 else 'drop'
-                    icon = 'fa-arrow-up' if weekly_change > 0 else 'fa-arrow-down'
-                    color = 'warning' if weekly_change > 0 else 'info'
-                    
-                    alerts.append({
-                        'type': alert_type,
-                        'severity': 'warning' if abs(weekly_change) < 5 else 'critical',
-                        'icon': icon,
-                        'color': color,
-                        'title': f"{'Lonjakan' if weekly_change > 0 else 'Penurunan'} Harga Signifikan",
-                        'message': f"IPH {'naik' if weekly_change > 0 else 'turun'} {abs(weekly_change):.1f}% dalam 7 hari terakhir",
-                        'detail': f"Dari {week_ago_iph:.3f} menjadi {latest_iph:.3f}",
-                        'date': latest_date.strftime('%d/%m/%Y'),
-                        'priority': 'high' if abs(weekly_change) > 5 else 'medium'
-                    })
-            
-            # 2. STATISTICAL BOUNDARY ALERT
+            # 2. Analisis Statistik & Volatilitas
+            mean_iph = df['Indikator_Harga'].mean()
+            std_iph = df['Indikator_Harga'].std()
             upper_2sigma = mean_iph + 2 * std_iph
             lower_2sigma = mean_iph - 2 * std_iph
-            upper_3sigma = mean_iph + 3 * std_iph
-            lower_3sigma = mean_iph - 3 * std_iph
             
-            if latest_iph > upper_3sigma:
-                alerts.append({
-                    'type': 'boundary_critical',
-                    'severity': 'critical',
-                    'icon': 'fa-exclamation-triangle',
-                    'color': 'danger',
-                    'title': 'IPH Melampaui Batas Kritis Atas',
-                    'message': f'IPH {latest_iph:.3f}% melampaui batas 3-sigma ({upper_3sigma:.3f}%)',
-                    'detail': f'Probabilitas kejadian: < 0.3%',
-                    'date': latest_date.strftime('%d/%m/%Y'),
-                    'priority': 'critical'
-                })
-            elif latest_iph < lower_3sigma:
-                alerts.append({
-                    'type': 'boundary_critical',
-                    'severity': 'critical',
-                    'icon': 'fa-exclamation-triangle',
-                    'color': 'danger',
-                    'title': 'IPH Melampaui Batas Kritis Bawah',
-                    'message': f'IPH {latest_iph:.3f}% di bawah batas 3-sigma ({lower_3sigma:.3f}%)',
-                    'detail': f'Probabilitas kejadian: < 0.3%',
-                    'date': latest_date.strftime('%d/%m/%Y'),
-                    'priority': 'critical'
-                })
-            elif latest_iph > upper_2sigma:
+            # Statistik untuk card atas
+            recent_volatility = df['Indikator_Harga'].tail(14).std()
+            historical_volatility = df['Indikator_Harga'].std()
+            trend_4_minggu = df['Indikator_Harga'].tail(4).mean()
+
+            statistics = {
+                'latest_value': float(latest_iph),
+                'std': float(recent_volatility),
+                'mean': float(trend_4_minggu)
+            }
+
+            # 3. Get Forecast Data (untuk rekomendasi)
+            forecast_data = None
+            forecast_summary = None
+            try:
+                forecast_result = self.get_current_forecast()
+                if forecast_result['success']:
+                    forecast_data = forecast_result['forecast']['data']
+                    forecast_summary = forecast_result['forecast']['summary']
+            except Exception as e:
+                logger.warning(f"Could not load forecast data for alerts: {e}")
+
+            # 4. Get Commodity Data (untuk rekomendasi)
+            comm_insights = None
+            try:
+                # Kita panggil commodity service untuk data minggu ini
+                from services.commodity_insight_service import CommodityInsightService
+                comm_service = CommodityInsightService() # Asumsi path default
+                comm_insights = comm_service.get_current_week_insights()
+            except Exception as e:
+                logger.warning(f"Could not load commodity insights for alerts: {e}")
+
+            # BUAT ALERTS (Logika lama Anda, bisa dipertahankan)
+            #             
+            # (Alert 1: Statistical Boundary)
+            if latest_iph > upper_2sigma:
                 alerts.append({
                     'type': 'boundary_warning',
                     'severity': 'warning',
                     'icon': 'fa-arrow-up',
                     'color': 'warning',
-                    'title': 'IPH Mendekati Batas Atas',
-                    'message': f'IPH {latest_iph:.3f}% mendekati batas 2-sigma ({upper_2sigma:.3f}%)',
-                    'detail': f'Perlu monitoring ketat',
+                    'title': 'IPH Mendekati Batas Atas Statistik (2-Sigma)',
+                    'message': f'IPH saat ini ({latest_iph:.3f}%) berada di atas batas wajar ({upper_2sigma:.3f}%).',
                     'date': latest_date.strftime('%d/%m/%Y'),
                     'priority': 'medium'
                 })
             elif latest_iph < lower_2sigma:
-                alerts.append({
+                 alerts.append({
                     'type': 'boundary_warning',
                     'severity': 'warning',
                     'icon': 'fa-arrow-down',
-                    'color': 'warning',
-                    'title': 'IPH Mendekati Batas Bawah',
-                    'message': f'IPH {latest_iph:.3f}% mendekati batas 2-sigma ({lower_2sigma:.3f}%)',
-                    'detail': f'Perlu monitoring ketat',
+                    'color': 'info',
+                    'title': 'IPH Mendekati Batas Bawah Statistik (2-Sigma)',
+                    'message': f'IPH saat ini ({latest_iph:.3f}%) berada di bawah batas wajar ({lower_2sigma:.3f}%).',
                     'date': latest_date.strftime('%d/%m/%Y'),
                     'priority': 'medium'
                 })
             
-            # 3. VOLATILITY ALERT
-            if len(df) >= 14:
-                recent_volatility = df['Indikator_Harga'].tail(14).std()
-                historical_volatility = df['Indikator_Harga'].std()
+            # (Alert 2: Menambahkan alert dari commodity insights jika ada)
+            if comm_insights and comm_insights['success']:
+                 # Ambil 2 komoditas teratas
+                top_pos = comm_insights['commodity_impacts'].get('significant_positive', [])
+                top_neg = comm_insights['commodity_impacts'].get('significant_negative', [])
                 
-                if recent_volatility > historical_volatility * 1.5:
+                if top_pos:
+                    c = top_pos[0]
                     alerts.append({
-                        'type': 'volatility',
-                        'severity': 'warning',
-                        'icon': 'fa-chart-line',
-                        'color': 'info',
-                        'title': 'Volatilitas Tinggi Terdeteksi',
-                        'message': f'Volatilitas 2 minggu terakhir meningkat {((recent_volatility/historical_volatility-1)*100):.0f}%',
-                        'detail': f'Volatilitas: {recent_volatility:.3f}% vs rata-rata {historical_volatility:.3f}%',
-                        'date': latest_date.strftime('%d/%m/%Y'),
-                        'priority': 'medium'
+                        'type': 'commodity', 'severity': 'info', 'icon': 'fa-seedling', 'color': 'danger',
+                        'title': f"Pendorong Inflasi: {c['name'].replace('_', ' ').title()}",
+                        'message': f"Komoditas {c['name'].replace('_', ' ').title()} berkontribusi signifikan ({c['impact']:.2f}%) terhadap IPH minggu ini.",
+                        'date': latest_date.strftime('%d/%m/%Y'), 'priority': 'medium'
                     })
-            
-            # 4. TREND CHANGE ALERT
-            if len(df) >= 10:
-                recent_trend = df['Indikator_Harga'].tail(5).diff().mean()
-                if abs(recent_trend) > std_iph * 0.3:
-                    trend_direction = "naik" if recent_trend > 0 else "turun"
+                if top_neg:
+                    c = top_neg[0]
                     alerts.append({
-                        'type': 'trend_change',
-                        'severity': 'info',
-                        'icon': 'fa-exchange-alt',
-                        'color': 'info',
-                        'title': 'Perubahan Tren Terdeteksi',
-                        'message': f'Tren {trend_direction} konsisten dalam 5 periode terakhir',
-                        'detail': f'Rata-rata perubahan: {recent_trend:.3f}',
-                        'date': latest_date.strftime('%d/%m/%Y'),
-                        'priority': 'low'
+                        'type': 'commodity', 'severity': 'info', 'icon': 'fa-leaf', 'color': 'success',
+                        'title': f"Pendorong Deflasi: {c['name'].replace('_', ' ').title()}",
+                        'message': f"Komoditas {c['name'].replace('_', ' ').title()} menahan IPH minggu ini ({c['impact']:.2f}%).",
+                        'date': latest_date.strftime('%d/%m/%Y'), 'priority': 'medium'
                     })
-            
-            # 5. FORECAST-BASED ALERTS
-            if forecast_data and len(forecast_data) > 0:
-                # Get forecast trend
-                first_forecast = forecast_data[0]['Prediksi']
-                last_forecast = forecast_data[-1]['Prediksi']
-                forecast_change = ((last_forecast - first_forecast) / first_forecast) * 100
-                
-                # Forecast vs Current Alert
-                current_vs_forecast = ((first_forecast - latest_iph) / latest_iph) * 100
-                
-                if abs(current_vs_forecast) > 3:
-                    direction = "naik" if current_vs_forecast > 0 else "turun"
-                    alerts.append({
-                        'type': 'forecast_divergence',
-                        'severity': 'info',
-                        'icon': 'fa-crystal-ball',
-                        'color': 'primary',
-                        'title': f'Prediksi Menunjukkan Perubahan',
-                        'message': f'Model memprediksi IPH akan {direction} {abs(current_vs_forecast):.1f}% minggu depan',
-                        'detail': f'Dari {latest_iph:.3f} ke {first_forecast:.3f}',
-                        'date': pd.to_datetime(forecast_data[0]['Tanggal']).strftime('%d/%m/%Y'),
-                        'priority': 'medium'
+
+            # BUAT REKOMENDASI 
+
+            # Rekomendasi 1: Berdasarkan Tren Prediksi
+            if forecast_data and forecast_summary:
+                if forecast_summary['trend'] == 'Naik' and forecast_summary['avg_prediction'] > 0.5:
+                    recommendations.append({
+                        'icon': 'fa-arrow-trend-up', 'color': 'danger',
+                        'title': 'Antisipasi Tren Inflasi',
+                        'text': f"Model memprediksi tren IPH akan **naik** dalam {len(forecast_data)} minggu ke depan (rata-rata {forecast_summary['avg_prediction']:.2f}%). Pertimbangkan langkah-langkah stabilisasi harga."
                     })
-                
-                # Long-term forecast trend
-                if abs(forecast_change) > 5:
-                    trend_dir = "naik" if forecast_change > 0 else "turun"
-                    alerts.append({
-                        'type': 'forecast_trend',
-                        'severity': 'info',
-                        'icon': 'fa-chart-line',
-                        'color': 'primary',
-                        'title': f'Tren Jangka Menengah: {trend_dir.title()}',
-                        'message': f'Peramalan menunjukkan tren {trend_dir} {abs(forecast_change):.1f}% dalam 8 minggu',
-                        'detail': f'Dari {first_forecast:.3f} ke {last_forecast:.3f}',
-                        'date': pd.to_datetime(forecast_data[-1]['Tanggal']).strftime('%d/%m/%Y'),
-                        'priority': 'low'
+                elif forecast_summary['trend'] == 'Turun' and forecast_summary['avg_prediction'] < -0.5:
+                    recommendations.append({
+                        'icon': 'fa-arrow-trend-down', 'color': 'success',
+                        'title': 'Tren Deflasi Terprediksi',
+                        'text': f"Model memprediksi tren IPH akan **turun** dalam {len(forecast_data)} minggu ke depan (rata-rata {forecast_summary['avg_prediction']:.2f}%). Awasi agar deflasi tidak terlalu dalam."
                     })
-            
-            # 6. MODEL CONFIDENCE ALERT
-            best_model = self.model_manager.get_current_best_model()
-            if best_model and best_model.get('mae', 0) > 1.0:
-                alerts.append({
-                    'type': 'model_confidence',
-                    'severity': 'warning',
-                    'icon': 'fa-robot',
-                    'color': 'warning',
-                    'title': 'Akurasi Model Menurun',
-                    'message': f'Model {best_model["model_name"]} memiliki error tinggi (MAE: {best_model["mae"]:.3f})',
-                    'detail': 'Disarankan untuk melakukan retraining model',
-                    'date': datetime.now().strftime('%d/%m/%Y'),
-                    'priority': 'medium'
+                else:
+                    recommendations.append({
+                        'icon': 'fa-arrows-left-right', 'color': 'primary',
+                        'title': 'Kondisi Harga Diprediksi Stabil',
+                        'text': f"Model memprediksi IPH akan relatif stabil ({forecast_summary['avg_prediction']:.2f}%). Lanjutkan monitoring rutin."
+                    })
+
+            # Rekomendasi 2: Berdasarkan Volatilitas
+            if recent_volatility > historical_volatility * 1.5:
+                recommendations.append({
+                    'icon': 'fa-wave-square', 'color': 'warning',
+                    'title': 'Waspada Volatilitas Tinggi',
+                    'text': f"Volatilitas harga 14 hari terakhir ({recent_volatility:.2f}) **lebih tinggi {((recent_volatility/historical_volatility)-1)*100:.0f}%** dibanding rata-rata historis ({historical_volatility:.2f}). Pasar sedang tidak stabil."
                 })
-            
-            # Sort alerts by priority
-            priority_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
-            alerts.sort(key=lambda x: priority_order.get(x['priority'], 3))
-            
+                
+            # Rekomendasi 3: Berdasarkan Komoditas (Jika ada)
+            if comm_insights and comm_insights['success']:
+                top_inflasi = comm_insights['commodity_impacts'].get('significant_positive', [])
+                if top_inflasi:
+                    top_comm = top_inflasi[0]
+                    recommendations.append({
+                        'icon': 'fa-seedling', 'color': 'danger',
+                        'title': 'Fokus pada Komoditas Pendorong Inflasi',
+                        'text': f"**{top_comm['name'].replace('_', ' ').title()}** menjadi pendorong inflasi utama minggu ini dengan dampak **{top_comm['impact']:.2f}%**. Perlu monitoring khusus pada pasokan dan distribusi komoditas ini."
+                    })
+
+                top_deflasi = comm_insights['commodity_impacts'].get('significant_negative', [])
+                if top_deflasi:
+                    top_comm = top_deflasi[0]
+                    recommendations.append({
+                        'icon': 'fa-leaf', 'color': 'success',
+                        'title': 'Komoditas Pendorong Deflasi',
+                        'text': f"**{top_comm['name'].replace('_', ' ').title()}** menjadi pendorong deflasi utama minggu ini dengan dampak **{top_comm['impact']:.2f}%**. Pastikan harga di tingkat petani tetap wajar."
+                    })
+
+            # Rekomendasi 4: Rekomendasi Umum
+            if not recommendations:
+                recommendations.append({
+                    'icon': 'fa-check-circle', 'color': 'success',
+                    'title': 'Kondisi Terkendali',
+                    'text': 'Semua indikator (tren, volatilitas, dan dampak komoditas) berada dalam batas wajar. Lanjutkan monitoring rutin.'
+                })
+
+            # Simpan ke Cache
             result = {
                 'success': True,
-                'alerts': alerts[:5],  # Limit to 5 most important alerts
+                'alerts': alerts[:5], # Batasi 5 alert teratas
+                'recommendations': recommendations, # Kirim semua rekomendasi
+                'statistics': statistics, # Kirim statistik untuk card atas
                 'total_alerts': len(alerts),
                 'generated_at': datetime.now().isoformat(),
-                'cache_info': {
-                    'cached': False,
-                    'generated_fresh': True
-                },
+                'cache_info': {'cached': False, 'generated_fresh': True},
                 'data_period': {
                     'start': df['Tanggal'].min().strftime('%d/%m/%Y'),
                     'end': df['Tanggal'].max().strftime('%d/%m/%Y'),
@@ -1142,8 +1103,12 @@ class ForecastService:
 
         except Exception as e:
             logger.error(f"Error generating economic alerts: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'alerts': [],
+                'recommendations': [],
+                'statistics': {},
                 'error': str(e)
             }

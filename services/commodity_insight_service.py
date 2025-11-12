@@ -667,245 +667,6 @@ class CommodityInsightService:
         else:
             return 'success'
 
-    def get_monthly_analysis(self, month=None, year=None):
-        """Enhanced monthly analysis dengan better error handling"""
-        try:
-            print(f"Enhanced monthly analysis for month: '{month}', year: '{year}'")
-            
-            df = self.load_commodity_data()
-            
-            if df.empty:
-                return {
-                    'success': False, 
-                    'message': 'No commodity data available. Please upload commodity data first.',
-                    'suggestion': 'Upload commodity data file to enable monthly analysis'
-                }
-            
-            print(f" Processing {len(df)} total records")
-            
-            # Enhanced month and year filtering
-            df_filtered = df.copy()
-            
-            # Set default to latest month and year if not specified
-            if not month or not month.strip():
-                # Get latest month with data
-                latest_month = df['Bulan'].dropna().iloc[-1] if not df.empty else None
-                if not latest_month:
-                    return {
-                        'success': False,
-                        'message': 'Tidak ada data bulan tersedia'
-                    }
-                month = latest_month
-                
-            if not year or not year.strip():
-                # Get latest year with data
-                df_temp = df.copy()
-                df_temp['year'] = pd.to_datetime(df_temp['Tanggal']).dt.year
-                latest_year = df_temp['year'].max() if not df_temp.empty else None
-                if not latest_year:
-                    return {
-                        'success': False,
-                        'message': 'Tidak ada data tahun tersedia'
-                    }
-                year = str(latest_year)
-            
-            # Filter by month and year
-            month_clean = month.strip().lower()
-            year_clean = int(year.strip())
-            
-            # Filter by month and year - STRICT matching to avoid cross-year contamination
-            # First, create year column from actual date (most reliable)
-            df['year'] = pd.to_datetime(df['Tanggal']).dt.year
-            
-            # Filter by year FIRST (critical to avoid cross-year contamination)
-            df_filtered = df[df['year'] == year_clean].copy()
-            
-            print(f" After year filter ({year_clean}): {len(df_filtered)} records")
-            
-            if df_filtered.empty:
-                return {
-                    'success': False,
-                    'message': f'Data tidak tersedia untuk tahun {year}',
-                    'suggestion': 'Pilih tahun yang memiliki data'
-                }
-            
-            # Then filter by month - use exact or prefix match
-            month_clean = month.strip().lower()
-            
-            # Normalize bulan in dataframe: remove year suffix
-            df_filtered['Bulan_Normalized'] = df_filtered['Bulan'].astype(str).str.lower()
-            df_filtered['Bulan_Normalized'] = df_filtered['Bulan_Normalized'].str.replace(r"'?\d{2,4}.*$", "", regex=True).str.strip()
-            
-            # Use exact or startswith match (more strict than contains)
-            month_clean_normalized = month_clean.replace("'", "").strip()
-            
-            # Enhanced matching: handle various formats like "Mei'23", "Mei 23", "Mei", etc.
-            # Strategy: extract first word from bulan and compare with month name
-            import re
-            def month_matches(bulan_str, month_name):
-                if pd.isna(bulan_str):
-                    return False
-                bulan_lower = str(bulan_str).lower().strip()
-                # Extract first word (month name) before any apostrophe, space, or number
-                first_word = re.match(r'^([a-z]+)', bulan_lower)
-                if first_word:
-                    extracted_month = first_word.group(1)
-                    return extracted_month == month_name
-                return False
-            
-            # Apply flexible matching
-            month_match_mask = df_filtered['Bulan'].apply(
-                lambda x: month_matches(x, month_clean_normalized)
-            )
-            normalized_match_mask = df_filtered['Bulan_Normalized'].str.startswith(month_clean_normalized, na=False)
-            direct_match_mask = df_filtered['Bulan'].str.lower().str.startswith(month_clean, na=False)
-            
-            df_filtered = df_filtered[month_match_mask | normalized_match_mask | direct_match_mask]
-            
-            print(f" After month filter ({month}): {len(df_filtered)} records")
-            
-            # Double-check: verify all records are from correct year
-            df_filtered['year_check'] = pd.to_datetime(df_filtered['Tanggal']).dt.year
-            wrong_year = df_filtered[df_filtered['year_check'] != year_clean]
-            if not wrong_year.empty:
-                print(f" WARNING: Found {len(wrong_year)} records with wrong year! Removing them...")
-                # Remove wrong year records
-                df_filtered = df_filtered[df_filtered['year_check'] == year_clean]
-            
-            # Clean up temporary columns
-            if 'Bulan_Normalized' in df_filtered.columns:
-                df_filtered = df_filtered.drop(columns=['Bulan_Normalized'])
-            if 'year_check' in df_filtered.columns:
-                df_filtered = df_filtered.drop(columns=['year_check'])
-            
-            # Final validation: ensure max 5 records per month (normal month has max 5 weeks)
-            if len(df_filtered) > 5:
-                print(f" WARNING: Found {len(df_filtered)} records for {month} {year}, expected max 5!")
-                # Sort by date and take first 5 (most recent if needed, or earliest)
-                df_filtered = df_filtered.sort_values('Tanggal').head(5)
-                print(f" Limited to 5 records")
-            
-            # Check if data exists for the selected month/year
-            if df_filtered.empty:
-                return {
-                    'success': False,
-                    'message': f'Data tidak tersedia untuk {month} {year}',
-                    'suggestion': 'Pilih bulan dan tahun yang memiliki data'
-                }
-            
-            selected_month = month
-            
-            print(f"Analyzing {len(df_filtered)} records for month: {selected_month}")
-            
-            # Enhanced commodity aggregation
-            all_commodities = defaultdict(lambda: {
-                'impacts': [],
-                'frequencies': 0,
-                'periods': [],
-                'category': 'UNKNOWN',
-                'category_icon': ''
-            })
-            
-            # Process each record in the month
-            for _, row in df_filtered.iterrows():
-                period_label = f"{row.get('Minggu', 'M?')}"
-                commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
-                
-                for comm in commodities:
-                    commodity_name = comm['name']
-                    all_commodities[commodity_name]['impacts'].append(comm['impact'])
-                    all_commodities[commodity_name]['frequencies'] += 1
-                    all_commodities[commodity_name]['periods'].append(period_label)
-                    all_commodities[commodity_name]['category'] = comm.get('category', 'UNKNOWN')
-                    all_commodities[commodity_name]['category_icon'] = comm.get('category_icon', '')
-            
-            # Calculate enhanced statistics
-            commodity_stats = []
-            for name, data in all_commodities.items():
-                if data['impacts']:
-                    impacts = data['impacts']
-                    commodity_stats.append({
-                        'name': name,
-                        'total_impact': float(sum(impacts)),
-                        'avg_impact': float(np.mean(impacts)),
-                        'max_impact': float(max(impacts)),
-                        'min_impact': float(min(impacts)),
-                        'frequency': data['frequencies'],
-                        'volatility': float(np.std(impacts)) if len(impacts) > 1 else 0.0,
-                        'consistency': 1.0 - (np.std(impacts) / (abs(np.mean(impacts)) + 0.001)) if len(impacts) > 1 else 1.0,
-                        'periods_active': data['periods'],
-                        'category': data['category'],
-                        'category_icon': data['category_icon'],
-                        'trend': self._calculate_commodity_trend(impacts),
-                        'impact_level': self._get_impact_level(float(sum(impacts)))
-                    })
-            
-            # Sort by absolute total impact
-            commodity_stats.sort(key=lambda x: abs(x['total_impact']), reverse=True)
-            
-            # Check if we have valid commodity data
-            valid_commodity_data = df_filtered[df_filtered['Komoditas_Andil'] != 'DATA_TIDAK_TERSEDIA']
-            has_valid_commodity_data = not valid_commodity_data.empty
-            
-            # Enhanced volatility analysis
-            volatility_data = df_filtered['Komoditas_Fluktuasi_Tertinggi'].dropna()
-            volatility_summary = {}
-            if not volatility_data.empty:
-                volatility_counts = volatility_data.value_counts().to_dict()
-                volatility_values = df_filtered['Nilai_Fluktuasi'].dropna()
-                
-                volatility_summary = {
-                    'most_frequent_volatile': list(volatility_counts.keys())[0] if volatility_counts else 'Tidak ada',
-                    'volatility_commodities': [
-                        {'name': str(k), 'frequency': int(v)} 
-                        for k, v in list(volatility_counts.items())[:5]
-                    ],
-                    'avg_volatility': float(volatility_values.mean()) if not volatility_values.empty else 0.0,
-                    'max_volatility': float(volatility_values.max()) if not volatility_values.empty else 0.0
-                }
-            
-            # Calculate month statistics
-            month_iph_values = df_filtered['IPH'].dropna()
-            
-            # Enhanced category breakdown
-            category_breakdown = self._get_enhanced_category_breakdown(commodity_stats)
-            
-            result = {
-                'success': True,
-                'month': str(selected_month),
-                'analysis_period': {
-                    'weeks_analyzed': len(df_filtered),
-                    'total_records': len(df_filtered),
-                    'valid_iph_records': len(month_iph_values)
-                },
-                'iph_statistics': {
-                    'avg_iph': float(month_iph_values.mean()) if not month_iph_values.empty else 0.0,
-                    'min_iph': float(month_iph_values.min()) if not month_iph_values.empty else 0.0,
-                    'max_iph': float(month_iph_values.max()) if not month_iph_values.empty else 0.0,
-                    'std_iph': float(month_iph_values.std()) if len(month_iph_values) > 1 else 0.0,
-                    'trend': 'Inflasi' if month_iph_values.mean() > 0 else 'Deflasi' if month_iph_values.mean() < 0 else 'Stabil'
-                },
-                'top_impact_commodities': commodity_stats[:8] if has_valid_commodity_data else [],  # Show more commodities
-                'volatility_summary': volatility_summary,
-                'category_breakdown': category_breakdown,
-                'monthly_summary': self._generate_enhanced_monthly_summary(df_filtered, commodity_stats, category_breakdown),
-                'recommendations': self._generate_monthly_recommendations(commodity_stats, category_breakdown)
-            }
-            
-            print(" Enhanced monthly analysis completed successfully")
-            return result
-            
-        except Exception as e:
-            print(f"Error in enhanced monthly analysis: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
-            return {
-                'success': False,
-                'message': f'Error dalam analisis bulanan: {str(e)}',
-                'error_details': str(e)
-            }
-
     def _calculate_commodity_trend(self, impacts):
         """Calculate trend for commodity impacts"""
         if len(impacts) < 2:
@@ -1524,208 +1285,26 @@ class CommodityInsightService:
             print(f" Error generating enhanced recommendations: {e}")
             return []
         
-    def get_commodity_trends(self, commodity_name=None, periods=4, start_key=None, end_key=None):
-        """Enhanced commodity trends analysis dengan better structure"""
-        try:
-            df = self.load_commodity_data()
-            
-            if df.empty:
-                return {
-                    'success': False, 
-                    'message': 'No commodity data available'
-                }
-            
-            # Get recent periods - but limit to available data
-            total_available = len(df)
-
-            # Optional: slice by start_key (YYYY-MM) and end_key (YYYY-MM)
-            if start_key or end_key:
-                try:
-                    # Expect start_key like '2024-06'
-                    df = df.copy()
-                    df['year'] = pd.to_datetime(df['Tanggal']).dt.year
-                    df['month'] = pd.to_datetime(df['Tanggal']).dt.month
-                    # Build numeric yyyymm for comparison
-                    df['_ym'] = df['year'] * 100 + df['month']
-                    start_ym = None
-                    end_ym = None
-                    if start_key:
-                        sy, sm = [int(x) for x in str(start_key).split('-')[:2]]
-                        start_ym = sy * 100 + sm
-                    if end_key:
-                        ey, em = [int(x) for x in str(end_key).split('-')[:2]]
-                        end_ym = ey * 100 + em
-
-                    if start_ym is not None and end_ym is not None:
-                        df_recent = df[(df['_ym'] >= start_ym) & (df['_ym'] <= end_ym)]
-                    elif start_ym is not None:
-                        df_recent = df[df['_ym'] >= start_ym]
-                    elif end_ym is not None:
-                        df_recent = df[df['_ym'] <= end_ym]
-                    else:
-                        df_recent = df
-
-                    if periods < 999:
-                        df_recent = df_recent.head(periods)
-                except Exception as _:
-                    df_recent = df.tail(min(periods if periods < 999 else total_available, total_available))
-                periods_to_analyze = len(df_recent)
-            else:
-                # Handle "all data" option (999 or very large number)
-                if periods >= 999:
-                    df_recent = df  # Use all available data
-                    periods_to_analyze = total_available
-                else:
-                    periods_to_analyze = min(periods, total_available)
-                    df_recent = df.tail(periods_to_analyze)  # Get exact number of periods requested, limited by available data
-            
-            trends = {}
-            valid_trend_rows = 0
-            
-            for _, row in df_recent.iterrows():
-                period_key = f"{row.get('Bulan', 'Unknown')} {row.get('Minggu', 'Unknown')}"
-                if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
-                    valid_trend_rows += 1
-                    commodities = self.parse_commodity_impacts(row.get('Komoditas_Andil', ''))
-                    
-                    for comm in commodities:
-                        # Filter by specific commodity if requested
-                        if commodity_name and comm['name'] != commodity_name.upper():
-                            continue
-                        
-                        if comm['name'] not in trends:
-                            trends[comm['name']] = {
-                                'periods': [],
-                                'impacts': [],
-                                'appearances': 0,
-                                'category': comm.get('category', 'LAINNYA'),
-                                'total_impact': 0,
-                                'trend': 'stable',
-                                'trend_strength': 'weak',
-                                'trend_coefficient': 0.0,
-                                'volatility': 0.0,
-                                'avg_impact': 0.0
-                            }
-                        
-                        trends[comm['name']]['periods'].append(period_key)
-                        trends[comm['name']]['impacts'].append(comm['impact'])
-                        trends[comm['name']]['appearances'] += 1
-                        trends[comm['name']]['total_impact'] += comm['impact']
-            
-            # If no valid commodity data found, provide informative message
-            if not trends:
-                return {
-                    'success': True,
-                    'periods_analyzed': periods_to_analyze,
-                    'total_available_periods': total_available,
-                    'commodities_found': 0,
-                    'commodity_trends': {},
-                    'summary': f"📊 Analisis Trend Komoditas:\n\n**Scope**: {periods_to_analyze} periode dari {total_available} total\n**Status**: Data komoditas tidak tersedia untuk periode yang dipilih\n**Saran**: Pilih periode yang lebih baru atau upload data komoditas historis",
-                    'category_trends': {},
-                    'analysis_scope': 'all_data' if periods >= 999 else f'last_{periods_to_analyze}_periods',
-                    'data_availability': 'no_commodity_data'
-                }
-            
-            
-            # Enhanced trend calculation
-            for name, data in trends.items():
-                impacts = data['impacts']
-                if len(impacts) > 1:
-                    # Linear trend coefficient
-                    x = np.arange(len(impacts))
-                    try:
-                        z = np.polyfit(x, impacts, 1)
-                        data['trend_coefficient'] = float(z[0])
-                        
-                        # Trend classification
-                        if abs(z[0]) < 0.01:
-                            data['trend'] = 'stable'
-                            data['trend_strength'] = 'weak'
-                        elif z[0] > 0.05:
-                            data['trend'] = 'increasing'
-                            data['trend_strength'] = 'strong'
-                        elif z[0] > 0.01:
-                            data['trend'] = 'increasing'
-                            data['trend_strength'] = 'moderate'
-                        elif z[0] < -0.05:
-                            data['trend'] = 'decreasing'
-                            data['trend_strength'] = 'strong'
-                        elif z[0] < -0.01:
-                            data['trend'] = 'decreasing'
-                            data['trend_strength'] = 'moderate'
-                        else:
-                            data['trend'] = 'stable'
-                            data['trend_strength'] = 'weak'
-                    except:
-                        data['trend_coefficient'] = 0.0
-                        data['trend'] = 'stable'
-                        data['trend_strength'] = 'weak'
-                    
-                    # Calculate volatility and average
-                    data['volatility'] = float(np.std(impacts))
-                    data['avg_impact'] = float(np.mean(impacts))
-                    
-                else:
-                    data['trend'] = 'insufficient_data'
-                    data['trend_coefficient'] = 0.0
-                    data['trend_strength'] = 'unknown'
-                    data['volatility'] = 0.0
-                    data['avg_impact'] = impacts[0] if impacts else 0.0
-            
-            # Sort by total absolute impact
-            sorted_trends = dict(sorted(
-                trends.items(), 
-                key=lambda x: abs(x[1]['total_impact']), 
-                reverse=True
-            ))
-            
-            # Generate enhanced summary
-            summary = self._generate_enhanced_trend_summary(sorted_trends, periods_to_analyze, total_available)
-            
-            # Generate category trends
-            category_trends = self._analyze_category_trends(sorted_trends)
-            
-            return {
-                'success': True,
-                'periods_analyzed': periods_to_analyze,
-                'total_available_periods': total_available,
-                'commodities_found': len(trends),
-                'commodity_trends': sorted_trends,
-                'summary': summary,
-                'category_trends': category_trends,
-                'analysis_scope': 'all_data' if periods >= 999 else f'last_{periods_to_analyze}_periods'
-            }
-            
-        except Exception as e:
-            print(f"Error in commodity trends: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            
-            return {
-                'success': False,
-                'message': f'Error menganalisis trend: {str(e)}'
-            }
-
-    def get_impact_ranking(self, start_key=None, end_key=None):
+    
+    def get_full_commodity_insights(self, start_key=None, end_key=None):
         """
-        Get volatility ranking of commodities
+        MODIFIED: Menghasilkan data untuk Sparkline (dengan hover) 
+        dan dua Bar Chart (Frekuensi & Dampak).
         """
         try:
             df = self.load_commodity_data()
-            
             if df.empty:
-                return {
-                    'success': False,
-                    'error': 'Tidak ada data komoditas tersedia',
-                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0                
-                    }
-            
+                return {'success': False, 'error': 'Tidak ada data komoditas tersedia'}
+
+            # --- 1. Filter Rentang Waktu (Tetap Sama) ---
             df_filtered = df.copy()
             if start_key or end_key:
                 try:
-                    df_filtered['year'] = pd.to_datetime(df_filtered['Tanggal']).dt.year
-                    df_filtered['month'] = pd.to_datetime(df_filtered['Tanggal']).dt.month
+                    df_filtered['Tanggal'] = pd.to_datetime(df_filtered['Tanggal'])
+                    df_filtered['year'] = df_filtered['Tanggal'].dt.year
+                    df_filtered['month'] = df_filtered['Tanggal'].dt.month
                     df_filtered['_ym'] = df_filtered['year'] * 100 + df_filtered['month']
+                    
                     start_ym = None
                     end_ym = None
                     if start_key:
@@ -1742,75 +1321,104 @@ class CommodityInsightService:
                     elif end_ym is not None:
                         df_filtered = df_filtered[df_filtered['_ym'] <= end_ym]
                 except Exception as e:
-                    print(f"Error filtering dates in get_impact_ranking: {e}")
-                    # Jika error, gunakan semua data
+                    print(f"Error filtering dates: {e}")
                     df_filtered = df.copy()
             
             if df_filtered.empty:
-                return {
-                    'success': False, 
-                    'error': 'Tidak ada data komoditas untuk rentang waktu yang dipilih',
-                    'box_plot_data': [], 'total_commodities': 0, 'total_appearances': 0, 'avg_frequency': 0
-                }
+                return {'success': False, 'error': 'Tidak ada data untuk rentang waktu yang dipilih'}
 
-            # Parse commodity impacts for all records
+            # --- 2. Parsing Komoditas (Tetap Sama) ---
             all_commodities = []
             for _, row in df_filtered.iterrows():
                 if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
                     commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
+                    for comm in commodities:
+                        comm['tanggal'] = row['Tanggal'] # Tambahkan tanggal ke setiap komoditas
                     all_commodities.extend(commodities)
             
             if not all_commodities:
-                return {'success': False, 'error': 'Tidak ada data dampak komoditas ditemukan di rentang ini', 'bar_chart_data': {}}
+                return {'success': False, 'error': 'Tidak ada data dampak komoditas di rentang ini'}
             
-            # Convert to DataFrame for analysis
             commodities_df = pd.DataFrame(all_commodities)
+            if 'tanggal' not in commodities_df.columns:
+                 return {'success': False, 'error': 'Gagal mem-parsing tanggal komoditas'}
+                 
+            commodities_df['tanggal'] = pd.to_datetime(commodities_df['tanggal'])
+
+            # --- 3. Hitung SEMUA Agregat ---
             
-            # 1. Hitung frekuensi (sudah benar)
-            commodity_frequency = commodities_df.groupby('name').size()
+            # A. Data Tren (untuk Sparkline)
+            trend_data_grouped = commodities_df.groupby('name').apply(
+                lambda x: x.sort_values('tanggal')[['tanggal', 'impact']].to_dict('records')
+            )
             
-            # 2. Urutkan berdasarkan frekuensi (paling sering muncul)
-            sorted_frequency = commodity_frequency.sort_values(ascending=False)
-            
-            # 3. Ambil Top 5
-            top_5_data = sorted_frequency.head(5)
-            
-            # 4. Format untuk Plotly bar chart
-            bar_chart_data = {
-                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in top_5_data.index], # Nama Komoditas
-                'y': [int(freq) for freq in top_5_data.values], # Frekuensi
+            trend_stats = commodities_df.groupby('name').agg(
+                total_impact=pd.NamedAgg(column='impact', aggfunc='sum'),
+                frequency=pd.NamedAgg(column='name', aggfunc='size')
+            ).sort_values(by='frequency', ascending=False) # Urutkan berdasarkan frekuensi
+
+            trend_data_final = []
+            for name, stats in trend_stats.head(5).iterrows(): # Top 5 berdasarkan frekuensi
+                sparkline_data = trend_data_grouped.get(name, [])
+                
+                # --- MODIFIKASI DI SINI ---
+                # Siapkan data hover (text) untuk Plotly
+                hover_text = [
+                    f"Tgl: {d['tanggal'].strftime('%Y-%m-%d')}<br>Dampak: {float(d['impact']):.2f}%" 
+                    for d in sparkline_data
+                ]
+                # --- AKHIR MODIFIKASI ---
+                
+                trend_data_final.append({
+                    'name': self._standardize_commodity_name(name).replace('_', ' ').lower(),
+                    # 'total_impact': float(stats['total_impact']), # <-- DIHAPUS SESUAI PERMINTAAN
+                    'frequency': int(stats['frequency']),
+                    'sparkline': {
+                        'x': [d['tanggal'].strftime('%Y-%m-%d') for d in sparkline_data],
+                        'y': [float(d['impact']) for d in sparkline_data],
+                        'text': hover_text # <-- TAMBAHKAN DATA HOVER
+                    }
+                })
+
+            # B. Data Frekuensi (untuk Bar Chart 1) - (Tetap Sama)
+            freq_data_series = commodities_df.groupby('name').size().sort_values(ascending=False).head(5)
+            frequency_chart_data = {
+                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in freq_data_series.index],
+                'y': [int(freq) for freq in freq_data_series.values],
                 'type': 'bar',
-                'name': 'Frekuensi Kemunculan',
+                'name': 'Frekuensi',
+                'marker': {'color': '#0d6efd', 'opacity': 0.8}
+            }
+
+            # C. Data Dampak (untuk Bar Chart 2) - (Tetap Sama)
+            impact_data_series = commodities_df.groupby('name')['impact'].sum().sort_values(ascending=False)
+            top_inflasi = impact_data_series.head(5)
+            top_deflasi = impact_data_series.tail(5)
+            impact_data_combined = pd.concat([top_inflasi, top_deflasi]).sort_values(ascending=False)
+            
+            impact_chart_data = {
+                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in impact_data_combined.index],
+                'y': [float(impact) for impact in impact_data_combined.values],
+                'type': 'bar',
+                'name': 'Dampak Akumulatif',
                 'marker': {
-                    'color': '#0d6efd', # Warna biru primer
-                    'opacity': 0.8
+                    'color': ['#dc3545' if v > 0 else '#198754' for v in impact_data_combined.values]
                 }
             }
 
-            # Calculate statistics
-            total_commodities = len(commodity_frequency)
-            total_appearances = int(commodity_frequency.sum())
-            avg_frequency = float(commodity_frequency.mean()) if not commodity_frequency.empty else 0
             return {
                 'success': True,
-                'bar_chart_data': bar_chart_data,
-                'total_commodities': total_commodities,
-                'total_appearances': total_appearances,
-                'avg_frequency': avg_frequency
+                'trend_sparkline_data': trend_data_final,
+                'frequency_chart_data': frequency_chart_data,
+                'impact_chart_data': impact_chart_data
             }
             
         except Exception as e:
-            print(f"Error in get_impact_ranking: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'ranking': [],
-                'box_plot_data': [],
-                'total_commodities': 0,
-                'total_appearances': 0,
-                'avg_frequency': 0
-            }
-
+            print(f"Error in get_full_commodity_insights: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'error': str(e)}
+        
     def _generate_enhanced_trend_summary(trends):
         """Generate enhanced trend summary"""
         if not trends:

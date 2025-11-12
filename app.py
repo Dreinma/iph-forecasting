@@ -1475,6 +1475,33 @@ def api_available_periods():
 
 # 5. COMMODITY APIs
 
+@app.route('/api/commodity/full-insights')
+def api_full_commodity_insights():
+    """
+    API BARU: Mengambil semua data insight (Tren, Frekuensi, Dampak)
+    dalam satu panggilan.
+    """
+    try:
+        start_key = request.args.get('start_key')
+        end_key = request.args.get('end_key')
+        
+        # Panggil fungsi service baru
+        insights_data = commodity_service.get_full_commodity_insights(
+            start_key=start_key, 
+            end_key=end_key
+        )
+        
+        return jsonify(clean_for_json(insights_data))
+
+    except Exception as e:
+        logger.error(f"ERROR: Full commodity insights error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+        }), 500
+        
 @app.route('/api/commodity/current-week')
 def api_commodity_current_week():
     """Enhanced current week commodity insights"""
@@ -1514,88 +1541,6 @@ def api_commodity_current_week():
             'error': str(e),
             'message': 'Failed to load current week insights. Please check if commodity data is available.',
             'error_details': str(e)
-        }))
-
-@app.route('/api/commodity/monthly-analysis')
-def api_commodity_monthly():
-    """Enhanced monthly commodity analysis"""
-    try:
-        month = request.args.get('month', '').strip()
-        year = request.args.get('year', '').strip()
-        logger.debug(f"API: Loading monthly analysis for month: '{month}', year: '{year}'")
-        
-        result = commodity_service.get_monthly_analysis(month if month else None, year if year else None)
-        
-        logger.debug(f" Monthly analysis result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
-        logger.debug(f" Success: {result.get('success')}")
-        
-        if result.get('success'):
-            logger.debug(f"    Month: {result.get('month')}")
-            logger.debug(f"    Analysis period keys: {list(result.get('analysis_period', {}).keys())}")
-            logger.debug(f"   IPH stats keys: {list(result.get('iph_statistics', {}).keys())}")
-        else:
-            logger.error(f"   ERROR: Error: {result.get('message')}")
-        
-        return jsonify(clean_for_json(result))
-        
-    except Exception as e:
-        logger.error(f"ERROR: API Error - monthly analysis: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        return jsonify(clean_for_json({
-            'success': False, 
-            'error': str(e),
-            'message': 'Failed to load monthly analysis. Please check if commodity data is available.',
-            'error_type': 'processing_error'
-        }))
-
-@app.route('/api/commodity/trends')
-def api_commodity_trends():
-    """Enhanced commodity trends"""
-    try:
-        commodity = request.args.get('commodity', '').strip()
-        periods = int(request.args.get('periods', 4))
-        start_key = request.args.get('start_key')
-        end_key = request.args.get('end_key')
-        
-        # Allow flexible periods, including 999 for "use full range". Only guard against invalid values
-        if periods <= 0:
-            periods = 4
-        
-        logger.debug(f"API: Loading commodity trends - periods: {periods}, start_key: {start_key}, end_key: {end_key}, commodity: '{commodity}'")
-        
-        result = commodity_service.get_commodity_trends(
-            commodity if commodity else None, 
-            periods,
-            start_key,
-            end_key
-        )
-        
-        logger.debug(f" Trends result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
-        logger.debug(f" Success: {result.get('success')}")
-        
-        if result.get('success'):
-            trends_count = len(result.get('commodity_trends', {}))
-            logger.debug(f"   Found {trends_count} commodity trends")
-            
-            if result.get('commodity_trends'):
-                first_trend = list(result['commodity_trends'].items())[0] if result['commodity_trends'] else None
-                if first_trend:
-                    trend_name, trend_data = first_trend
-                    logger.debug(f"   First trend '{trend_name}' keys: {list(trend_data.keys())}")
-        
-        return jsonify(clean_for_json(result))
-        
-    except Exception as e:
-        logger.error(f"ERROR: API Error - commodity trends: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        return jsonify(clean_for_json({
-            'success': False, 
-            'error': str(e),
-            'message': 'Failed to load commodity trends'
         }))
 
 @app.route('/api/commodity/seasonal')
@@ -1839,32 +1784,6 @@ def api_commodity_data_status():
             'has_data': False,
             'record_count': 0
         })
-
-@app.route('/api/commodity/impact-ranking')
-def api_commodity_impact_ranking():
-    """Get impact ranking of commodities"""
-    try:
-        start_key = request.args.get('start_key')
-        end_key = request.args.get('end_key')
-        
-        ranking_data = commodity_service.get_impact_ranking(start_key=start_key, end_key=end_key)
-
-        return jsonify(clean_for_json({
-            'success': True,
-            'bar_chart_data': ranking_data.get('bar_chart_data', {}),
-            'total_commodities': ranking_data.get('total_commodities', 0),
-            'total_appearances': ranking_data.get('total_appearances', 0),
-            'avg_frequency': ranking_data.get('avg_frequency', 0),
-            'message': 'Impact ranking retrieved successfully'
-        }))
-
-    except Exception as e:
-        logger.error(f"ERROR: Impact ranking error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'bar_chart_data': {}
-        }), 500
 
 # 6. ALERTS APIs
 

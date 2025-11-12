@@ -146,172 +146,111 @@
 
 <!-- Analisis Komoditas Utama & Trend & Prediksi IPH (Side by Side) -->
 <div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-bar text-info me-2"></i>
-                    Analisis Komoditas Utama
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <!-- Beras -->
-                    <div class="col-12">
-                        <div class="d-flex align-items-center p-3 bg-light rounded">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1 fw-bold">Beras</h6>
-                                <small class="text-muted">Komoditas utama</small>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <span class="badge bg-success fs-6">-1.26%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Minyak Goreng -->
-                    <div class="col-12">
-                        <div class="d-flex align-items-center p-3 bg-light rounded">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1 fw-bold">Minyak Goreng</h6>
-                                <small class="text-muted">Fluktuasi tinggi</small>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <span class="badge bg-warning fs-6">-0.25%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Bawang Merah -->
-                    <div class="col-12">
-                        <div class="d-flex align-items-center p-3 bg-light rounded">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1 fw-bold">Bawang Merah</h6>
-                                <small class="text-muted">Volatilitas tinggi</small>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <span class="badge bg-danger fs-6">-0.29%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Cabai Rawit -->
-                    <div class="col-12">
-                        <div class="d-flex align-items-center p-3 bg-light rounded">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1 fw-bold">Cabai Rawit</h6>
-                                <small class="text-muted">Fluktuasi ekstrem</small>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <span class="badge bg-danger fs-6">0.06%</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Telur Ayam -->
-                    <div class="col-12">
-                        <div class="d-flex align-items-center p-3 bg-light rounded">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1 fw-bold">Telur Ayam Ras</h6>
-                                <small class="text-muted">Stabil</small>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <span class="badge bg-info fs-6">0.02%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-list-check text-success me-2"></i>
-                    Rekomendasi Tindakan
-                </h5>
-            </div>
-            <div class="card-body">
-                <div>
-                    <h6 class="text-dark mb-3 fw-bold">
-                        <i class="fas fa-lightbulb text-warning me-2"></i>
-                        Rekomendasi:
-                    </h6>
-                    <div class="list-group list-group-flush">
-                        <div class="list-group-item d-flex align-items-center px-0 py-2">
-                            <i class="fas fa-check text-success me-3"></i>
-                            <span class="small">Monitor volatilitas cabai rawit & bawang merah</span>
-                        </div>
-                        <div class="list-group-item d-flex align-items-center px-0 py-2">
-                            <i class="fas fa-check text-success me-3"></i>
-                            <span class="small">Analisis dampak musim panen beras</span>
-                        </div>
-                        <div class="list-group-item d-flex align-items-center px-0 py-2">
-                            <i class="fas fa-check text-success me-3"></i>
-                            <span class="small">Perhatikan tren harga minyak goreng</span>
+        <div class="col-lg-12"> <div class="card h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list-check text-success me-2"></i>
+                        Rekomendasi Tindakan
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="recommendationsList">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-success" role="status"></div>
+                            <p class="mt-2 text-muted">Memuat rekomendasi...</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Economic alerts system JavaScript
+// =========================================================================
+// SCRIPT BARU UNTUK HALAMAN ALERTS (v2 - Rekomendasi Dinamis)
+// =========================================================================
+
+// Variabel global untuk menyimpan data
 let economicAlerts = [];
 let economicIndicators = {};
+let recommendations = []; // Variabel baru
 
-async function loadEconomicAlerts() {
+/**
+ * Panggilan API yang aman dengan timeout dan error handling.
+ */
+async function safeApiCall(url) {
     try {
-        const response = await fetch('/api/dashboard/economic-alerts');
-        const data = await response.json();
-        
-        if (data.success) {
-            economicAlerts = data.alerts || [];
-            displayEconomicAlerts();
-        } else {
-            // Fallback: show sample economic alerts
-            showSampleEconomicAlerts();
+        console.log(`🌐 Memanggil API: ${url}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); 
+
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${response.statusText} | ${errorText}`);
         }
+        
+        const data = await response.json();
+        console.log(`✅ Sukses API: ${url}`, data);
+        return data;
     } catch (error) {
-        console.error('Error loading economic alerts:', error);
-        showSampleEconomicAlerts();
+        console.error(`❌ Error API: ${url}`, error);
+        if (error.name === 'AbortError') {
+            return { success: false, error: 'Timeout', message: 'Permintaan API memakan waktu terlalu lama.' };
+        }
+        return { success: false, error: error.message, message: `Error Jaringan: ${error.message}` };
     }
 }
 
-async function loadEconomicIndicators() {
-    try {
-        const response = await fetch('/api/dashboard/economic-indicators');
-        const data = await response.json();
+/**
+ * FUNGSI UTAMA: Memuat semua data untuk halaman ini
+ */
+async function loadData() {
+    console.log('Memuat data alerts & rekomendasi...');
+    
+    const data = await safeApiCall('/api/economic-alerts');
+    
+    if (data.success) {
+        economicAlerts = data.alerts || [];
+        recommendations = data.recommendations || []; // Ambil rekomendasi baru
         
-        if (data.success) {
-            economicIndicators = data.indicators;
-            updateEconomicIndicators();
-        } else {
-            // Use default values
-            updateEconomicIndicators();
+        displayEconomicAlerts();
+        displayRecommendations(); // Panggil fungsi render baru
+        
+        // Perbarui card statistik dari data yang sama
+        if (data.statistics) { 
+            updateEconomicIndicators(data.statistics);
         }
-    } catch (error) {
-        console.error('Error loading economic indicators:', error);
-        updateEconomicIndicators();
+        
+    } else {
+        // Tampilkan error
+        const errorMsg = data.error || 'Gagal memuat data';
+        showError('economicAlertsList', errorMsg, 'loadData()');
+        showError('recommendationsList', errorMsg, 'loadData()');
     }
 }
 
+/**
+ * Render Peringatan & Notifikasi
+ */
 function displayEconomicAlerts() {
     const container = document.getElementById('economicAlertsList');
+    if (!container) return;
     
     if (economicAlerts.length === 0) {
         container.innerHTML = `
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-chart-line fa-3x mb-3"></i>
-                <p>Tidak ada peringatan ekonomi terkini</p>
-                <small>Peringatan akan muncul ketika ada perubahan signifikan pada indikator ekonomi</small>
+            <div class="alert alert-success border-0">
+                <i class="fas fa-check-circle me-2"></i>
+                Tidak ada peringatan aktif. Semua indikator dalam batas normal.
             </div>
         `;
         return;
@@ -319,22 +258,8 @@ function displayEconomicAlerts() {
     
     let html = '';
     economicAlerts.forEach(alert => {
-        const priorityClass = {
-            'critical': 'danger',
-            'high': 'warning',
-            'medium': 'info',
-            'low': 'secondary'
-        }[alert.priority] || 'secondary';
-        
-        const icon = {
-            'volatility': 'fa-wave-square',
-            'commodity': 'fa-seedling',
-            'anomaly': 'fa-exclamation-triangle',
-            'trend': 'fa-chart-line',
-            'price': 'fa-tags',
-            'seasonal': 'fa-calendar',
-            'impact': 'fa-chart-bar'
-        }[alert.type] || 'fa-bell';
+        const priorityClass = alert.color || 'secondary';
+        const icon = alert.icon || 'fa-bell';
         
         html += `
             <div class="alert alert-${priorityClass} border-0 mb-3" role="alert">
@@ -347,7 +272,7 @@ function displayEconomicAlerts() {
                         <p class="mb-2 text-dark">${alert.message}</p>
                         <small class="text-muted d-flex align-items-center">
                             <i class="fas fa-calendar me-1"></i>
-                            ${new Date(alert.timestamp).toLocaleDateString('id-ID')}
+                            Terdeteksi pada ${alert.date || new Date(alert.timestamp).toLocaleDateString('id-ID')}
                         </small>
                     </div>
                 </div>
@@ -358,48 +283,76 @@ function displayEconomicAlerts() {
     container.innerHTML = html;
 }
 
-function showSampleEconomicAlerts() {
-    const sampleAlerts = [
-        {
-            title: "Penurunan IPH Signifikan",
-            message: "IPH turun -0.83% minggu ini, dipengaruhi penurunan harga beras (-1.26%) dan bawang merah (-0.29%).",
-            priority: "high",
-            type: "trend",
-            timestamp: new Date().toISOString()
-        },
-        {
-            title: "Volatilitas Tinggi Cabai Rawit",
-            message: "Cabai rawit menunjukkan fluktuasi ekstrem dengan volatilitas 0.06%. Perlu monitoring ketat.",
-            priority: "medium",
-            type: "commodity",
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-        }
-    ];
+/**
+ * FUNGSI BARU: Render Rekomendasi Dinamis
+ */
+function displayRecommendations() {
+    const container = document.getElementById('recommendationsList');
+    if (!container) return;
+
+    if (!recommendations || recommendations.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>Tidak ada rekomendasi spesifik saat ini.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div class="list-group list-group-flush">';
+    recommendations.forEach(rec => {
+        const color = rec.color || 'primary';
+        const icon = rec.icon || 'fa-list-check';
+        
+        html += `
+            <div class="list-group-item d-flex align-items-start px-0 py-3">
+                <i class="fas ${icon} text-${color} fa-lg me-3 mt-1"></i>
+                <div class="flex-grow-1">
+                    <h6 class="mb-1 fw-bold text-dark">${rec.title}</h6>
+                    <span class="small">${rec.text}</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
     
-    economicAlerts = sampleAlerts;
-    displayEconomicAlerts();
+    container.innerHTML = html;
 }
 
-function updateEconomicIndicators() {
-    // Update economic indicators with current or default values
+/**
+ * Update 3 card statistik di atas
+ */
+function updateEconomicIndicators(stats) {
+    // 'stats' sekarang berasal dari get_real_economic_alerts
+    // Pastikan nama field ini cocok dengan yang ada di services/forecast_service.py
     const indicators = {
-        currentIPH: economicIndicators.currentIPH || "-0.83%",
-        iphVolatility: economicIndicators.iphVolatility || "1.24",
-        iphTrend: economicIndicators.iphTrend || "-0.45%"
+        currentIPH: (stats.latest_value !== undefined ? stats.latest_value.toFixed(2) : "-") + "%",
+        iphVolatility: (stats.std !== undefined ? stats.std.toFixed(2) : "-"),
+        iphTrend: (stats.mean !== undefined ? stats.mean.toFixed(2) : "-") + "%" 
     };
     
-    document.getElementById('currentIPH').textContent = indicators.currentIPH;
-    document.getElementById('iphVolatility').textContent = indicators.iphVolatility;
-    document.getElementById('iphTrend').textContent = indicators.iphTrend;
-    // anomalyCount removed from UI
+    // Pastikan elemen ini ada di HTML Anda
+    const currentIPHEl = document.getElementById('currentIPH');
+    const iphVolatilityEl = document.getElementById('iphVolatility');
+    const iphTrendEl = document.getElementById('iphTrend');
+
+    if (currentIPHEl) currentIPHEl.textContent = indicators.currentIPH;
+    if (iphVolatilityEl) iphVolatilityEl.textContent = indicators.iphVolatility;
+    if (iphTrendEl) iphTrendEl.textContent = indicators.iphTrend;
 }
 
+/**
+ * Fungsi Refresh Tombol
+ */
 function refreshAlerts() {
-    loadEconomicAlerts();
-    loadEconomicIndicators();
-    showAlert('Data ekonomi diperbarui!', 'info');
+    loadData(); // Cukup panggil satu fungsi ini
+    showAlert('Data peringatan dan rekomendasi diperbarui!', 'info');
 }
 
+/**
+ * Helper: Tampilkan Alert
+ */
 function showAlert(message, type) {
     const alertHTML = `
         <div class="alert alert-${type} fade show position-fixed" 
@@ -423,16 +376,27 @@ function showAlert(message, type) {
     }, 5000);
 }
 
+/**
+ * Helper: Tampilkan Error
+ */
+function showError(containerId, message) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-danger border-0">
+                <i class="fas fa-times-circle me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    loadEconomicAlerts();
-    loadEconomicIndicators();
+    loadData(); // Panggil fungsi utama
     
-    // Auto-refresh every 60 seconds
-    setInterval(() => {
-        loadEconomicAlerts();
-        loadEconomicIndicators();
-    }, 60000);
+    // Auto-refresh setiap 60 detik
+    setInterval(loadData, 60000);
 });
 </script>
 {% endblock %}
