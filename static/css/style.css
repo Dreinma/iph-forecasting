@@ -666,14 +666,6 @@ body {
         margin-bottom: 1rem;
     }
     
-    /* Make all columns full width on mobile */
-    [class*="col-md-"],
-    [class*="col-lg-"],
-    [class*="col-xl-"] {
-        width: 100% !important;
-        flex: 0 0 100% !important;
-        max-width: 100% !important;
-    }
 }
 
 /* Responsive Forms */
