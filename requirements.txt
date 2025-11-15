@@ -13,7 +13,7 @@ plotly
 openpyxl
 
 # ML Inference (ONNX Runtime only - no training libraries)
-onnxruntime==1.16.3
+onnxruntime==1.18.0
 onnxmltools==1.12.0
 
 # Utilities
