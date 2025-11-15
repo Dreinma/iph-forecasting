@@ -105,3 +105,7 @@ requirements_train.txt
 
 # Hapus file .pkl
 *.pkl
+
+test_db_connection.py
+DEPLOYMENT_GUIDE.md
+*.sql
