@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "name": "iph-forecasting-app",
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/app.py"
+    }
+  ],
+  "env": {
+    "FLASK_ENV": "production"
+  },
+  "functions": {
+    "app.py": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "regions": ["sin1"],
+  "github": {
+    "silent": true
+  }
+}

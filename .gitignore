@@ -95,3 +95,13 @@ static/uploads/*
 !static/uploads/.gitkeep
 !static/uploads/template_iph_komoditas.csv
 
+*.egg
+MANIFEST
+
+# File Training Lokal (BARU)
+train_local.py
+requirements_train.txt
+.env
+
+# Hapus file .pkl
+*.pkl

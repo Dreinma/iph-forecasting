@@ -1,30 +1,24 @@
 import os
+import tempfile
 from datetime import timedelta
-import logging
 
 class Config:
+    """Base configuration - shared across all environments"""
+    
     # Flask Configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'iph-forecasting-secret-key-2024'
-    DEBUG = True
     
     # Session Configuration
-    PERMANENT_SESSION_LIFETIME = timedelta(minutes=5)  # Session timeout 5 menit jika tidak ada aktivitas
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
     
-    # Kredensial database Laragon Anda
-    DB_USER = "root"
-    DB_PASS = ""  # Passwordnya kosong
-    DB_HOST = "127.0.0.1" # Ini adalah localhost
-    DB_PORT = "3306"
-    DB_NAME = "prisma_db" # <-- GANTI INI dengan nama DB yang Anda impor
-
-
-    #  Database Configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-                            f'mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+    # ✅ Database Configuration - PostgreSQL Supabase
+    # Same untuk development & production!
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ECHO = False  # Set True for SQL query debugging
+    SQLALCHEMY_ECHO = False
     
-    #  Database Connection Pool
+    # Database Connection Pool
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
         'pool_recycle': 3600,
@@ -32,22 +26,13 @@ class Config:
         'max_overflow': 20
     }
     
-    # File Upload Configuration - Use absolute paths for production
-    UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static', 'uploads'))
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+    # File Upload Configuration
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
     
-    # Data Storage Configuration - Use absolute paths for production
-    DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
-    HISTORICAL_DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'historical_data.csv'))  # Legacy backup
-    COMMODITY_DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'IPH-Kota-Batu.csv'))     # Legacy backup
-    MODELS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'models'))
-    BACKUPS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'backups'))
-    
-    #  Database Backup Configuration
-    DB_BACKUP_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'db_backups'))
-    DB_BACKUP_RETENTION_DAYS = 30
-    AUTO_BACKUP_ENABLED = True
+    # Base paths
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    MODELS_PATH = os.path.abspath(os.path.join(BASE_DIR, 'data', 'models'))
     
     # Model Configuration
     FORECAST_MIN_WEEKS = 4
@@ -55,11 +40,9 @@ class Config:
     DEFAULT_FORECAST_WEEKS = 8
     
     # Performance Configuration
-    MODEL_PERFORMANCE_THRESHOLD = 0.1  # 10% improvement threshold
-    AUTO_RETRAIN_THRESHOLD = 50  # Retrain when new data > 50 records
-    
-    #  Performance History Configuration
-    MAX_PERFORMANCE_HISTORY_PER_MODEL = 50  # Keep last 50 training records
+    MODEL_PERFORMANCE_THRESHOLD = 0.1
+    AUTO_RETRAIN_THRESHOLD = 50
+    MAX_PERFORMANCE_HISTORY_PER_MODEL = 50
     PERFORMANCE_CLEANUP_ENABLED = True
     
     # Dashboard Configuration
@@ -68,75 +51,99 @@ class Config:
     MAX_HISTORICAL_DISPLAY = 60
     
     # Logging Configuration
-    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()  # DEBUG, INFO, WARNING, ERROR
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
     LOG_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
     LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-    VERBOSE_LOGGING = os.environ.get('VERBOSE_LOGGING', 'false').lower() == 'true'  # Show last 60 periods in chart
+    VERBOSE_LOGGING = os.environ.get('VERBOSE_LOGGING', 'false').lower() == 'true'
     
-    #  Cache Configuration
+    # Cache Configuration
     CACHE_TYPE = 'simple'
-    CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes
-    
-    #  Migration Configuration
-    MIGRATION_BACKUP_ENABLED = True
-    KEEP_CSV_AFTER_MIGRATION = True  # Keep CSV files as backup
+    CACHE_DEFAULT_TIMEOUT = 300
     
     @staticmethod
     def init_app(app):
         """Initialize application with config"""
         # Create necessary directories
-        directories = [
-            Config.UPLOAD_FOLDER,
-            Config.DATA_FOLDER,
-            Config.MODELS_PATH,
-            Config.BACKUPS_PATH,
-            Config.DB_BACKUP_FOLDER
-        ]
+        directories_to_create = []
         
-        for directory in directories:
-            os.makedirs(directory, exist_ok=True)
+        if app.config.get('UPLOAD_FOLDER'):
+            directories_to_create.append(app.config['UPLOAD_FOLDER'])
         
-        print(" Application directories initialized")
+        if app.config.get('FLASK_ENV') != 'production':
+            if app.config.get('DATA_FOLDER'):
+                directories_to_create.append(app.config['DATA_FOLDER'])
+            if app.config.get('BACKUPS_PATH'):
+                directories_to_create.append(app.config['BACKUPS_PATH'])
         
-        #  Initialize database
+        for directory in directories_to_create:
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except OSError:
+                pass
+        
+        # Initialize database
         from database import init_db
         init_db(app)
-        
-        print(" Database initialized")
+
 
 class DevelopmentConfig(Config):
+    """Development configuration"""
     DEBUG = True
-    SQLALCHEMY_ECHO = True  # Show SQL queries in development
+    FLASK_ENV = 'development'
+    SQLALCHEMY_ECHO = True  # Show SQL queries
+    
+    # Session - allow HTTP in development
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+    SESSION_COOKIE_SECURE = False
+    
+    # ✅ File paths - Local development (writable)
+    UPLOAD_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'static', 'uploads'))
+    DATA_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'data'))
+    BACKUPS_PATH = os.path.abspath(os.path.join(Config.BASE_DIR, 'data', 'backups'))
+
 
 class ProductionConfig(Config):
+    """Production configuration - Vercel"""
     DEBUG = False
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    if not SECRET_KEY:
-        import secrets
-        SECRET_KEY = secrets.token_urlsafe(32)
+    FLASK_ENV = 'production'
     SQLALCHEMY_ECHO = False
     
-    # Production database - Use environment variable or fallback to SQLite
-    if os.environ.get('DATABASE_URL'):
-        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
-    else:
-        # Fallback to SQLite with absolute path
-        SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "prisma.db"))}'
+    # Session - HTTPS required
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=1)
+    SESSION_COOKIE_SECURE = True
     
-    # Security settings for production
-    # Set SESSION_COOKIE_SECURE = False via env var if not using HTTPS
-    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=1)  # 1 hour session timeout
+    # ✅ File paths - Vercel serverless
+    UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'iph_uploads')
+    DATA_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'data'))
+    BACKUPS_PATH = None  # Disabled in production
     
-    # Logging for production - default to WARNING to reduce noise
+    # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING').upper()
+    
+    @staticmethod
+    def init_app(app):
+        Config.init_app(app)
+        
+        # Production logging
+        import logging
+        from logging import StreamHandler
+        
+        stream_handler = StreamHandler()
+        stream_handler.setLevel(getattr(logging, app.config['LOG_LEVEL']))
+        app.logger.addHandler(stream_handler)
+        app.logger.setLevel(getattr(logging, app.config['LOG_LEVEL']))
+        
+        # Create /tmp upload folder
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 class TestingConfig(Config):
+    """Testing configuration"""
     TESTING = True
+    FLASK_ENV = 'testing'
     SQLALCHEMY_DATABASE_URI = 'sqlite:///data/test_prisma.db'
-    WTF_CSRF_ENABLED = False
+    UPLOAD_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'static', 'uploads'))
+    DATA_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'data'))
+
 
 config = {
     'development': DevelopmentConfig,

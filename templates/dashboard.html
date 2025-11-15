@@ -376,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadModelMetrics() {
     try {
-        const response = await fetch('/api/dashboard/model-performance');
+        const response = await fetch('/api/dashboard/model-comparison-chart');
         const data = await response.json();
         
         if (data.success && data.models) {
@@ -384,9 +384,12 @@ async function loadModelMetrics() {
                 name: model.name,
                 mae: model.mae,
                 rmse: model.rmse,
-                r2_score: model.r2,
+                r2_score: model.r2_score,
                 mape: model.mape,
                 status: model.status,
+                status_color: model.status_color, // Ambil dari API
+                status_icon: model.status_icon, // Ambil dari API
+                overall_score: model.overall_score, // Ambil dari API
                 training_count: model.training_count || 1
             }));
             renderModelDifferences(metrics);

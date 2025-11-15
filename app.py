@@ -1,4 +1,7 @@
-﻿from flask import Flask, render_template, request, jsonify, redirect, flash, session
+﻿from dotenv import load_dotenv
+load_dotenv()
+
+from flask import Flask, render_template, request, jsonify, redirect, flash, session
 import pandas as pd
 import json
 import os
@@ -192,138 +195,6 @@ from database import db
 db.init_app(app)
 
 # AUTO DATABASE INITIALIZATION & MIGRATION
-def init_database_and_migrate():
-    """Initialize database tables dan auto-migrate CSV data"""
-    try:
-        with app.app_context():
-            # 1. Create all tables
-            db.create_all()
-            logger.info("Database initialized")
-            
-            # 2. Check if data already migrated
-            iph_count = db.session.query(db.func.count(IPHData.id)).scalar()
-            
-            if iph_count == 0:
-                logger.info("Database empty, initializing defaults...")
-                create_default_admin()
-                create_default_alert_rules()
-            else:
-                logger.info(f"Database ready ({iph_count} records)")
-                # Always ensure admin user exists and has correct password hash
-                create_default_admin()
-                create_default_alert_rules()
-                
-    except Exception as e:
-        logger.error(f"Database initialization failed: {str(e)}")
-
-def migrate_csv_if_exists():
-    """Migrate CSV ke database jika file ada"""
-    import os
-    import pandas as pd
-    from datetime import datetime, timedelta
-    import re
-    
-    csv_path = 'data/IPH-Kota-Batu.csv'
-    
-    if not os.path.exists(csv_path):
-        logger.debug(f"CSV file not found: {csv_path}")
-        return False
-    
-    try:
-        df = pd.read_csv(csv_path)
-        logger.debug(f"Loading CSV: {len(df)} records")
-        
-        # Clean data
-        if 'Bulan' in df.columns:
-            df['Bulan'] = df['Bulan'].ffill()
-        
-        if 'Minggu ke-' not in df.columns:
-            logger.error("Required column 'Minggu ke-' not found")
-            return False
-        
-        df = df.dropna(subset=['Minggu ke-', ' Indikator Perubahan Harga (%)'])
-        df = df[df['Bulan'].astype(str).str.strip() != '']
-        
-        logger.debug(f"Cleaned: {len(df)} records")
-        
-        migrated_iph = 0
-        migrated_commodity = 0
-        
-        for index, row in df.iterrows():
-            try:
-                # Parse data
-                bulan = str(row['Bulan']).strip()
-                minggu = str(row['Minggu ke-']).strip()
-                iph_value = float(row[' Indikator Perubahan Harga (%)'])
-                kab_kota = str(row.get('Kab/Kota', 'BATU')).strip()
-                
-                # Extract year
-                tahun = None
-                if "'" in bulan:
-                    try:
-                        tahun_part = int(bulan.split("'")[1])
-                        tahun = 2000 + tahun_part if tahun_part < 100 else tahun_part
-                        bulan_clean = bulan.split("'")[0].strip()
-                    except:
-                        tahun = datetime.now().year
-                        bulan_clean = bulan
-                else:
-                    tahun = datetime.now().year
-                    bulan_clean = bulan
-                
-                # Calculate date
-                tanggal = _calculate_date_from_period(bulan_clean, minggu, tahun)
-                if not tanggal:
-                    continue
-                
-                bulan_numerik = _get_month_number(bulan_clean)
-                
-                # Create IPH record
-                iph_record = IPHData(
-                    tanggal=tanggal,
-                    indikator_harga=iph_value,
-                    bulan=bulan_clean,
-                    minggu=minggu,
-                    tahun=tahun,
-                    bulan_numerik=bulan_numerik,
-                    kab_kota=kab_kota,
-                    data_source='csv_migration'
-                )
-                db.session.add(iph_record)
-                db.session.flush()
-                migrated_iph += 1
-                
-                # Create Commodity record
-                commodity_record = CommodityData(
-                    tanggal=tanggal,
-                    bulan=bulan_clean,
-                    minggu=minggu,
-                    tahun=tahun,
-                    kab_kota=kab_kota,
-                    iph_id=iph_record.id,
-                    iph_value=iph_value,
-                    komoditas_andil=str(row.get('Komoditas Andil Perubahan Harga', '')),
-                    komoditas_fluktuasi=str(row.get('Komoditas Fluktuasi Harga Tertinggi', '')),
-                    nilai_fluktuasi=float(row.get('Fluktuasi Harga', 0)) if pd.notna(row.get('Fluktuasi Harga', 0)) else 0.0
-                )
-                db.session.add(commodity_record)
-                migrated_commodity += 1
-                
-                if (index + 1) % 50 == 0:
-                    logger.debug(f"Processing: {index + 1}/{len(df)} records")
-                    
-            except Exception as e:
-                logger.debug(f"Row {index} skipped: {str(e)}")
-                continue
-        
-        db.session.commit()
-        logger.info(f"CSV migrated: {migrated_iph} IPH, {migrated_commodity} commodity records")
-        return True
-        
-    except Exception as e:
-        logger.error(f"CSV migration failed: {str(e)}", exc_info=True)
-        db.session.rollback()
-        return False
 
 def _calculate_date_from_period(bulan_str, minggu_str, tahun=None):
     """Calculate date from bulan and minggu"""
@@ -381,109 +252,7 @@ def _get_month_number(bulan_str):
     }
     return month_map.get(bulan_str, 1)
 
-def create_default_admin():
-    """Create default admin user"""
-    from auth.utils import hash_password
-    
-    try:
-        # Use fresh query dengan session refresh
-        db.session.expire_all()
-        existing_admin = AdminUser.query.filter_by(username='admin').first()
-        
-        if existing_admin:
-            logger.debug(f"Admin user exists (ID: {existing_admin.id})")
-            hash_format = 'werkzeug' if existing_admin.password_hash and existing_admin.password_hash.startswith('pbkdf2:') else 'bcrypt' if existing_admin.password_hash and existing_admin.password_hash.startswith('$2b$') else 'unknown'
-            logger.debug(f"Password hash format: {hash_format}")
-            
-            # FORCE UPDATE - selalu update ke bcrypt untuk memastikan
-            if existing_admin.password_hash and not existing_admin.password_hash.startswith('$2b$'):
-                logger.debug("Updating admin password hash to bcrypt")
-                existing_admin.password_hash = hash_password('admin123')
-                existing_admin.is_active = True
-                db.session.commit()
-                db.session.refresh(existing_admin)
-                logger.debug("Admin password hash updated")
-            elif not existing_admin.password_hash:
-                logger.debug("Password hash is null, setting new hash...")
-                existing_admin.password_hash = hash_password('admin123')
-                existing_admin.is_active = True
-                db.session.commit()
-                logger.debug("Admin password hash set")
-            else:
-                # Already bcrypt, verify it works
-                from auth.utils import check_password
-                if not check_password(existing_admin.password_hash, 'admin123'):
-                    logger.debug("Password check failed, resetting hash")
-                    existing_admin.password_hash = hash_password('admin123')
-                    db.session.commit()
-                    logger.debug("Admin password hash reset")
-            
-            return True
-        
-        admin = AdminUser(
-            username='admin',
-            password_hash=hash_password('admin123'),
-            email='admin@prisma.local',
-            is_active=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-        logger.debug("Default admin created")
-        return True
-    except Exception as e:
-        logger.warning(f"Admin creation: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def create_default_alert_rules():
-    """Create default alert rules"""
-    try:
-        existing_rules = AlertRule.query.count()
-        if existing_rules > 0:
-            logger.debug("Alert rules already exist")
-            return True
-        
-        default_rules = [
-            {
-                'rule_name': 'IPH Tinggi - 2 Sigma',
-                'rule_type': 'threshold',
-                'threshold_value': 2.0,
-                'comparison_operator': '>',
-                'severity_level': 'warning',
-                'description': 'Alert when IPH > 2 sigma'
-            },
-            {
-                'rule_name': 'IPH Kritis - 3 Sigma',
-                'rule_type': 'threshold',
-                'threshold_value': 3.0,
-                'comparison_operator': '>',
-                'severity_level': 'critical',
-                'description': 'Critical alert when IPH > 3 sigma'
-            }
-        ]
-        
-        for rule_data in default_rules:
-            rule = AlertRule(
-                rule_name=rule_data['rule_name'],
-                rule_type=rule_data['rule_type'],
-                threshold_value=rule_data['threshold_value'],
-                comparison_operator=rule_data['comparison_operator'],
-                severity_level=rule_data['severity_level'],
-                description=rule_data['description'],
-                created_by='system'
-            )
-            db.session.add(rule)
-        
-        db.session.commit()
-        logger.info(f"Created {len(default_rules)} default alert rules")
-        return True
-    except Exception as e:
-        logger.warning(f"Alert rules: {str(e)}")
-        return False
-
 # SUCCESS: CALL INITIALIZATION
-init_database_and_migrate()
 
 # Initialize services
 forecast_service = ForecastService()
@@ -502,49 +271,50 @@ from admin.routes import admin_bp
 app.register_blueprint(admin_bp)
 
 # Session timeout handler - Check session activity before each request
-@app.before_request
-def check_session_timeout():
-    """Check session timeout - logout if idle for more than 5 minutes"""
-    from flask_login import current_user, logout_user
+# @app.before_request
+# def check_session_timeout():
+#     """Check session timeout - logout if idle for more than 5 minutes"""
+#     from flask_login import current_user, logout_user
     
-    # Skip for static files and login routes
-    if request.endpoint in ['static', 'admin.login', 'admin.logout']:
-        return
+#     # Skip for static files and login routes
+#     if request.endpoint in ['static', 'admin.login', 'admin.logout']:
+#         return
     
-    # Only check for authenticated admin users
-    if current_user.is_authenticated:
-        # Set session as permanent
-        session.permanent = True
+#     # Only check for authenticated admin users
+#     if current_user.is_authenticated:
+#         # Set session as permanent
+#         session.permanent = True
         
-        # Get current time
-        now = datetime.utcnow()
+#         # Get current time
+#         now = datetime.utcnow()
         
-        # Check if this is the first request after login (no last_activity set)
-        if 'last_activity' not in session:
-            session['last_activity'] = now.isoformat()
-            return
+#         # Check if this is the first request after login (no last_activity set)
+#         if 'last_activity' not in session:
+#             session['last_activity'] = now.isoformat()
+#             return
         
-        # Parse last activity time
-        try:
-            last_activity = datetime.fromisoformat(session['last_activity'])
-            time_diff = (now - last_activity).total_seconds()
+#         # Parse last activity time
+#         try:
+#             last_activity = datetime.fromisoformat(session['last_activity'])
+#             time_diff = (now - last_activity).total_seconds()
             
-            # If more than 5 minutes (300 seconds) of inactivity, logout
-            if time_diff > 300:  # 5 minutes
-                logout_user()
-                session.clear()
-                flash('Session Anda telah timeout karena tidak ada aktivitas selama 5 menit. Silakan login kembali.', 'warning')
-                # Redirect to login if trying to access admin routes
-                if request.path.startswith('/admin'):
-                    from flask import url_for
-                    return redirect(url_for('admin.login'))
-                return
+#             # If more than 5 minutes (300 seconds) of inactivity, logout
+#             if time_diff > 300:  # 5 minutes
+#                 logout_user()
+#                 session.clear()
+#                 flash('Session Anda telah timeout karena tidak ada aktivitas selama 5 menit. Silakan login kembali.', 'warning')
+#                 # Redirect to login if trying to access admin routes
+#                 if request.path.startswith('/admin'):
+#                     from flask import url_for
+#                     return redirect(url_for('admin.login'))
+#                 return
             
-            # Update last activity time for this request
-            session['last_activity'] = now.isoformat()
-        except (ValueError, TypeError):
-            # If parsing fails, set new last_activity
-            session['last_activity'] = now.isoformat()
+#             # Update last activity time for this request
+#             session['last_activity'] = now.isoformat()
+#         except (ValueError, TypeError):
+#             # If parsing fails, set new last_activity
+#             session['last_activity'] = now.isoformat()
+
 
 # Diagnostics endpoint to inspect recent events/errors
 @app.route('/api/_debug/recent')
@@ -638,7 +408,11 @@ def historical_data():
 @app.route('/api/upload-data', methods=['POST'])
 @admin_required
 def upload_data():
-    """Upload new data and trigger forecasting pipeline - ENHANCED ERROR HANDLING"""
+    """
+    MODIFIED: HANYA mengupload data ke database. TIDAK MELAKUKAN TRAINING.
+    Membaca file dari stream memori, tidak menyimpan ke disk (Vercel compatible).
+    """
+    logger = app.logger
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file uploaded'})
@@ -646,106 +420,50 @@ def upload_data():
         file = request.files['file']
         if file.filename == '':
             return jsonify({'success': False, 'message': 'No file selected'})
+
+        # BACA LANGSUNG DARI STREAM (Vercel tidak bisa menyimpan file)
+        try:
+            if file.filename.lower().endswith('.csv'):
+                # Coba beberapa encoding umum
+                df = None
+                for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                    try:
+                        file.stream.seek(0) # Kembali ke awal stream
+                        df = pd.read_csv(file.stream, encoding=encoding)
+                        logger.debug(f"CSV loaded from stream with {encoding}")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if df is None:
+                    return jsonify({'success': False, 'message': 'Gagal membaca file CSV. Coba encoding UTF-8.'})
+            
+            elif file.filename.lower().endswith(('.xlsx', '.xls')):
+                file.stream.seek(0)
+                df = pd.read_excel(file.stream)
+                logger.debug("Excel file loaded from stream")
+            else:
+                return jsonify({'success': False, 'message': 'Format file tidak valid (hanya .csv, .xlsx).'})
         
-        if file and file.filename.lower().endswith(('.csv', '.xlsx')):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            try:
-                if filename.lower().endswith('.csv'):
-                    for encoding in ['utf-8', 'latin-1', 'cp1252']:
-                        try:
-                            df = pd.read_csv(filepath, encoding=encoding)
-                            logger.debug(f"CSV loaded with {encoding} encoding")
-                            break
-                        except UnicodeDecodeError:
-                            continue
-                    else:
-                        return jsonify({'success': False, 'message': 'Unable to read CSV file. Please check file encoding.'})
-                else:
-                    df = pd.read_excel(filepath)
-                    
-                logger.debug(f"Loaded {len(df)} rows, {len(df.columns)} columns")
-                
-            except Exception as e:
-                return jsonify({'success': False, 'message': f'Error reading file: {str(e)}'})
-            
-            if df.empty:
-                return jsonify({'success': False, 'message': 'Uploaded file is empty'})
-            
-            if len(df) < 3:
-                return jsonify({
-                    'success': False, 
-                    'message': f'Insufficient data: {len(df)} rows found. Minimum 3 rows required for processing.'
-                })
-            
-            forecast_weeks = int(request.form.get('forecast_weeks', 8))
-            if not (4 <= forecast_weeks <= 12):
-                forecast_weeks = 8
-            
-            try:
-                result = forecast_service.process_new_data_and_forecast(df, forecast_weeks)
-                
-                # SUCCESS: Check if result indicates recovery mode
-                if result.get('success') and result.get('data_processing', {}).get('merge_info', {}).get('recovery_mode'):
-                    result['warning'] = 'Some duplicate data was detected and skipped. Existing data was used for training.'
-                
-                # Clean sklearn model objects from response
-                if result.get('success') and 'model_training' in result:
-                    training_results = result['model_training'].get('training_results', {})
-                    for model_name in training_results:
-                        if 'model' in training_results[model_name]:
-                            del training_results[model_name]['model']
-                            
-            except ValueError as ve:
-                return jsonify({
-                    'success': False, 
-                    'message': f'Data validation error: {str(ve)}',
-                    'error_type': 'validation_error',
-                    'hint': 'Please check your data format. Required columns: Tanggal, Indikator_Harga (or similar)'
-                })
-            except Exception as pe:
-                error_str = str(pe)
-                
-                if "UNIQUE constraint failed" in error_str:
-                    return jsonify({
-                        'success': False, 
-                        'message': 'Duplicate data detected. Some dates already exist in the database.',
-                        'error_type': 'duplicate_error',
-                        'hint': 'The system has been updated to handle duplicates automatically. Please try uploading again.'
-                    })
-                else:
-                    return jsonify({
-                        'success': False, 
-                        'message': f'Processing error: {error_str}',
-                        'error_type': 'processing_error'
-                    })
-            
-            # Clean up uploaded file
-            try:
-                os.remove(filepath)
-            except:
-                pass
-            
-            # Clean result for JSON
-            cleaned_result = clean_for_json(result)
-            return jsonify(cleaned_result)
+        except Exception as e:
+            logger.error(f"Error reading file stream: {str(e)}")
+            return jsonify({'success': False, 'message': f'Error reading file: {str(e)}'})
+
+        if df.empty or len(df) < 1:
+            return jsonify({'success': False, 'message': 'File kosong atau tidak ada data.'})
         
-        return jsonify({'success': False, 'message': 'Invalid file format. Please upload CSV or Excel file.'})
+        # Panggil data_handler yang sudah dimodifikasi
+        logger.info(f"Memanggil data_handler.merge_and_save_data untuk {len(df)} baris...")
+        combined_df, merge_info = forecast_service.data_handler.merge_and_save_data(df)
         
-    except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        error_response = clean_for_json({
-            'success': False, 
-            'message': f'Unexpected error: {str(e)}',
-            'error_type': type(e).__name__,
-            'hint': 'Please check your file format and try again. Contact support if the problem persists.'
+        return jsonify({
+            'success': True,
+            'message': f"Data berhasil di-upload ke database. {merge_info['new_records']} rekaman baru, {merge_info['updated_records']} diperbarui. Jalankan training lokal untuk memperbarui model.",
+            'merge_info': merge_info
         })
-        return jsonify(error_response)
+
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Unexpected error: {str(e)}'})
 
 @app.route('/api/add-single-record', methods=['POST'])
 @admin_required
@@ -893,55 +611,6 @@ def add_manual_record():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Error adding record: {str(e)}'})
 
-@app.route('/api/retrain-models', methods=['POST'])
-@admin_required
-def retrain_models():
-    try:
-        # logger.debug(" Retraining models with existing data...")
-        
-        # Load historical data
-        df = forecast_service.data_handler.load_historical_data()
-        
-        if df is None or df.empty:
-            return jsonify({
-                'success': False,
-                'message': 'No historical data available for training'
-            }), 400
-        
-        # Train and compare models
-        result = forecast_service.model_manager.train_and_compare_models(df)
-        
-        # Generate forecast with best model
-        best_model_name = result['summary']['best_model']
-
-        
-        # Clear latest forecast cache
-        forecast_service.latest_forecast = None
-        # logger.debug("    Cleared latest forecast from memory (will use retrained best model)")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Models retrained successfully',
-            'best_model': best_model_name,
-            'summary': {
-                'models_trained': result['summary']['total_models_trained'],
-                'is_improvement': result['summary']['is_improvement'],
-                'best_mae': result['comparison']['new_best_model']['mae']
-            }
-        })
-        
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        # logger.error(f"Error retraining models: {str(e)}")
-        # logger.debug(error_trace)
-        
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': f'Error retraining models: {str(e)}'
-        }), 500
-
 @app.route('/api/historical-data')
 def api_historical_data():
     """API untuk mengambil data historis dengan pagination"""
@@ -1036,157 +705,104 @@ def api_data_summary():
 
 @app.route('/api/forecast-chart-data')
 def forecast_chart_data():
-    """Simple and reliable forecast chart data API"""
+    """API endpoint untuk mendapatkan data forecast untuk chart
+    
+    Production-ready approach:
+    1. Load dari database (ForecastHistory) - PERSISTENT & FAST
+    2. Fallback: Load dari in-memory cache (jika database kosong)
+    3. Last resort: Generate new forecast
+    """
     try:
-        logger.debug("API /api/forecast-chart-data called")
+        # ✅ STEP 1: Load dari database DULU (production approach)
+        from database import ForecastHistory
         
-        try:
-            historical_df = forecast_service.data_handler.load_historical_data()
-            logger.debug(f"Loaded {len(historical_df)} historical records")
-        except Exception as e:
-            logger.error(f"Error loading historical data: {str(e)}")
+        latest_forecast_record = ForecastHistory.query.order_by(
+            ForecastHistory.created_at.desc()
+        ).first()
+        
+        if latest_forecast_record:
+            try:
+                # Parse JSON data dari database
+                forecast_data_json = json.loads(latest_forecast_record.forecast_data)
+                confidence_intervals_json = json.loads(latest_forecast_record.confidence_intervals) if latest_forecast_record.confidence_intervals else None
+                
+                # Reconstruct predictions dalam format yang expected frontend
+                predictions = []
+                dates = forecast_data_json.get('dates', [])
+                prediction_values = forecast_data_json.get('predictions', [])
+                
+                for i, pred_value in enumerate(prediction_values):
+                    prediction_item = {
+                        'week': i + 1,
+                        'date': dates[i] if i < len(dates) else None,
+                        'value': float(pred_value)
+                    }
+                    
+                    # Add confidence intervals if available
+                    if confidence_intervals_json and i < len(confidence_intervals_json.get('lower', [])):
+                        prediction_item['lower_bound'] = float(confidence_intervals_json['lower'][i])
+                        prediction_item['upper_bound'] = float(confidence_intervals_json['upper'][i])
+                    
+                    predictions.append(prediction_item)
+                
+                # Build response dengan format yang sama seperti get_current_forecast()
+                forecast_result = {
+                    'success': True,
+                    'timestamp': latest_forecast_record.created_at.isoformat(),
+                    'forecast': {
+                        'data': predictions,
+                        'model_name': latest_forecast_record.model_name,
+                        'model_performance': {
+                            'mae': float(latest_forecast_record.mae) if latest_forecast_record.mae else 0.0,
+                            'rmse': float(latest_forecast_record.rmse) if latest_forecast_record.rmse else 0.0,
+                            'r2_score': float(latest_forecast_record.r2_score) if latest_forecast_record.r2_score else 0.0,
+                            'training_time': 0.0  # Not stored in ForecastHistory
+                        },
+                        'summary': {
+                            'avg_prediction': float(latest_forecast_record.avg_prediction) if latest_forecast_record.avg_prediction else 0.0,
+                            'trend': latest_forecast_record.trend or 'stable',
+                            'volatility': 0.0,  # Not stored in ForecastHistory, bisa calculate jika perlu
+                            'min_prediction': float(min([p['value'] for p in predictions])) if predictions else 0.0,
+                            'max_prediction': float(max([p['value'] for p in predictions])) if predictions else 0.0
+                        },
+                        'weeks_forecasted': latest_forecast_record.forecast_weeks or len(predictions)
+                    }
+                }
+                
+                logger.info(f"✅ Forecast loaded from database (ID: {latest_forecast_record.id}, created: {latest_forecast_record.created_at})")
+                return jsonify(forecast_result)
+                
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(f"⚠️ Error parsing forecast from database: {str(e)}, trying in-memory cache...")
+                # Continue to fallback
+        
+        # ✅ STEP 2: Fallback ke in-memory cache (jika ada)
+        if hasattr(forecast_service, '_latest_forecast') and forecast_service._latest_forecast:
+            logger.info("📦 Loading forecast from in-memory cache")
             return jsonify({
-                'success': False,
-                'error': f'Historical data error: {str(e)}'
+                'success': True,
+                'timestamp': datetime.now().isoformat(),
+                'forecast': forecast_service._latest_forecast
             })
         
-        if historical_df.empty:
-            return jsonify({
-                'success': False,
-                'error': 'No historical data available'
-            })
+        # ✅ STEP 3: Last resort - Generate new forecast
+        logger.info("🔄 No forecast found in database or cache, generating new forecast...")
+        forecast_result = forecast_service.get_current_forecast()
         
-        historical_df['Tanggal'] = pd.to_datetime(historical_df['Tanggal'])
-        historical_df = historical_df.sort_values('Tanggal')
-        
-        historical_data = []
-        for _, row in historical_df.iterrows():
-            try:
-                historical_data.append({
-                    'date': row['Tanggal'].strftime('%Y-%m-%d'),
-                    'value': float(row['Indikator_Harga'])
-                })
-            except Exception as e:
-                logger.warning(f"Error processing historical row: {e}")
-                continue
-        
-        logger.debug(f"Processed {len(historical_data)} historical points")
-        
-        forecast_data = []
-        metadata = {
-            'model_name': 'No Model',
-            'weeks_forecasted': 0,
-            'has_forecast': False
-        }
-        
-        forecast_file_path = 'data/latest_forecast.json'
-        if os.path.exists(forecast_file_path):
-            try:
-                logger.debug(f" Loading forecast from file: {forecast_file_path}")
-                with open(forecast_file_path, 'r') as f:
-                    forecast_file_data = json.load(f)
-                
-                metadata.update({
-                    'model_name': forecast_file_data.get('model_name', 'Unknown'),
-                    'weeks_forecasted': len(forecast_file_data.get('forecasts', [])),
-                    'has_forecast': True
-                })
-                
-                for item in forecast_file_data.get('forecasts', []):
-                    try:
-                        forecast_data.append({
-                            'date': item['date'],
-                            'prediction': float(item['prediction']),
-                            'lower_bound': float(item['lower_bound']),
-                            'upper_bound': float(item['upper_bound']),
-                            'confidence': float(item.get('confidence', 0.5))
-                        })
-                    except Exception as e:
-                        logger.warning(f"Error processing forecast row: {e}")
-                        continue
-                
-                logger.debug(f"Loaded {len(forecast_data)} forecast points from file")
-                
-            except Exception as e:
-                logger.warning(f"Error reading forecast file: {e}")
-                # Fallback ke API
-                forecast_result = forecast_service.get_current_forecast()
-                if forecast_result.get('success') and forecast_result.get('forecast', {}).get('data'):
-                    forecast_info = forecast_result['forecast']
-                    
-                    metadata.update({
-                        'model_name': forecast_info.get('model_name', 'Unknown Model'),
-                        'weeks_forecasted': forecast_info.get('weeks_forecasted', len(forecast_info.get('data', []))),
-                        'has_forecast': True
-                    })
-                    
-                    for item in forecast_info['data']:
-                        try:
-                            forecast_data.append({
-                                'date': item['Tanggal'][:10] if isinstance(item['Tanggal'], str) else item['Tanggal'].strftime('%Y-%m-%d'),
-                                'prediction': float(item['Prediksi']),
-                                'lower_bound': float(item.get('Batas_Bawah', item['Prediksi'])),
-                                'upper_bound': float(item.get('Batas_Atas', item['Prediksi'])),
-                                'confidence': float(item.get('Confidence_Width', 0.5))
-                            })
-                        except Exception as e:
-                            logger.warning(f"Error processing forecast row: {e}")
-                            continue
-                    
-                    logger.debug(f"Loaded {len(forecast_data)} forecast points from API")
+        if forecast_result.get('success'):
+            logger.info("✅ New forecast generated successfully")
         else:
-            logger.debug("Forecast file not found, trying API...")
-            forecast_result = forecast_service.get_current_forecast()          
-            if forecast_result.get('success') and forecast_result.get('forecast', {}).get('data'):
-                forecast_info = forecast_result['forecast']
-                
-                metadata.update({
-                    'model_name': forecast_info.get('model_name', 'Unknown Model'),
-                    'weeks_forecasted': forecast_info.get('weeks_forecasted', len(forecast_info.get('data', []))),
-                    'has_forecast': True
-                })
-                
-                for item in forecast_info['data']:
-                    try:
-                        forecast_data.append({
-                            'date': item['Tanggal'][:10] if isinstance(item['Tanggal'], str) else item['Tanggal'].strftime('%Y-%m-%d'),
-                            'prediction': float(item['Prediksi']),
-                            'lower_bound': float(item.get('Batas_Bawah', item['Prediksi'])),
-                            'upper_bound': float(item.get('Batas_Atas', item['Prediksi'])),
-                            'confidence': float(item.get('Confidence_Width', 0.5))
-                        })
-                    except Exception as e:
-                        logger.warning(f"Error processing forecast row: {e}")
-                        continue
-                
-                logger.debug(f"Processed {len(forecast_data)} forecast points")
-            else:
-                logger.info("No forecast data available")
-                
-        result = {
-            'success': True,
-            'historical': historical_data,
-            'forecast': forecast_data,
-            'metadata': metadata,
-            'timestamp': datetime.now().isoformat()
-        }
+            logger.error(f"❌ Failed to generate forecast: {forecast_result.get('error')}")
         
-        logger.debug(f"API returning: historical={len(historical_data)}, forecast={len(forecast_data)}")
-        return jsonify(result)
+        return jsonify(forecast_result)
         
     except Exception as e:
-        error_msg = f"API Error: {str(e)}"
-        logger.error(f"ERROR: {error_msg}")
-        import traceback
-        logger.error(f"ERROR: Traceback: {traceback.format_exc()}")
-        
+        logger.error(f"❌ Error in forecast_chart_data: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': error_msg,
-            'historical': [],
-            'forecast': [],
-            'metadata': {'model_name': 'Error', 'weeks_forecasted': 0}
-        })
+            'error': 'Terjadi kesalahan saat memuat data forecast',
+            'details': str(e) if app.config.get('DEBUG') else 'Internal server error'
+        }), 500
 
 @app.route('/api/model-comparison-chart')
 def model_comparison_chart():
@@ -1858,10 +1474,13 @@ def api_recent_alerts():
 # 7. EXPORT APIs
 
 @app.route('/api/export-data', methods=['GET'])
+@admin_required
 def export_data():
     """Export current data to CSV"""
     try:
         data_type = request.args.get('type', 'historical')
+        df = pd.DataFrame()
+        filename = f"export_{datetime.now().strftime('%Y%m%d')}.csv"
         
         if data_type == 'historical':
             df = forecast_service.data_handler.load_historical_data()
@@ -2057,10 +1676,6 @@ def inject_datetime():
         'datetime': datetime,
         'now': datetime.now()
     }
-
-# Legacy URL rule
-
-app.add_url_rule('/upload', 'data_control', data_control)
 
 
 

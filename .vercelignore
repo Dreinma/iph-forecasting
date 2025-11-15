@@ -1,0 +1,69 @@
+# Training scripts (local only - not needed in production)
+train_local.py
+requirements_train.txt
+services/data_handler_rest.py
+services/model_performance_rest.py
+
+# Development & testing files
+tests/
+*.ipynb
+.ipynb_checkpoints/
+pytest.ini
+.pytest_cache/
+
+# Documentation
+README.md
+DEPLOYMENT_GUIDE.md
+docs/
+*.md
+
+# Backups & local data files
+data/backups/
+data/db_backups/
+data/latest_forecast.json
+*.log
+*.tmp
+*.bak
+
+# Large data files (should be in database)
+data/raw/
+data/historical_data.db
+data/*.csv
+data/*.xlsx
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# IDE & editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment files (secrets should be in Vercel dashboard)
+.env
+.env.local
+.env.production
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
