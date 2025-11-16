@@ -46,9 +46,8 @@ class DataHandler:
                 logger.warning("No records found in database")
                 return pd.DataFrame()
             
-            data = [record.to_dict() for record in query]
-            df = pd.DataFrame(data)
-
+            df = pd.read_sql(query.statement, db.session.bind)
+            
             if df.empty:
                 logger.warning("DataFrame is empty after conversion")
                 return pd.DataFrame()
@@ -76,8 +75,7 @@ class DataHandler:
         except Exception as e:
             logger.error(f"[ERROR] Error loading historical data: {str(e)}", exc_info=True)
             return pd.DataFrame()
-        
-        
+              
     def validate_new_data(self, df):
         
         original_size = len(df)
@@ -165,8 +163,6 @@ class DataHandler:
                    f"Date: {df['Tanggal'].min().strftime('%Y-%m-%d')} to {df['Tanggal'].max().strftime('%Y-%m-%d')}")
         
         return df
-
-
 
     def merge_and_save_data(self, new_data_df):
         """ 
