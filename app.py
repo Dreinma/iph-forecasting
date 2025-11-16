@@ -329,8 +329,14 @@ def api_debug_recent():
     })
 
 # Create upload folder
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
+if 'UPLOAD_FOLDER' in app.config:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+else:
+    # Fallback for production
+    upload_folder = os.path.join(os.path.dirname(__file__), 'uploads')
+    os.makedirs(upload_folder, exist_ok=True)
+    app.config['UPLOAD_FOLDER'] = upload_folder
+    
 # 1. MAIN ROUTES
 
 @app.route('/')

@@ -50,6 +50,10 @@ class Config:
     COMPARISON_CHART_HEIGHT = 400
     MAX_HISTORICAL_DISPLAY = 60
     
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
+    ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
+    
     # Logging Configuration
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
     LOG_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
@@ -100,7 +104,6 @@ class DevelopmentConfig(Config):
     UPLOAD_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'static', 'uploads'))
     DATA_FOLDER = os.path.abspath(os.path.join(Config.BASE_DIR, 'data'))
     BACKUPS_PATH = os.path.abspath(os.path.join(Config.BASE_DIR, 'data', 'backups'))
-
 
 class ProductionConfig(Config):
     """Production configuration - Vercel"""

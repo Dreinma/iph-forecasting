@@ -66,11 +66,11 @@ class ModelManager:
                     logger.info(f"  [OK] Loaded {model_name} (ONNX)")
                     
                     # Coba load metadata (scaler, features) dari .pkl.meta
-                    meta_path = onnx_path.replace('.onnx', '.pkl.meta')
-                    if os.path.exists(meta_path):
-                        with open(meta_path, 'rb') as f:
-                            self.model_metadata[model_name] = pickle.load(f)
-                        logger.debug(f"  [OK] Loaded metadata for {model_name}")
+                    # meta_path = onnx_path.replace('.onnx', '.pkl.meta')
+                    # if os.path.exists(meta_path):
+                    #     with open(meta_path, 'rb') as f:
+                    #         self.model_metadata[model_name] = pickle.load(f)
+                    #     logger.debug(f"  [OK] Loaded metadata for {model_name}")
                     
                 except Exception as e:
                     logger.error(f"  [ERROR] Load {onnx_file}: {e}", exc_info=True)
