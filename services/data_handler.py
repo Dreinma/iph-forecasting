@@ -40,13 +40,12 @@ class DataHandler:
         logger.debug("Loading historical data from database")
         try:
             # Query all records from database ordered by date
-            query = IPHData.query.order_by(IPHData.tanggal) 
-
+            query = IPHData.query.order_by(IPHData.tanggal).all()
             if not query:
                 logger.warning("No records found in database")
                 return pd.DataFrame()
-            
-            df = pd.read_sql(query.statement, db.session.bind)
+            data = [record.to_dict() for record in query]
+            df = pd.DataFrame(data)
 
             if df.empty:
                 logger.warning("DataFrame is empty after conversion")
