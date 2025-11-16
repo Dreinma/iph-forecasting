@@ -20,7 +20,8 @@ class ModelManager:
     Training dinonaktifkan, tetapi performance history (dari DB) tetap bisa dibaca.
     """
 
-    def __init__(self, models_path='data/models/'):
+    def __init__(self, data_path='data/historical_data.csv', models_path='data/models/'):
+            self.engine = ForecastingEngine(data_path, models_path)
             self.models_path = models_path
             self.loaded_models = {}  # {model_name: onnx_session}
             self.model_metadata = {}  # {model_name: {scaler, features}}
@@ -29,7 +30,7 @@ class ModelManager:
             logger.info("ModelManager initialized (Inference-Only Mode)")
             
             # Load ONNX models saat init
-            self._load_onnx_models()
+            # self._load_onnx_models()
 
     def _load_onnx_models(self):
         """

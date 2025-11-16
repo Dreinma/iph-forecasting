@@ -57,8 +57,6 @@ class IPHData(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-
-
 class CommodityData(db.Model):
     """Model untuk data komoditas - Terintegrasi dengan IPH"""
     __tablename__ = 'commodity_data'
@@ -113,8 +111,6 @@ class CommodityData(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
-
-
 class ModelPerformance(db.Model):
     """Model untuk tracking model performance history"""
     __tablename__ = 'model_performance'
@@ -155,38 +151,34 @@ class ModelPerformance(db.Model):
         return f'<ModelPerformance {self.model_name}: MAE {self.mae:.4f}>'
     
     def to_dict(self):
-        """Convert to dictionary - FIXED JSON PARSING"""
-        # Parse feature_importance dengan aman
+        """Convert to dictionary"""
+
         feature_imp = None
-        if self.feature_importance:
-            if isinstance(self.feature_importance, str):
-                try:
-                    feature_imp = json.loads(self.feature_importance)
-                except (json.JSONDecodeError, TypeError):
-                    feature_imp = None
-            else:
-                # Sudah list/dict (PostgreSQL JSONB)
-                feature_imp = self.feature_importance
+        if isinstance(self.feature_importance, str):
+            try:
+                feature_imp = json.loads(self.feature_importance)
+            except (json.JSONDecodeError, TypeError):
+                feature_imp = None 
+        elif isinstance(self.feature_importance, list):
+            feature_imp = self.feature_importance 
         
         return {
             'id': self.id,
             'model_name': self.model_name,
             'batch_id': self.batch_id,
-            'mae': float(self.mae) if self.mae else None,
-            'rmse': float(self.rmse) if self.rmse else None,
-            'r2_score': float(self.r2_score) if self.r2_score else None,
-            'cv_score': float(self.cv_score) if self.cv_score else None,
-            'mape': float(self.mape) if self.mape else None,
-            'training_time': float(self.training_time) if self.training_time else None,
+            'mae': float(self.mae) if self.mae is not None else None,
+            'rmse': float(self.rmse) if self.rmse is not None else None,
+            'r2_score': float(self.r2_score) if self.r2_score is not None else None,
+            'cv_score': float(self.cv_score) if self.cv_score is not None else None,
+            'mape': float(self.mape) if self.mape is not None else None,
+            'training_time': float(self.training_time) if self.training_time is not None else None,
             'data_size': self.data_size,
             'test_size': self.test_size,
             'is_best': self.is_best,
-            'feature_importance': feature_imp,  # ✅ Sudah diparsing
+            'feature_importance': feature_imp, 
             'trained_at': self.trained_at.isoformat() if self.trained_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-
-
 class AdminUser(db.Model):
     """Model untuk admin users"""
     __tablename__ = 'admin_users'
@@ -213,7 +205,6 @@ class AdminUser(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
-
 
 class AlertHistory(db.Model):
     """Model untuk alert history - Enhanced untuk admin system"""
@@ -270,7 +261,6 @@ class AlertHistory(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-
 class AlertRule(db.Model):
     """Model untuk aturan peringatan yang bisa dikelola admin"""
     __tablename__ = 'alert_rules'
@@ -318,7 +308,6 @@ class AlertRule(db.Model):
             'description': self.description
         }
 
-
 class ActivityLog(db.Model):
     """Model untuk activity log / audit trail"""
     __tablename__ = 'activity_logs'
@@ -360,7 +349,6 @@ class ActivityLog(db.Model):
             'metadata': json.loads(self.activity_metadata) if self.activity_metadata else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-
 
 class ForecastHistory(db.Model):
     """Model untuk menyimpan riwayat forecast yang telah dibuat"""
@@ -420,7 +408,6 @@ class ForecastHistory(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-
 def init_db(app):
     """Initialize database dengan Flask app"""
     db.init_app(app)
@@ -440,7 +427,6 @@ def init_db(app):
         print(f"   - {AlertRule.__tablename__}")
         print(f"   - {ActivityLog.__tablename__}")
         print(f"   - {ForecastHistory.__tablename__}")
-
 
 def get_db_stats():
     """Get database statistics"""
