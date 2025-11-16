@@ -289,20 +289,33 @@ class AlertRule(db.Model):
         return f'<AlertRule {self.rule_name}: {self.rule_type}>'
     
     def to_dict(self):
+        """Convert to dictionary"""
+
+        feature_imp = None
+        if isinstance(self.feature_importance, str):
+            try:
+                feature_imp = json.loads(self.feature_importance)
+            except (json.JSONDecodeError, TypeError):
+                feature_imp = None # Set None jika gagal parsing
+        elif isinstance(self.feature_importance, list):
+            feature_imp = self.feature_importance # Jika sudah list, gunakan langsung
+        
         return {
-            'id': self.id,
-            'rule_name': self.rule_name,
-            'rule_type': self.rule_type,
-            'is_active': self.is_active,
-            'threshold_value': float(self.threshold_value) if self.threshold_value else None,
-            'comparison_operator': self.comparison_operator,
-            'severity_level': self.severity_level,
-            'check_period_days': self.check_period_days,
-            'min_data_points': self.min_data_points,
-            'created_by': self.created_by,
-            'description': self.description,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        'id': self.id,
+        'model_name': self.model_name,
+        'batch_id': self.batch_id,
+        'mae': float(self.mae) if self.mae else None,
+        'rmse': float(self.rmse) if self.rmse else None,
+        'r2_score': float(self.r2_score) if self.r2_score else None,
+        'cv_score': float(self.cv_score) if self.cv_score else None,
+        'mape': float(self.mape) if self.mape else None,
+        'training_time': float(self.training_time) if self.training_time else None,
+        'data_size': self.data_size,
+        'test_size': self.test_size,
+        'is_best': self.is_best,
+        'feature_importance': feature_imp, # Gunakan yang sudah diparsing
+        'trained_at': self.trained_at.isoformat() if self.trained_at else None,
+        'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 

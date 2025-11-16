@@ -376,10 +376,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadModelMetrics() {
     try {
-        const response = await fetch('/api/dashboard/model-comparison-chart');
+        const response = await fetch('/api/model-comparison-chart');
         const data = await response.json();
         
-        if (data.success && data.models) {
+        if (data.success && data.metrics) {
             const metrics = data.models.map(model => ({
                 name: model.name,
                 mae: model.mae,

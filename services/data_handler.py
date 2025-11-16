@@ -319,7 +319,7 @@ class DataHandler:
                 }
             
             # Get IPH values for statistics (use lowercase column name)
-            iph_values = df['indikator_harga']
+            iph_values = df['Indikator_Harga']
             
             # Calculate quartiles for outlier detection
             Q1 = iph_values.quantile(0.25)
