@@ -38,6 +38,7 @@ class ForecastingEngine:
         else:
             self.models_path = models_path
         
+        self.model_sessions = {}
         os.makedirs(self.models_path, exist_ok=True)
         
         # Initialize other attributes

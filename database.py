@@ -179,6 +179,7 @@ class ModelPerformance(db.Model):
             'trained_at': self.trained_at.isoformat() if self.trained_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
 class AdminUser(db.Model):
     """Model untuk admin users"""
     __tablename__ = 'admin_users'
