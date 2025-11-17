@@ -1855,6 +1855,25 @@ def inject_datetime():
         'now': datetime.now()
     }
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check dengan info berguna"""
+    from datetime import datetime
+    import pytz
+    
+    jakarta_tz = pytz.timezone('Asia/Jakarta')
+    current_time = datetime.now(jakarta_tz)
+    
+    # Working hours: 08:00 - 20:00 WIB
+    is_working_hours = 8 <= current_time.hour < 20
+    
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': current_time.isoformat(),
+        'is_working_hours': is_working_hours,
+        'hour_wib': current_time.hour,
+        'service': 'IPH Forecasting'
+    }), 200
 
 
 # APPLICATION STARTUP
