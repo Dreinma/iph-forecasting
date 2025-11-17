@@ -63,6 +63,11 @@ class ForecastService:
             from database import db, ForecastHistory
             from flask_login import current_user
             
+            try:
+                db.session.rollback()
+            except:
+                pass
+
             # Prepare forecast data as JSON
             forecast_data_list = []
             confidence_intervals_list = []
@@ -84,9 +89,9 @@ class ForecastService:
             predictions = [f['prediction'] for f in forecast_data_list]
             if len(predictions) >= 2:
                 if predictions[-1] > predictions[0]:
-                    trend = 'up'
+                    trend = 'increasing'
                 elif predictions[-1] < predictions[0]:
-                    trend = 'down'
+                    trend = 'decreasing'
                 else:
                     trend = 'stable'
             else:
@@ -120,7 +125,6 @@ class ForecastService:
             logger.debug("Database not available, skipping database save")
         except Exception as e:
             logger.error(f"Error saving forecast to database: {e}")
-            # Don't fail the whole process if DB save fails
 
     def get_current_forecast(self, model_name=None, forecast_weeks=8):
         """Get forecast using current best model or specified model"""
