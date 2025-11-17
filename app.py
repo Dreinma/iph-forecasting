@@ -1855,26 +1855,81 @@ def inject_datetime():
         'now': datetime.now()
     }
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check dengan info berguna"""
+@app.route('/health/detailed', methods=['GET'])
+def health_check_detailed():
+    """Detailed health check with component status"""
     from datetime import datetime
-    import pytz
+    import psutil  # pip install psutil
     
-    jakarta_tz = pytz.timezone('Asia/Jakarta')
-    current_time = datetime.now(jakarta_tz)
+    try:
+        from database import db, ForecastHistory
+        
+        # Check database
+        db.session.execute('SELECT 1')
+        latest_forecast = ForecastHistory.query.order_by(
+            ForecastHistory.created_at.desc()
+        ).first()
+        
+        db_status = {
+            'status': 'healthy',
+            'latest_forecast': latest_forecast.created_at.isoformat() if latest_forecast else None
+        }
+    except Exception as e:
+        db_status = {
+            'status': 'unhealthy',
+            'error': str(e)
+        }
     
-    # Working hours: 08:00 - 20:00 WIB
-    is_working_hours = 8 <= current_time.hour < 20
+    # System metrics
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
     
     return jsonify({
         'status': 'healthy',
-        'timestamp': current_time.isoformat(),
-        'is_working_hours': is_working_hours,
-        'hour_wib': current_time.hour,
-        'service': 'IPH Forecasting'
+        'service': 'IPH Forecasting',
+        'timestamp': datetime.utcnow().isoformat(),
+        'components': {
+            'database': db_status,
+            'api': {'status': 'healthy'},
+            'forecast_engine': {'status': 'healthy'}
+        },
+        'system': {
+            'memory_used_percent': memory.percent,
+            'disk_used_percent': disk.percent
+        }
     }), 200
 
+@app.route('/ping', methods=['GET'])
+def health_check():
+    """Lightweight health check endpoint untuk cron job monitoring"""
+    from datetime import datetime
+    import pytz
+    
+    try:
+        # Quick database check (optional)
+        from database import db
+        db.session.execute('SELECT 1')
+        db_status = 'healthy'
+    except Exception as e:
+        logger.warning(f"Database check failed: {e}")
+        db_status = 'degraded'
+    
+    # Jakarta timezone
+    jakarta_tz = pytz.timezone('Asia/Jakarta')
+    current_time = datetime.now(jakarta_tz)
+    
+    # Check if working hours (08:00 - 20:00 WIB)
+    is_working_hours = 8 <= current_time.hour < 20
+    
+    # ✅ Return MINIMAL JSON response
+    return jsonify({
+        'status': 'ok',
+        'service': 'IPH Forecasting',
+        'timestamp': current_time.isoformat(),
+        'database': db_status,
+        'working_hours': is_working_hours,
+        'uptime': 'healthy'
+    }), 200
 
 # APPLICATION STARTUP
 if __name__ == '__main__':
