@@ -685,81 +685,104 @@ def forecast_chart_data():
                     confidence_intervals = json.loads(confidence_intervals)
                 
                 predictions = []
-                
-                # forecast_data structure: [{'date': '...', 'prediction': X, 'lower_bound': Y, ...}, ...]
+                                
                 for i, item in enumerate(forecast_data):
                     prediction_item = {
-                        'week': i + 1,
                         'date': item.get('date'),
-                        'value': float(item.get('prediction', 0))
+                        'prediction': float(item.get('prediction', 0)),
+                        'lower_bound': float(item.get('lower_bound', 0)),
+                        'upper_bound': float(item.get('upper_bound', 0))
                     }
-                    
-                    # Add confidence intervals from forecast_data itself
-                    if 'lower_bound' in item and 'upper_bound' in item:
-                        prediction_item['lower_bound'] = float(item['lower_bound'])
-                        prediction_item['upper_bound'] = float(item['upper_bound'])
-                    # Or from separate confidence_intervals array
-                    elif confidence_intervals and i < len(confidence_intervals):
-                        ci = confidence_intervals[i]
-                        prediction_item['lower_bound'] = float(ci.get('lower', 0))
-                        prediction_item['upper_bound'] = float(ci.get('upper', 0))
-                    
                     predictions.append(prediction_item)
                 
-                forecast_result = {
+                historical_data = []
+                try:
+                    from services.data_handler import DataHandler
+                    data_handler = DataHandler()
+                    df = data_handler.load_data()
+                    
+                    if not df.empty:
+                        for _, row in df.iterrows():
+                            historical_data.append({
+                                'date': row['Tanggal'].strftime('%Y-%m-%d') if hasattr(row['Tanggal'], 'strftime') else str(row['Tanggal']),
+                                'value': float(row['IPH'])
+                            })
+                except Exception as e:
+                    logger.warning(f"Could not load historical data: {e}")
+
+                response_data = {
                     'success': True,
-                    'timestamp': latest_forecast.created_at.isoformat(),
-                    'forecast': {
-                        'data': predictions,
+                    'historical': historical_data,
+                    'forecast': predictions,
+                    'metadata': {
                         'model_name': latest_forecast.model_name,
-                        'model_performance': {
-                            'mae': float(latest_forecast.validation_mae) if latest_forecast.validation_mae else 0.0,
-                            'rmse': float(latest_forecast.validation_rmse) if latest_forecast.validation_rmse else 0.0,
-                            'r2_score': 0.0,  # ❌ Tidak ada di schema
-                            'training_time': 0.0
-                        },
-                        'summary': {
-                            'avg_prediction': float(latest_forecast.avg_prediction) if latest_forecast.avg_prediction else 0.0,
-                            'trend': latest_forecast.trend or 'stable',
-                            'volatility': 0.0,
-                            'min_prediction': float(latest_forecast.min_value) if latest_forecast.min_value else 0.0,
-                            'max_prediction': float(latest_forecast.max_value) if latest_forecast.max_value else 0.0
-                        },
-                        'weeks_forecasted': latest_forecast.forecast_weeks or len(predictions)
+                        'weeks_forecasted': latest_forecast.forecast_weeks or len(predictions),
+                        'has_forecast': True,
+                        'avg_prediction': float(latest_forecast.avg_prediction) if latest_forecast.avg_prediction else None,
+                        'trend': latest_forecast.trend or 'stable',
+                        'created_at': latest_forecast.created_at.isoformat() if latest_forecast.created_at else None
                     }
                 }
                 
                 logger.info(f"✅ Forecast loaded from DB: {latest_forecast.model_name} (ID: {latest_forecast.id})")
-                return jsonify(forecast_result)
+                return jsonify(response_data)
+
                 
             except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as e:
                 logger.warning(f"⚠️ Error parsing forecast from database: {str(e)}, trying fallback...")
                 # Continue to fallback
         
-        if hasattr(forecast_service, '_latest_forecast') and forecast_service._latest_forecast:
-            logger.info("📦 Loading forecast from in-memory cache")
+        try:
+            from services.data_handler import DataHandler
+            data_handler = DataHandler()
+            df = data_handler.load_data()
+            
+            historical_data = []
+            if not df.empty:
+                for _, row in df.iterrows():
+                    historical_data.append({
+                        'date': row['Tanggal'].strftime('%Y-%m-%d') if hasattr(row['Tanggal'], 'strftime') else str(row['Tanggal']),
+                        'value': float(row['IPH'])
+                    })
+            
             return jsonify({
                 'success': True,
-                'timestamp': datetime.now().isoformat(),
-                'forecast': forecast_service._latest_forecast
+                'historical': historical_data,
+                'forecast': [],
+                'metadata': {
+                    'model_name': 'No Model',
+                    'weeks_forecasted': 0,
+                    'has_forecast': False
+                }
             })
         
-        logger.info("🔄 No forecast in DB/cache, generating new...")
-        forecast_result = forecast_service.get_current_forecast()
-        
-        if forecast_result.get('success'):
-            logger.info("✅ New forecast generated")
-        else:
-            logger.error(f"❌ Forecast generation failed: {forecast_result.get('error')}")
-        
-        return jsonify(forecast_result)
+        except Exception as e:
+            logger.error(f"Error loading historical data: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to load data',
+                'historical': [],
+                'forecast': [],
+                'metadata': {
+                    'model_name': 'No Model',
+                    'weeks_forecasted': 0,
+                    'has_forecast': False
+                }
+            })
         
     except Exception as e:
         logger.error(f"❌ Error in forecast_chart_data: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'Terjadi kesalahan saat memuat data forecast',
-            'details': str(e) if app.config.get('DEBUG') else 'Internal server error'
+            'details': str(e) if app.config.get('DEBUG') else 'Internal server error',
+            'historical': [],
+            'forecast': [],
+            'metadata': {
+                'model_name': 'Error',
+                'weeks_forecasted': 0,
+                'has_forecast': False
+            }
         }), 500
 
 @app.route('/api/model-comparison-chart')
