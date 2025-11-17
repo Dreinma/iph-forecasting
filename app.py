@@ -699,13 +699,13 @@ def forecast_chart_data():
                 try:
                     from services.data_handler import DataHandler
                     data_handler = DataHandler()
-                    df = data_handler.load_data()
+                    df = data_handler.load_historical_data()
                     
                     if not df.empty:
                         for _, row in df.iterrows():
                             historical_data.append({
                                 'date': row['Tanggal'].strftime('%Y-%m-%d') if hasattr(row['Tanggal'], 'strftime') else str(row['Tanggal']),
-                                'value': float(row['IPH'])
+                                'value': float(row['Indikator_Harga'])
                             })
                 except Exception as e:
                     logger.warning(f"Could not load historical data: {e}")
@@ -793,12 +793,12 @@ def model_comparison_chart():
         
         if not model_summary:
             return jsonify({
-                'success': False, 
+                'success': True, 
                 'message': 'No model data available',
-                'metrics': []
+                'models': []
             })
         
-        metrics = []
+        models_list = []
         for model_name, summary in model_summary.items():
             latest_performance = summary.get('performances', [])
             latest_perf = latest_performance[-1] if latest_performance else {}
@@ -817,8 +817,8 @@ def model_comparison_chart():
 
             badge = get_model_status_badge(overall_score, mae_val)
 
-            metrics.append({
-                'name': model_name.replace('_', ' '),
+            models_list.append({
+                'name': model_name,
                 'mae': mae_val,
                 'rmse': rmse_val,
                 'r2_score': r2_val,
@@ -831,12 +831,12 @@ def model_comparison_chart():
                 'trend_direction': summary.get('trend_direction', 'stable')
             })
         
-        metrics.sort(key=lambda x: x['overall_score'], reverse=True)
+        models_list.sort(key=lambda x: x['overall_score'], reverse=True)
         
         return jsonify({
             'success': True,
-            'metrics': metrics,
-            'total_models': len(metrics)
+            'models': models_list,
+            'count': len(models_list)
         })
         
     except Exception as e:
@@ -846,7 +846,7 @@ def model_comparison_chart():
         return jsonify({
             'success': False, 
             'error': str(e),
-            'metrics': []
+            'models': []
         })
 
 @app.route('/api/economic-alerts')

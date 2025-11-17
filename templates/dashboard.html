@@ -354,66 +354,45 @@ function refreshForecastChart() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Load forecast chart first
-    loadForecastChart();
-
-    // Load model differences (compact summary)
-    loadModelMetrics();
-    
-    // Load economic alerts
-    loadEconomicAlerts();
-    
-    // Load forecast table
-    loadForecastTable();
-
-    // Initialize tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-});
-
 async function loadModelMetrics() {
+    console.log('📊 Loading model metrics...');
+    
     try {
         const response = await fetch('/api/model-comparison-chart');
         const data = await response.json();
         
-        if (data.success && data.metrics) {
-            const metrics = data.models.map(model => ({
-                name: model.name,
-                mae: model.mae,
-                rmse: model.rmse,
-                r2_score: model.r2_score,
-                mape: model.mape,
-                status: model.status,
-                status_color: model.status_color, // Ambil dari API
-                status_icon: model.status_icon, // Ambil dari API
-                overall_score: model.overall_score, // Ambil dari API
-                training_count: model.training_count || 1
-            }));
-            renderModelDifferences(metrics);
-        } else {
-            const container = document.getElementById('modelMetricsContainer') || document.getElementById('modelPerformanceGrid');
-            if (container) {
-                container.innerHTML = `
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${data.message || 'Tidak ada data metrik model tersedia'}
-                    </div>
-                `;
-            }
+        console.log('📊 Model metrics received:', data);
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to load model metrics');
         }
+        
+        // ✅ CHECK: Handle empty models array
+        if (!data.models || data.models.length === 0) {
+            console.warn('⚠️ No model metrics available');
+            displayNoModelMetrics();
+            return;
+        }
+        
+        // ✅ Call renderModelDifferences (the function that exists)
+        renderModelDifferences(data.models);
+        
     } catch (error) {
-        const container = document.getElementById('modelDifferencesContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-times-circle me-2"></i>
-                    Error memuat metrik: ${error.message}
-                </div>
-            `;
-        }
+        console.error('❌ Error loading model metrics:', error);
+        displayNoModelMetrics('Error: ' + error.message);
+    }
+}
+
+function displayNoModelMetrics(message = 'Belum ada metrik model tersedia') {
+    const container = document.getElementById('modelDifferencesContainer');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-light border-0 text-center py-5">
+                <i class="fas fa-chart-bar fa-3x text-muted mb-3 d-block"></i>
+                <h6 class="text-muted">Tidak Ada Data Model</h6>
+                <p class="text-muted mb-0 small">${message}</p>
+            </div>
+        `;
     }
 }
 
@@ -769,7 +748,7 @@ function renderEconomicAlerts(alerts, metadata) {
 }
 
 
-function renderModelMetrics(metrics) {
+function renderModelMetrics(models) {
     if (!metrics || metrics.length === 0) {
         const container = document.getElementById('modelDifferencesContainer');
         if (container) {
@@ -899,11 +878,11 @@ function renderModelMetrics(metrics) {
     }
 }
 
-function renderModelDifferences(metrics) {
+function renderModelDifferences(models) {
     const container = document.getElementById('modelDifferencesContainer');
     if (!container) return;
 
-    if (!metrics || metrics.length === 0) {
+    if (!models || models.length === 0) {
         container.innerHTML = `
             <div class="alert alert-warning border-0">
                 <i class="fas fa-exclamation-triangle me-2"></i>
@@ -941,11 +920,11 @@ function renderModelDifferences(metrics) {
     };
 
     // Sort by MAE (best first)
-    const sortedMetrics = [...metrics].sort((a, b) => (a.mae || Infinity) - (b.mae || Infinity));
-
+    const sortedModels = [...models].sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
+    
     let html = '<div class="row g-3">';
     
-    sortedMetrics.forEach((m, index) => {
+    sortedModels.forEach((m, index) => {
         const key = m.name;
         const info = descriptions[key] || { 
             title: m.name.replace('_',' '), 
@@ -959,6 +938,11 @@ function renderModelDifferences(metrics) {
         const maeBadge = m.mae ? `<span class="badge bg-primary me-1" style="font-size: 0.65rem;">MAE: ${m.mae.toFixed(3)}</span>` : '';
         const r2Badge = m.r2_score ? `<span class="badge bg-success me-1" style="font-size: 0.65rem;">R²: ${m.r2_score.toFixed(2)}</span>` : '';
         
+        const statusBadge = `<span class="badge bg-${m.status_color} ms-2" style="font-size: 0.65rem;">
+            <i class="${m.status_icon} me-1"></i>${m.status}
+        </span>`;
+        const scoreBadge = `<span class="badge bg-info me-1" style="font-size: 0.65rem;">Score: ${m.overall_score}%</span>`;
+
         html += `
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 border-${isBest ? 'primary border-2' : 'light'} shadow-sm ${isBest ? 'bg-light' : ''}">
@@ -967,7 +951,7 @@ function renderModelDifferences(metrics) {
                         <div class="d-flex align-items-center mb-2">
                             <i class="${info.icon} text-primary me-2"></i>
                             <h6 class="card-title mb-0 fw-bold">${info.title}</h6>
-                            ${trainedBadge}
+                            ${statusBadge}
                         </div>
                         <p class="card-text small text-muted mb-2" style="font-size: 0.75rem; line-height: 1.4;">
                             ${info.summary}
@@ -977,8 +961,12 @@ function renderModelDifferences(metrics) {
                                 <i class="fas fa-check-circle text-success me-1"></i>${info.highlight}
                             </small>
                         </div>
-                        <div class="mt-2 pt-2 border-top">
-                            ${maeBadge}${r2Badge}
+                        <div class="mt-3 pt-2 border-top">
+                            <div class="mb-2">
+                                ${scoreBadge}
+                                ${maeBadge}
+                                ${r2Badge}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -986,7 +974,20 @@ function renderModelDifferences(metrics) {
         `;
     });
 
-    html += '</div>';
+    html += `
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="alert alert-info border-0 mb-0">
+                    <small>
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Model Terbaik:</strong> ${sortedModels[0]?.name.replace('_', ' ') || 'N/A'} 
+                        dengan skor ${sortedModels[0]?.overall_score || 0}%
+                        ${sortedModels.length > 1 ? ` | Total ${sortedModels.length} model aktif` : ''}
+                    </small>
+                </div>
+            </div>
+        </div>
+    `;
     container.innerHTML = html;
 }
 
@@ -1339,9 +1340,11 @@ window.refreshDashboard = refreshDashboard;
 
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Dashboard initializing...');
+    
+    // ===== 1. SETUP COMPATIBILITY LAYER FIRST =====
     console.log('🔧 Setting up ID compatibility layer...');
     
-    // Keep forecastChart ID as is - no mapping needed
     const forecastChart = document.getElementById('forecastChart');
     if (forecastChart) {
         console.log('   ✅ forecastChart found');
@@ -1349,14 +1352,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('   ⚠️ forecastChart not found');
     }
     
-    // Map modelPerformanceGrid → modelMetricsContainer
-    const modelMetrics = document.getElementById('modelMetricsContainer');
-    if (modelMetrics && !document.getElementById('modelPerformanceGrid')) {
-        modelMetrics.id = 'modelPerformanceGrid';
-        console.log('   ✅ Mapped modelMetricsContainer → modelPerformanceGrid');
-    }
-    
-    // Ensure forecastTable exists
     const forecastTable = document.getElementById('forecastTable');
     if (forecastTable) {
         console.log('   ✅ forecastTable found');
@@ -1364,7 +1359,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('   ⚠️ forecastTable not found');
     }
     
-    // Map statisticalAlerts
     const statsAlerts = document.getElementById('statisticalAlertsContainer');
     if (statsAlerts && !document.getElementById('statisticalAlerts')) {
         statsAlerts.id = 'statisticalAlerts';
@@ -1372,6 +1366,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     console.log('✅ Compatibility layer setup complete');
+    
+    // ===== 2. LOAD DATA COMPONENTS =====
+    console.log('📊 Loading dashboard components...');
+    
+    // Load forecast chart first
+    loadForecastChart();
+    
+    // Load model metrics (will call renderModelDifferences)
+    loadModelMetrics();
+    
+    // Load economic alerts
+    loadEconomicAlerts();
+    
+    // Load forecast table
+    loadForecastTable();
+    
+    // ===== 3. INITIALIZE BOOTSTRAP COMPONENTS =====
+    console.log('🎨 Initializing Bootstrap tooltips...');
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    console.log('✅ Dashboard initialization complete');
 });
 
 // ✅ GLOBAL FUNCTIONS for sidebar links
