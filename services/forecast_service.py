@@ -98,15 +98,14 @@ class ForecastService:
             forecast_history = ForecastHistory(
                 model_name=str(model_name),
                 forecast_weeks=int(forecast_weeks), 
-                forecast_data=json.dumps(forecast_data_list),
-                confidence_intervals=json.dumps(confidence_intervals_list),
+                forecast_data=forecast_data_list,
+                confidence_intervals=confidence_intervals_list,
                 avg_prediction=float(summary['avg_prediction']),
                 trend=str(trend),
                 min_value=float(summary['min_prediction']),
                 max_value=float(summary['max_prediction']),
-                model_mae=float(perf.get('mae', 0)),
-                model_rmse=float(perf.get('rmse', 0)),
-                model_r2=float(perf.get('r2_score', 0)),
+                validation_mae=float(perf.get('mae', 0)),
+                validation_rmse=float(perf.get('rmse', 0)),
                 data_points_used=len(forecast_df),
                 created_by=current_user.username if hasattr(current_user, 'username') and current_user.is_authenticated else 'system'
             )

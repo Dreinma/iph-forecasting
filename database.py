@@ -362,12 +362,12 @@ class ForecastHistory(db.Model):
     forecast_weeks = db.Column(db.Integer, nullable=False)  # Jumlah minggu yang di-forecast
     
     # Forecast data (stored as JSON)
-    forecast_data = db.Column(db.Text)  # JSON array of forecast values
-    confidence_intervals = db.Column(db.Text)  # JSON array of confidence intervals
+    forecast_data = db.Column(db.JSON)  # JSON array of forecast values
+    confidence_intervals = db.Column(db.JSON)  # JSON array of confidence intervals
     
     # Statistics
     avg_prediction = db.Column(db.Float)  # Rata-rata nilai prediksi
-    trend = db.Column(db.String(20))  # 'up', 'down', 'stable'
+    trend = db.Column(db.String(50))  # 'up', 'down', 'stable'
     min_value = db.Column(db.Float)
     max_value = db.Column(db.Float)
     

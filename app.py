@@ -711,78 +711,76 @@ def api_data_summary():
 
 @app.route('/api/forecast-chart-data')
 def forecast_chart_data():
-    """API endpoint untuk mendapatkan data forecast untuk chart
-    
-    Production-ready approach:
-    1. Load dari database (ForecastHistory) - PERSISTENT & FAST
-    2. Fallback: Load dari in-memory cache (jika database kosong)
-    3. Last resort: Generate new forecast
-    """
+    """API endpoint untuk mendapatkan data forecast untuk chart"""
     try:
-        # ✅ STEP 1: Load dari database DULU (production approach)
         from database import ForecastHistory
         
-        latest_forecast_record = ForecastHistory.query.order_by(
+        latest_forecast = ForecastHistory.query.order_by(
             ForecastHistory.created_at.desc()
         ).first()
         
-        if latest_forecast_record:
+        if latest_forecast:
             try:
-                # Parse JSON data dari database
-                forecast_data_json = json.loads(latest_forecast_record.forecast_data)
-                confidence_intervals_json = json.loads(latest_forecast_record.confidence_intervals) if latest_forecast_record.confidence_intervals else None
+                forecast_data = latest_forecast.forecast_data  # Already list
+                confidence_intervals = latest_forecast.confidence_intervals  # Already list
                 
-                # Reconstruct predictions dalam format yang expected frontend
+                if isinstance(forecast_data, str):
+                    forecast_data = json.loads(forecast_data)
+                if isinstance(confidence_intervals, str):
+                    confidence_intervals = json.loads(confidence_intervals)
+                
                 predictions = []
-                dates = forecast_data_json.get('dates', [])
-                prediction_values = forecast_data_json.get('predictions', [])
                 
-                for i, pred_value in enumerate(prediction_values):
+                # forecast_data structure: [{'date': '...', 'prediction': X, 'lower_bound': Y, ...}, ...]
+                for i, item in enumerate(forecast_data):
                     prediction_item = {
                         'week': i + 1,
-                        'date': dates[i] if i < len(dates) else None,
-                        'value': float(pred_value)
+                        'date': item.get('date'),
+                        'value': float(item.get('prediction', 0))
                     }
                     
-                    # Add confidence intervals if available
-                    if confidence_intervals_json and i < len(confidence_intervals_json.get('lower', [])):
-                        prediction_item['lower_bound'] = float(confidence_intervals_json['lower'][i])
-                        prediction_item['upper_bound'] = float(confidence_intervals_json['upper'][i])
+                    # Add confidence intervals from forecast_data itself
+                    if 'lower_bound' in item and 'upper_bound' in item:
+                        prediction_item['lower_bound'] = float(item['lower_bound'])
+                        prediction_item['upper_bound'] = float(item['upper_bound'])
+                    # Or from separate confidence_intervals array
+                    elif confidence_intervals and i < len(confidence_intervals):
+                        ci = confidence_intervals[i]
+                        prediction_item['lower_bound'] = float(ci.get('lower', 0))
+                        prediction_item['upper_bound'] = float(ci.get('upper', 0))
                     
                     predictions.append(prediction_item)
                 
-                # Build response dengan format yang sama seperti get_current_forecast()
                 forecast_result = {
                     'success': True,
-                    'timestamp': latest_forecast_record.created_at.isoformat(),
+                    'timestamp': latest_forecast.created_at.isoformat(),
                     'forecast': {
                         'data': predictions,
-                        'model_name': latest_forecast_record.model_name,
+                        'model_name': latest_forecast.model_name,
                         'model_performance': {
-                            'mae': float(latest_forecast_record.mae) if latest_forecast_record.mae else 0.0,
-                            'rmse': float(latest_forecast_record.rmse) if latest_forecast_record.rmse else 0.0,
-                            'r2_score': float(latest_forecast_record.r2_score) if latest_forecast_record.r2_score else 0.0,
-                            'training_time': 0.0  # Not stored in ForecastHistory
+                            'mae': float(latest_forecast.validation_mae) if latest_forecast.validation_mae else 0.0,
+                            'rmse': float(latest_forecast.validation_rmse) if latest_forecast.validation_rmse else 0.0,
+                            'r2_score': 0.0,  # ❌ Tidak ada di schema
+                            'training_time': 0.0
                         },
                         'summary': {
-                            'avg_prediction': float(latest_forecast_record.avg_prediction) if latest_forecast_record.avg_prediction else 0.0,
-                            'trend': latest_forecast_record.trend or 'stable',
-                            'volatility': 0.0,  # Not stored in ForecastHistory, bisa calculate jika perlu
-                            'min_prediction': float(min([p['value'] for p in predictions])) if predictions else 0.0,
-                            'max_prediction': float(max([p['value'] for p in predictions])) if predictions else 0.0
+                            'avg_prediction': float(latest_forecast.avg_prediction) if latest_forecast.avg_prediction else 0.0,
+                            'trend': latest_forecast.trend or 'stable',
+                            'volatility': 0.0,
+                            'min_prediction': float(latest_forecast.min_value) if latest_forecast.min_value else 0.0,
+                            'max_prediction': float(latest_forecast.max_value) if latest_forecast.max_value else 0.0
                         },
-                        'weeks_forecasted': latest_forecast_record.forecast_weeks or len(predictions)
+                        'weeks_forecasted': latest_forecast.forecast_weeks or len(predictions)
                     }
                 }
                 
-                logger.info(f"✅ Forecast loaded from database (ID: {latest_forecast_record.id}, created: {latest_forecast_record.created_at})")
+                logger.info(f"✅ Forecast loaded from DB: {latest_forecast.model_name} (ID: {latest_forecast.id})")
                 return jsonify(forecast_result)
                 
-            except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.warning(f"⚠️ Error parsing forecast from database: {str(e)}, trying in-memory cache...")
+            except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as e:
+                logger.warning(f"⚠️ Error parsing forecast from database: {str(e)}, trying fallback...")
                 # Continue to fallback
         
-        # ✅ STEP 2: Fallback ke in-memory cache (jika ada)
         if hasattr(forecast_service, '_latest_forecast') and forecast_service._latest_forecast:
             logger.info("📦 Loading forecast from in-memory cache")
             return jsonify({
@@ -791,14 +789,13 @@ def forecast_chart_data():
                 'forecast': forecast_service._latest_forecast
             })
         
-        # ✅ STEP 3: Last resort - Generate new forecast
-        logger.info("🔄 No forecast found in database or cache, generating new forecast...")
+        logger.info("🔄 No forecast in DB/cache, generating new...")
         forecast_result = forecast_service.get_current_forecast()
         
         if forecast_result.get('success'):
-            logger.info("✅ New forecast generated successfully")
+            logger.info("✅ New forecast generated")
         else:
-            logger.error(f"❌ Failed to generate forecast: {forecast_result.get('error')}")
+            logger.error(f"❌ Forecast generation failed: {forecast_result.get('error')}")
         
         return jsonify(forecast_result)
         
