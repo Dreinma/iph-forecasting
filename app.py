@@ -19,7 +19,7 @@ from services.debugger import init_debugger, debugger
 from database import db, IPHData, CommodityData, AdminUser, AlertRule
 from services.data_handler import DataHandler
 
-from auth.decorators import admin_required
+from auth.decorators import admin_required, login_required
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -269,51 +269,6 @@ init_auth(app)
 # Register Admin Blueprint
 from admin.routes import admin_bp
 app.register_blueprint(admin_bp)
-
-# Session timeout handler - Check session activity before each request
-# @app.before_request
-# def check_session_timeout():
-#     """Check session timeout - logout if idle for more than 5 minutes"""
-#     from flask_login import current_user, logout_user
-    
-#     # Skip for static files and login routes
-#     if request.endpoint in ['static', 'admin.login', 'admin.logout']:
-#         return
-    
-#     # Only check for authenticated admin users
-#     if current_user.is_authenticated:
-#         # Set session as permanent
-#         session.permanent = True
-        
-#         # Get current time
-#         now = datetime.utcnow()
-        
-#         # Check if this is the first request after login (no last_activity set)
-#         if 'last_activity' not in session:
-#             session['last_activity'] = now.isoformat()
-#             return
-        
-#         # Parse last activity time
-#         try:
-#             last_activity = datetime.fromisoformat(session['last_activity'])
-#             time_diff = (now - last_activity).total_seconds()
-            
-#             # If more than 5 minutes (300 seconds) of inactivity, logout
-#             if time_diff > 300:  # 5 minutes
-#                 logout_user()
-#                 session.clear()
-#                 flash('Session Anda telah timeout karena tidak ada aktivitas selama 5 menit. Silakan login kembali.', 'warning')
-#                 # Redirect to login if trying to access admin routes
-#                 if request.path.startswith('/admin'):
-#                     from flask import url_for
-#                     return redirect(url_for('admin.login'))
-#                 return
-            
-#             # Update last activity time for this request
-#             session['last_activity'] = now.isoformat()
-#         except (ValueError, TypeError):
-#             # If parsing fails, set new last_activity
-#             session['last_activity'] = now.isoformat()
 
 
 # Diagnostics endpoint to inspect recent events/errors
@@ -889,6 +844,203 @@ def get_economic_alerts():
             'error': error_msg,
             'alerts': []
         })
+
+@app.route('/admin/api/forecasts/history', methods=['GET'])
+@login_required 
+@admin_required 
+def get_forecast_history():
+    """API untuk mendapatkan forecast history (untuk admin page)"""
+    try:
+        from database import db, ForecastHistory
+        
+        # ✅ ROLLBACK dulu (jaga-jaga ada pending transaction)
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # Get pagination & filter parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        model_filter = request.args.get('model', '', type=str)
+        
+        # Build query
+        query = ForecastHistory.query.order_by(ForecastHistory.created_at.desc())
+        
+        # Apply model filter
+        if model_filter:
+            query = query.filter(ForecastHistory.model_name.ilike(f'%{model_filter}%'))
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Apply pagination
+        forecasts = query.limit(per_page).offset((page - 1) * per_page).all()
+        
+        # Convert to dict
+        forecast_list = []
+        for forecast in forecasts:
+            try:
+                # Parse JSONB data safely
+                forecast_data = forecast.forecast_data if isinstance(forecast.forecast_data, list) else []
+                
+                forecast_list.append({
+                    'id': forecast.id,
+                    'created_at': forecast.created_at.isoformat() if forecast.created_at else None,
+                    'model_name': forecast.model_name,
+                    'weeks_forecasted': forecast.forecast_weeks,
+                    'avg_prediction': float(forecast.avg_prediction) if forecast.avg_prediction else None,
+                    'trend': forecast.trend or 'stable',
+                    'validation_mae': float(forecast.validation_mae) if forecast.validation_mae else None,
+                    'validation_rmse': float(forecast.validation_rmse) if forecast.validation_rmse else None,
+                    'created_by': forecast.created_by or 'system'
+                })
+            except Exception as e:
+                logger.error(f"Error parsing forecast {forecast.id}: {e}")
+                continue
+        
+        # ✅ SESUAI FORMAT FRONTEND (result.data.items)
+        return jsonify({
+            'success': True,
+            'data': {
+                'items': forecast_list,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'pages': (total_count + per_page - 1) // per_page
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting forecast history: {str(e)}", exc_info=True)
+        
+        # Rollback on error
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        return jsonify({
+            'success': False,
+            'error': 'Failed to load forecast history',
+            'details': str(e) if app.config.get('DEBUG') else None
+        }), 500
+
+
+# ✅ TAMBAHAN: API untuk Statistics
+@app.route('/admin/api/forecasts/statistics', methods=['GET'])
+@login_required
+@admin_required
+def get_forecast_statistics():
+    """API untuk mendapatkan statistik forecast"""
+    try:
+        from database import db, ForecastHistory
+        from sqlalchemy import func, extract
+        from datetime import datetime
+        
+        # Rollback dulu
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # Total forecasts
+        total_forecasts = ForecastHistory.query.count()
+        
+        # This month
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        this_month = ForecastHistory.query.filter(
+            extract('month', ForecastHistory.created_at) == current_month,
+            extract('year', ForecastHistory.created_at) == current_year
+        ).count()
+        
+        # Most used model
+        most_used = db.session.query(
+            ForecastHistory.model_name,
+            func.count(ForecastHistory.id).label('count')
+        ).group_by(ForecastHistory.model_name).order_by(func.count(ForecastHistory.id).desc()).first()
+        
+        most_used_model = most_used[0] if most_used else 'N/A'
+        
+        return jsonify({
+            'success': True,
+            'statistics': {
+                'total_forecasts': total_forecasts,
+                'this_month': this_month,
+                'most_used_model': most_used_model
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting forecast statistics: {str(e)}", exc_info=True)
+        
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ✅ TAMBAHAN: API untuk Export
+@app.route('/admin/api/forecasts/export', methods=['GET'])
+@login_required
+@admin_required
+def export_forecast_history():
+    """Export forecast history ke CSV"""
+    try:
+        from database import db, ForecastHistory
+        import csv
+        from io import StringIO
+        from flask import make_response
+        
+        # Rollback dulu
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # Get all forecasts
+        forecasts = ForecastHistory.query.order_by(ForecastHistory.created_at.desc()).all()
+        
+        # Create CSV
+        si = StringIO()
+        cw = csv.writer(si)
+        
+        # Header
+        cw.writerow(['ID', 'Date', 'Model', 'Weeks', 'Avg Prediction', 'Trend', 'MAE', 'RMSE', 'Created By'])
+        
+        # Data
+        for f in forecasts:
+            cw.writerow([
+                f.id,
+                f.created_at.strftime('%Y-%m-%d %H:%M') if f.created_at else '',
+                f.model_name,
+                f.forecast_weeks,
+                f'{f.avg_prediction:.4f}' if f.avg_prediction else '',
+                f.trend,
+                f'{f.validation_mae:.4f}' if f.validation_mae else '',
+                f'{f.validation_rmse:.4f}' if f.validation_rmse else '',
+                f.created_by
+            ])
+        
+        # Create response
+        output = make_response(si.getvalue())
+        output.headers["Content-Disposition"] = "attachment; filename=forecast_history.csv"
+        output.headers["Content-type"] = "text/csv"
+        
+        return output
+        
+    except Exception as e:
+        logger.error(f"❌ Error exporting forecast history: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # 4. VISUALIZATION APIs
 
