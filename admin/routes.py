@@ -6,7 +6,7 @@ CATATAN: Routes ini belum diintegrasikan ke app.py
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from auth.decorators import admin_required
-from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm, ForgotPasswordForm, ResetPasswordForm
+from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm
 from auth.utils import check_password, update_last_login, create_admin_user, hash_password
 from database import db, AdminUser
 from datetime import datetime, timedelta
@@ -88,70 +88,6 @@ def logout():
     session.pop('user_role', None)
     flash('Anda telah logout.', 'info')
     return redirect(url_for('admin.login'))
-
-@admin_bp.route('/forgot-password', methods=['GET', 'POST'])
-def forgot_password():
-    """Forgot password page"""
-    form = ForgotPasswordForm()
-    
-    if form.validate_on_submit():
-        email = form.email.data.strip()
-        user = AdminUser.query.filter_by(email=email).first()
-        
-        if user and user.email:
-            # Generate reset token
-            reset_token = secrets.token_urlsafe(32)
-            user.reset_token = hashlib.sha256(reset_token.encode()).hexdigest()
-            user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)  # Token valid 1 jam
-            db.session.commit()
-            
-            # Log token untuk development (HAPUS DI PRODUCTION!)
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Reset token generated for user: {user.username}")
-            logger.info(f"Reset URL: {url_for('admin.reset_password', token=reset_token, _external=True)}")
-            
-            flash(f'Link reset password telah dibuat! Token: {reset_token[:20]}... (cek log untuk full URL)', 'info')
-            flash(f'URL Reset: {url_for("admin.reset_password", token=reset_token, _external=True)}', 'info')
-        else:
-            # Jangan reveal bahwa email tidak ada (security)
-            flash('Jika email terdaftar, link reset password akan dikirim ke email tersebut.', 'info')
-    
-    return render_template('admin/forgot_password.html', form=form)
-
-@admin_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    """Reset password dengan token"""
-    form = ResetPasswordForm()
-    
-    # Hash token untuk dicocokkan dengan database
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    user = AdminUser.query.filter_by(reset_token=token_hash).first()
-    
-    if not user:
-        flash('Token reset password tidak valid atau sudah digunakan.', 'danger')
-        return redirect(url_for('admin.login'))
-    
-    # Check token expiry
-    if user.reset_token_expiry and user.reset_token_expiry < datetime.utcnow():
-        flash('Token reset password sudah kadaluarsa. Silakan request reset password lagi.', 'danger')
-        user.reset_token = None
-        user.reset_token_expiry = None
-        db.session.commit()
-        return redirect(url_for('admin.forgot_password'))
-    
-    if form.validate_on_submit():
-        # Update password
-        from auth.utils import hash_password
-        user.password_hash = hash_password(form.password.data)
-        user.reset_token = None
-        user.reset_token_expiry = None
-        db.session.commit()
-        
-        flash('Password berhasil direset! Silakan login dengan password baru.', 'success')
-        return redirect(url_for('admin.login'))
-    
-    return render_template('admin/reset_password.html', form=form, token=token)
 
 @admin_bp.route('/change-password', methods=['GET', 'POST'])
 @admin_required

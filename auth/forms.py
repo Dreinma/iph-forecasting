@@ -54,22 +54,3 @@ class CreateAdminForm(FlaskForm):
     
     # Note: Username and email uniqueness validation is done in route handler
     # to avoid app context issues during form initialization
-
-class ForgotPasswordForm(FlaskForm):
-    """Form untuk forgot password"""
-    email = StringField('Email', validators=[
-        DataRequired(message='Email harus diisi'),
-        Length(max=100, message='Email maksimal 100 karakter')
-    ])
-
-class ResetPasswordForm(FlaskForm):
-    """Form untuk reset password"""
-    password = PasswordField('Password Baru', validators=[
-        DataRequired(message='Password baru harus diisi'),
-        Length(min=8, message='Password minimal 8 karakter')
-    ])
-    confirm_password = PasswordField('Konfirmasi Password Baru', validators=[
-        DataRequired(message='Konfirmasi password harus diisi'),
-        EqualTo('password', message='Password tidak cocok')
-    ])
-
