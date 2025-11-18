@@ -1334,6 +1334,7 @@ class CommodityInsightService:
                     commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
                     for comm in commodities:
                         comm['tanggal'] = row['Tanggal'] # Tambahkan tanggal ke setiap komoditas
+                        comm['periode_label'] = f"{row.get('Bulan', '')} {row.get('Minggu', '')}".strip()
                     all_commodities.extend(commodities)
             
             if not all_commodities:
@@ -1349,7 +1350,7 @@ class CommodityInsightService:
             
             # A. Data Tren (untuk Sparkline)
             trend_data_grouped = commodities_df.groupby('name').apply(
-                lambda x: x.sort_values('tanggal')[['tanggal', 'impact']].to_dict('records')
+                lambda x: x.sort_values('tanggal')[['tanggal', 'impact', 'periode_label']].to_dict('records')            
             )
             
             trend_stats = commodities_df.groupby('name').agg(
@@ -1364,7 +1365,7 @@ class CommodityInsightService:
                 # --- MODIFIKASI DI SINI ---
                 # Siapkan data hover (text) untuk Plotly
                 hover_text = [
-                    f"Tgl: {d['tanggal'].strftime('%Y-%m-%d')}<br>Dampak: {float(d['impact']):.2f}%" 
+                    f"{d['periode_label']}<br>Indeks Perubahan: {float(d['impact']):.3f}%"                    f"Tgl: {d['tanggal'].strftime('%Y-%m-%d')}<br>Dampak: {float(d['impact']):.2f}%" 
                     for d in sparkline_data
                 ]
                 # --- AKHIR MODIFIKASI ---
@@ -1390,21 +1391,7 @@ class CommodityInsightService:
                 'marker': {'color': '#0d6efd', 'opacity': 0.8}
             }
 
-            # C. Data Dampak (untuk Bar Chart 2) - (Tetap Sama)
-            impact_data_series = commodities_df.groupby('name')['impact'].sum().sort_values(ascending=False)
-            top_inflasi = impact_data_series.head(5)
-            top_deflasi = impact_data_series.tail(5)
-            impact_data_combined = pd.concat([top_inflasi, top_deflasi]).sort_values(ascending=False)
-            
-            impact_chart_data = {
-                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in impact_data_combined.index],
-                'y': [float(impact) for impact in impact_data_combined.values],
-                'type': 'bar',
-                'name': 'Dampak Akumulatif',
-                'marker': {
-                    'color': ['#dc3545' if v > 0 else '#198754' for v in impact_data_combined.values]
-                }
-            }
+            impact_chart_data = {}
 
             return {
                 'success': True,

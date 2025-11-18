@@ -12,11 +12,11 @@
 </div>
 
 <div class="card mb-4 border-0 shadow-sm">
-    <div class="card-body">
-        <div class="row g-3 align-items-end">
+    <div class="card-body py-4">
+        <div class="row g-3 align-items-center">
             <div class="col-lg-5">
-                <label class="form-label fw-bold mb-2">
-                    <i class="fas fa-calendar-alt me-2"></i>Periode Window
+                <label class="form-label fw-bold mb-2 text-muted small text-uppercase">
+                    Periode Window
                 </label>
                 <div class="btn-group w-100" role="group">
                     <button type="button" class="btn btn-outline-primary" 
@@ -31,24 +31,31 @@
             </div>
 
             <div class="col-lg-7">
-                <label class="form-label fw-bold mb-2">
-                    <i class="fas fa-sliders-h me-2"></i>Geser Periode
-                </label>
-                <div class="position-relative">
-                    <div class="timeline-bar mb-2" style="height: 40px; background: linear-gradient(90deg, #e3f2fd 0%, #2196f3 100%); border-radius: 8px; position: relative;">
-                        <div id="windowIndicator" style="position: absolute; height: 100%; background: rgba(33, 150, 243, 0.3); border: 2px solid #2196f3; border-radius: 8px; transition: all 0.3s ease;"></div>
-                        <div style="position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-weight: bold; color: #1976d2; font-size: 11px;">
-                            <span id="windowStartDate">Memuat...</span> ← Terlama
-                        </div>
-                        <div style="position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-weight: bold; color: #1976d2; font-size: 11px;">
-                            <span id="windowEndDate">Memuat...</span> ← Terbaru
-                        </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label fw-bold mb-0 text-muted small text-uppercase">
+                        Geser Periode
+                    </label>
+                    <span class="badge bg-light text-primary border border-primary-subtle" id="rangeInfoBadge">
+                        <i class="fas fa-calendar-alt me-1"></i>
+                        <span id="dynamicRangeDisplay">Memuat rentang data...</span>
+                    </span>
+                </div>
+                
+                <div class="position-relative mt-2">
+                    <div class="timeline-bar mb-2" style="height: 10px; background: #e9ecef; border-radius: 10px; position: relative; overflow: hidden;">
+                        <div id="windowIndicator" style="position: absolute; height: 100%; background: var(--primary-color); border-radius: 10px; transition: all 0.2s ease; opacity: 0.8;"></div>
                     </div>
+                    
                     <input type="range" class="form-range" id="periodSlider" 
                         min="0" max="0" value="0" step="1"
-                        style="width: 100%;"
+                        style="position: absolute; top: -8px; width: 100%; opacity: 0; cursor: pointer;"
                         oninput="updateSliderPreview(this.value)"
                         onchange="applySliderOffset(this.value)">
+                        
+                    <div class="d-flex justify-content-between text-muted small" style="font-size: 0.75rem;">
+                        <span><i class="fas fa-chevron-left me-1"></i>Data Lama</span>
+                        <span>Data Baru<i class="fas fa-chevron-right ms-1"></i></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -68,10 +75,9 @@
     <div class="tab-pane fade show active" id="volatility" role="tabpanel">
         <div class="row g-4">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-line text-primary me-2"></i>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="card-title mb-0 text-primary">
                             Grafik Pergerakan & Volatilitas IPH
                         </h5>
                     </div>
@@ -79,7 +85,7 @@
                         <div id="volatilityChart" style="height: 500px;">
                             <div class="text-center py-5">
                                 <div class="spinner-border text-primary"></div>
-                                <p class="mt-2">Memuat visualisasi data...</p>
+                                <p class="mt-2 text-muted">Memuat visualisasi data...</p>
                             </div>
                         </div>
                     </div>
@@ -89,80 +95,55 @@
             <div class="col-12">
                 <div class="row g-4">
                     <div class="col-md-6 col-lg-3">
-                        <div class="card border-info h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-chart-line text-info fa-2x mb-2"></i>
-                                <h6 class="card-title small">Volatilitas Terkini</h6>
-                                <div id="currentVolatility" class="h3 text-info fw-bold">-</div>
-                                <small class="text-muted d-block">7 hari terakhir</small>
+                        <div class="card border-info h-100 shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <h6 class="card-title text-muted text-uppercase small mb-3">Volatilitas Terkini</h6>
+                                <div id="currentVolatility" class="display-6 text-info fw-bold">-</div>
+                                <small class="text-muted d-block mt-2">7 hari terakhir</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6 col-lg-3">
-                        <div class="card border-success h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-chart-area text-success fa-2x mb-2"></i>
-                                <h6 class="card-title small">Rata-rata 30 Hari</h6>
-                                <div id="avgVolatility30" class="h3 text-success fw-bold">-</div>
-                                <small class="text-muted d-block">Baseline normal</small>
+                        <div class="card border-success h-100 shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <h6 class="card-title text-muted text-uppercase small mb-3">Rata-rata 30 Hari</h6>
+                                <div id="avgVolatility30" class="display-6 text-success fw-bold">-</div>
+                                <small class="text-muted d-block mt-2">Baseline normal</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6 col-lg-3">
-                        <div class="card border-warning h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-exclamation-triangle text-warning fa-2x mb-2"></i>
-                                <h6 class="card-title small">Level Risiko</h6>
-                                <div id="riskLevel" class="h3 fw-bold">
+                        <div class="card border-secondary h-100 shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <h6 class="card-title text-muted text-uppercase small mb-3">Range Volatilitas</h6>
+                                <div class="d-flex justify-content-center gap-3 align-items-end">
+                                    <div>
+                                        <span class="text-danger fw-bold d-block">Max</span>
+                                        <span id="maxVolatility" class="h5">-</span>
+                                    </div>
+                                    <div class="border-end h-100"></div>
+                                    <div>
+                                        <span class="text-success fw-bold d-block">Min</span>
+                                        <span id="minVolatility" class="h5">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="col-md-6 col-lg-3">
+                        <div class="card border-warning h-100 shadow-sm">
+                            <div class="card-body text-center p-4">
+                                <h6 class="card-title text-muted text-uppercase small mb-3">Level Risiko</h6>
+                                <div id="riskLevel" class="display-6 fw-bold">
                                     <span id="riskLevelText">-</span>
                                 </div>
-                                <small class="text-muted d-block">Penilaian risiko</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 col-lg-3">
-                        <div class="card border-secondary h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-arrows-alt-v text-secondary fa-2x mb-2"></i>
-                                <h6 class="card-title small">Range Volatilitas</h6>
-                                <div class="small">
-                                    <p class="mb-1">Max: <span id="maxVolatility" class="text-danger fw-bold">-</span></p>
-                                    <p class="mb-0">Min: <span id="minVolatility" class="text-success fw-bold">-</span></p>
-                                </div>
+                                <small class="text-muted d-block mt-2">Penilaian risiko</small>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table text-info me-2"></i>
-                            Ringkasan Analisis Data
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Metrik</th>
-                                        <th>Nilai</th>
-                                        <th>Status</th>
-                                        <th>Keterangan</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="volatilityDetailsTable">
-                                    <tr><td colspan="4" class="text-center py-3">Memuat...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
             </div>
-        </div>
     </div>
 </div>
 {% endblock %}
@@ -170,17 +151,39 @@
 {% block scripts %}
 <script>
     const LOAD_TIMEOUT = 10000;  
-    
-    // ✅ DEFAULT TIMEFRAME: ALL
     let currentTimeframe = 'ALL';
     let startMonthOffset = 0;  
     let allAvailablePeriods = [];
     let sliderMetadata = {
         totalMonths: 0,
-        windowMonths: 0, // 0 for ALL
+        windowMonths: 0, 
         availableDates: [],
         currentOffset: 0
     };
+
+    // Fungsi Helper: Ubah "YYYY-MM-DD" menjadi "M{X} {Bulan} {Tahun}"
+    function formatDateToWeekLabel(dateStr) {
+        if (!dateStr) return '';
+        
+        // Parsing manual string tanggal (format YYYY-MM-DD) untuk menghindari masalah timezone
+        const parts = dateStr.split('-');
+        const year = parseInt(parts[0]);
+        const monthIndex = parseInt(parts[1]) - 1; // JS months 0-11
+        const day = parseInt(parts[2]);
+        
+        // Array nama bulan Indonesia
+        const monthNames = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        
+        // Hitung minggu (sederhana: 1-7=M1, 8-14=M2, dst)
+        // Atau menggunakan logika bisnis Anda jika berbeda
+        const weekNum = Math.ceil(day / 7); 
+        // Cap di M4 atau M5 jika perlu, tapi Math.ceil(31/7) = 5, jadi aman.
+
+        return `M${weekNum} ${monthNames[monthIndex]} ${year}`;
+    }
 
     async function loadVolatility() {
         console.log('🔄 Loading actual data visualization...');
@@ -201,16 +204,28 @@
             const data = await response.json();
             
             if (data.success && data.charts) {  
-                // Gunakan chart yang tersedia (biasanya accuracy_trends atau forecast_vs_actual dari backend)
                 const chartData = data.charts.accuracy_trends || data.charts.forecast_vs_actual;
                 
                 if (chartData) {
-                    // Update judul chart agar sesuai
-                    chartData.layout.title = `Visualisasi Data Aktual (${currentTimeframe})`;
+                    // 1. Generate Custom Hover Text
+                    const dates = chartData.data[0].x; // Ambil array tanggal asli
+                    const customHoverText = dates.map(dateStr => formatDateToWeekLabel(dateStr));
                     
+                    // 2. Update Trace dengan Custom Text
+                    chartData.data[0].text = customHoverText;
+                    // Update template hover: Tampilkan text custom + Nilai Y
+                    chartData.data[0].hovertemplate = '<b>%{text}</b><br>IPH: %{y:.2f}%<extra></extra>';
+                    
+                    // 3. Update Judul
+                    chartData.layout.title = {
+                        text: `Data Aktual (${currentTimeframe})`,
+                        font: { size: 16 }
+                    };
+
+                    // 4. Render Chart Tanpa Toolbar (displayModeBar: false)
                     Plotly.newPlot('volatilityChart', chartData.data, chartData.layout, {
                         responsive: true,
-                        displayModeBar: true
+                        displayModeBar: false // Hilangkan toolbar di kanan atas
                     });
                 }
                 
@@ -234,7 +249,6 @@
         const max = parseFloat(stats.max_volatility ?? 0).toFixed(2);
         let min = parseFloat(stats.min_volatility ?? 0).toFixed(2);
         
-        // Logic fallback min
         if ((min == 0 || min == 0.00) && max > 0) min = (max * 0.1).toFixed(2);
 
         const riskLevel = current > avg30 * 1.5 ? 'TINGGI' : current > avg30 * 1.2 ? 'SEDANG' : 'RENDAH';
@@ -245,39 +259,10 @@
         
         const riskLevelText = document.getElementById('riskLevelText');
         riskLevelText.textContent = riskLevel;
-        riskLevelText.className = `h3 fw-bold text-${riskColor}`;
+        riskLevelText.className = `display-6 fw-bold text-${riskColor}`;
         
         document.getElementById('maxVolatility').textContent = max;
         document.getElementById('minVolatility').textContent = min;
-        
-        // Simple Table
-        const tbody = document.getElementById('volatilityDetailsTable');
-        tbody.innerHTML = `
-            <tr>
-                <td><strong>Volatilitas Terkini</strong></td>
-                <td class="fw-bold">${current}</td>
-                <td><span class="badge bg-info">AKTUAL</span></td>
-                <td>Standar deviasi 7 hari terakhir</td>
-            </tr>
-            <tr>
-                <td><strong>Rata-rata 30 Hari</strong></td>
-                <td class="fw-bold">${avg30}</td>
-                <td><span class="badge bg-secondary">BASELINE</span></td>
-                <td>Referensi normal</td>
-            </tr>
-            <tr>
-                <td><strong>Range (Max-Min)</strong></td>
-                <td class="fw-bold">${(max - min).toFixed(2)}</td>
-                <td><span class="badge bg-secondary">RANGE</span></td>
-                <td>Perbedaan tertinggi dan terendah</td>
-            </tr>
-            <tr>
-                <td><strong>Level Risiko</strong></td>
-                <td class="fw-bold"><span class="text-${riskColor}">${riskLevel}</span></td>
-                <td><span class="badge bg-${riskColor}">${riskLevel}</span></td>
-                <td>${riskLevel === 'TINGGI' ? '⚠️ Perhatian khusus' : '✅ Kondisi normal'}</td>
-            </tr>
-        `;
     }
 
     function withTimeout(promise, timeout = LOAD_TIMEOUT) {
@@ -289,20 +274,14 @@
 
     function changeTimeframe(timeframe) {
         currentTimeframe = timeframe;
-        
-        // Update slider state
         updateSliderRange();
-        
-        // Update buttons
         document.querySelectorAll('.btn-group .btn-outline-primary').forEach(btn => {
             btn.classList.remove('active');
         });
         event.target.classList.add('active');
-        
         loadVolatility();
     }
 
-    // Slider Logic (Simplified for ALL default)
     async function initializeSlider() {
         try {
             const response = await fetch('/api/data/available-periods');
@@ -326,6 +305,12 @@
             // ALL
             slider.disabled = true;
             slider.value = 0;
+            // Tampilkan rentang penuh untuk ALL
+            if (sliderMetadata.availableDates.length > 0) {
+                 const first = sliderMetadata.availableDates[0].display;
+                 const last = sliderMetadata.availableDates[sliderMetadata.availableDates.length-1].display;
+                 document.getElementById('dynamicRangeDisplay').textContent = `${first} - ${last}`;
+            }
             return;
         }
         
@@ -349,10 +334,11 @@
         const startDate = sliderMetadata.availableDates[startIndex];
         const endDate = sliderMetadata.availableDates[endIndex];
         
-        document.getElementById('windowStartDate').textContent = startDate?.display || '';
-        document.getElementById('windowEndDate').textContent = endDate?.display || '';
+        // Update Teks Rentang Data di Card
+        const rangeText = `${startDate?.display || ''} - ${endDate?.display || ''}`;
+        document.getElementById('dynamicRangeDisplay').textContent = rangeText;
         
-        // Update Indicator Bar
+        // Update Indicator Bar Width & Position
         const indicator = document.getElementById('windowIndicator');
         const percentStart = (offset / totalMonths) * 100;
         const percentWidth = (windowMonths / totalMonths) * 100;
