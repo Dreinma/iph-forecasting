@@ -295,6 +295,11 @@ else:
 # 1. MAIN ROUTES
 
 @app.route('/')
+def visualization():
+    """Data Visualization page"""
+    return render_template('visualization.html', page_title="Visualisasi Data IPH")
+
+@app.route('/dashboard')
 def dashboard():
     """Main dashboard - Public access (visitor) atau Admin"""
     # Visitor access is free - no login needed
@@ -343,11 +348,6 @@ def data_control():
     from flask import redirect, url_for
     # Redirect to admin data control page
     return redirect(url_for('admin.data_control'))
-
-@app.route('/visualization')
-def visualization():
-    """Data Visualization page"""
-    return render_template('visualization.html', page_title="Visualisasi Data IPH")
 
 @app.route('/commodity-insights')
 def commodity_insights():

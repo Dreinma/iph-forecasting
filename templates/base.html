@@ -215,17 +215,17 @@
             <!-- Navigation Menu -->
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" 
-                    href="{{ url_for('dashboard') }}" title="Dashboard">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span class="nav-text ms-2">Dashboard</span>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link {% if request.endpoint == 'visualization' %}active{% endif %}" 
                     href="{{ url_for('visualization') }}" title="Visualisasi">
                         <i class="fas fa-chart-area"></i>
-                        <span class="nav-text ms-2">Visualisasi Data</span>
+                        <span class="nav-text ms-2">Dashboard Visualisasi</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" 
+                    href="{{ url_for('dashboard') }}" title="Dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span class="nav-text ms-2">Forecasting</span>
                     </a>
                 </li>
                 <li class="nav-item">
