@@ -79,26 +79,44 @@
 </div>
 
 <!-- Insight IPH Komoditas (Full Width) -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-lightbulb text-warning me-2"></i>
-                    Insight IPH Komoditas
-                </h5>
-            </div>
-            <div class="card-body">
-                <div id="insightsList">
-                    <div class="text-center py-4">
-                        <p class="mt-2 text-muted">Memuat insights...</p>
+<div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="alert alert-info border-0 h-100">
+                            <div class="d-flex align-items-start">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="fas fa-info-circle fa-lg mt-1"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2 fw-bold" id="insightTitle">Memuat Analisis...</h6>
+                                    <p class="mb-2 text-dark" id="insightDesc">
+                                        Mengambil data terbaru...
+                                    </p>
+                                    <small class="text-muted d-flex align-items-center">
+                                        <i class="fas fa-clock me-1"></i>
+                                        <span id="insightDate">-</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-light border-0 h-100" id="volatilityCard">
+                            <div class="d-flex align-items-start">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="fas fa-wave-square fa-lg mt-1"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2 fw-bold">Status Volatilitas</h6>
+                                    <p class="mb-2 text-dark" id="volatilityDesc">
+                                        Menganalisis fluktuasi harga...
+                                    </p>
+                                    <span class="badge bg-secondary" id="volatilityBadge">Memuat</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 </div>
-
 <!-- Analisis Komoditas Utama & Trend & Prediksi IPH (Side by Side) -->
 <div class="row g-4">
     
@@ -217,24 +235,19 @@ function displayEconomicAlerts() {
     economicAlerts.forEach(alert => {
         const priorityClass = alert.color || 'secondary';
         const icon = alert.icon || 'fa-bell';
-        
+        const msg = alert.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
         html += `
-            <div class="alert alert-${priorityClass} border-0 mb-3" role="alert">
+            <div class="alert alert-${alert.color || 'primary'} border-0 mb-3" role="alert">
                 <div class="d-flex align-items-start">
-                    <div class="flex-shrink-0 me-3">
-                        <i class="fas ${icon} fa-lg mt-1"></i>
-                    </div>
+                    <div class="flex-shrink-0 me-3"><i class="fas ${alert.icon} fa-lg mt-1"></i></div>
                     <div class="flex-grow-1">
                         <h6 class="alert-heading mb-2 fw-bold">${alert.title}</h6>
-                        <p class="mb-2 text-dark">${alert.message}</p>
-                        <small class="text-muted d-flex align-items-center">
-                            <i class="fas fa-calendar me-1"></i>
-                            Terdeteksi pada ${alert.date || new Date(alert.timestamp).toLocaleDateString('id-ID')}
-                        </small>
+                        <p class="mb-2 text-dark">${msg}</p>
+                        <small class="text-muted"><i class="fas fa-calendar me-1"></i>${alert.date}</small>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
     });
     
     container.innerHTML = html;
@@ -322,17 +335,16 @@ function displayRecommendations() {
     recommendations.forEach(rec => {
         const color = rec.color || 'primary';
         const icon = rec.icon || 'fa-list-check';
-        const displayText = rec.text_html || rec.text || '';
+        const formattedText = rec.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
         html += `
             <div class="list-group-item d-flex align-items-start px-0 py-3">
                 <i class="fas ${icon} text-${color} fa-lg me-3 mt-1"></i>
                 <div class="flex-grow-1">
                     <h6 class="mb-1 fw-bold text-dark">${rec.title}</h6>
-                    <span class="small">${displayText}</span>
+                    <span class="small" style="display:block; line-height:1.5;">${formattedText}</span>
                 </div>
-            </div>
-        `;
+            </div>        `;
     });
     html += '</div>';
     
@@ -342,20 +354,31 @@ function displayRecommendations() {
 /**
  * Update 3 card statistik di atas
  */
-function updateEconomicIndicators(stats) {
-    const indicators = {
-        currentIPH: (stats.latest_value !== undefined ? stats.latest_value.toFixed(2) : "-") + "%",
-        iphVolatility: (stats.std !== undefined ? stats.std.toFixed(2) : "-"),
-        iphTrend: (stats.mean !== undefined ? stats.mean.toFixed(2) : "-") + "%" 
-    };
+function updateInsightNarrative(insight) {
+    // Update Teks
+    document.getElementById('insightTitle').textContent = insight.title;
     
-    const currentIPHEl = document.getElementById('currentIPH');
-    const iphVolatilityEl = document.getElementById('iphVolatility');
-    const iphTrendEl = document.getElementById('iphTrend');
-
-    if (currentIPHEl) currentIPHEl.textContent = indicators.currentIPH;
-    if (iphVolatilityEl) iphVolatilityEl.textContent = indicators.iphVolatility;
-    if (iphTrendEl) iphTrendEl.textContent = indicators.iphTrend;
+    // Gunakan innerHTML karena kita mengirim teks dengan format <strong> dari backend
+    document.getElementById('insightDesc').innerHTML = insight.description.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    document.getElementById('insightDate').textContent = "Data per: " + insight.last_updated;
+    
+    // Update Card Volatilitas
+    const volCard = document.getElementById('volatilityCard');
+    const volBadge = document.getElementById('volatilityBadge');
+    
+    document.getElementById('volatilityDesc').innerHTML = insight.volatility_desc.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Update Warna Badge
+    let badgeClass = 'bg-secondary';
+    if (insight.volatility_status === 'Tinggi') badgeClass = 'bg-danger';
+    else if (insight.volatility_status === 'Sedang') badgeClass = 'bg-warning text-dark';
+    else badgeClass = 'bg-success';
+    
+    volBadge.className = `badge ${badgeClass}`;
+    volBadge.textContent = insight.volatility_status;
+    
+    // Update Warna Card Background (Opsional)
+    volCard.className = `alert ${insight.volatility_status === 'Tinggi' ? 'alert-warning' : 'alert-light'} border-0 h-100`;
 }
 
 /**

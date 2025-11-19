@@ -1,7 +1,7 @@
 ﻿from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, render_template, request, jsonify, redirect, flash, session
+from flask import Flask, render_template, request, jsonify, flash, Response, make_response
 import pandas as pd
 import json
 import os
@@ -1821,7 +1821,6 @@ def export_forecast_history():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/export-data', methods=['GET'])
-@admin_required
 def export_data():
     """Export current data to CSV"""
     try:
@@ -1881,7 +1880,7 @@ def export_data():
             'records': len(df),
             'download_url': f'/download/{filename}'
         })
-        
+    
     except Exception as e:
         return jsonify({
             'success': False, 
@@ -2013,6 +2012,57 @@ def generate_forecast():
             'success': False,
             'message': f'Error generating forecast: {str(e)}'
         })
+
+@app.route('/api/export-data', methods=['GET'])
+@admin_required
+def export_data():
+    """MODIFIED: Export data to CSV from memory (Vercel/Render compatible) - Uses make_response"""
+    try:
+        data_type = request.args.get('type', 'historical')
+        df = pd.DataFrame()
+        filename = f"export_{datetime.now().strftime('%Y%m%d')}.csv"
+
+        if data_type == 'historical':
+            # Pastikan fungsi ini ada di DataHandler, jika tidak gunakan load_historical_data()
+            if hasattr(forecast_service.data_handler, 'get_full_export_data'):
+                 df = forecast_service.data_handler.get_full_export_data()
+            else:
+                 df = forecast_service.data_handler.load_historical_data()
+                 
+            if df.empty:
+                return jsonify({'success': False, 'message': 'No historical data available'})
+            filename = f"data_historis_lengkap_{datetime.now().strftime('%Y%m%d')}.csv"
+            
+        elif data_type == 'forecast':
+            forecast_result = forecast_service.get_current_forecast()
+            if not forecast_result['success'] or not forecast_result.get('forecast'):
+                return jsonify({'success': False, 'message': 'No forecast data available'})
+            
+            forecast_data = forecast_result['forecast']['data']
+            df = pd.DataFrame(forecast_data)
+            filename = f"forecast_data_{datetime.now().strftime('%Y%m%d')}.csv"
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid data type specified'})
+        
+        # --- PEMBUATAN CSV DI MEMORI (DIPERBAIKI) ---
+        output = io.StringIO()
+        df.to_csv(output, index=False, encoding='utf-8')
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Gunakan make_response untuk keamanan yang lebih baik
+        response = make_response(csv_content)
+        # Tambahkan tanda kutip pada filename untuk menangani spasi/karakter khusus
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Export failed: {str(e)}")
+        return jsonify({'success': False, 'message': f'Export failed: {str(e)}'})
+
 
 # UTILITY FUNCTIONS & CONTEXT PROCESSORS
 

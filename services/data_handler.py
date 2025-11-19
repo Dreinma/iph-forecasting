@@ -265,6 +265,53 @@ class DataHandler:
             logger.error(f"Merge error: {str(e)}", exc_info=True)
             raise Exception(f"Database merge failed: {str(e)}")
 
+    def get_full_export_data(self):
+            """
+            Mengambil data lengkap (IPH + Komoditas) untuk export CSV.
+            Menggabungkan data komoditas menjadi string dalam satu kolom.
+            """
+            try:
+                # 1. Query semua data IPH
+                iph_records = IPHData.query.order_by(IPHData.tanggal.desc()).all()
+                
+                export_list = []
+                
+                for iph in iph_records:
+                    # 2. Cari komoditas yang terkait dengan IPH ini
+                    # Asumsi: Ada relasi atau query manual ke CommodityData
+                    commodities = CommodityData.query.filter_by(iph_id=iph.id).all()
+                    
+                    # 3. Format string komoditas: "Beras(0.5); Cabai(-0.2)"
+                    komoditas_str = ""
+                    if commodities:
+                        items = []
+                        for c in commodities:
+                            # Gunakan share_value, impact, atau iph_value sesuai model Anda
+                            val = getattr(c, 'share_value', getattr(c, 'impact', 0))
+                            name = getattr(c, 'commodity_name', getattr(c, 'name', 'Unknown'))
+                            items.append(f"{name}({val})")
+                        komoditas_str = "; ".join(items)
+                    
+                    # 4. Buat dictionary untuk baris CSV
+                    row = {
+                        'Tanggal': iph.tanggal,
+                        'Tahun': iph.tahun,
+                        'Bulan': iph.bulan,
+                        'Minggu ke-': iph.minggu,
+                        'Kab/Kota': iph.kab_kota,
+                        'Indikator Perubahan Harga (%)': iph.indikator_harga,
+                        'Komoditas Andil Perubahan Harga': komoditas_str
+                    }
+                    export_list.append(row)
+                
+                # 5. Buat DataFrame
+                df = pd.DataFrame(export_list)
+                return df
+                
+            except Exception as e:
+                logger.error(f"Export data error: {str(e)}")
+                return pd.DataFrame()
+            
     def get_data_summary(self):
         """
         Get summary statistics of IPH data from database.

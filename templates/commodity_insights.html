@@ -194,22 +194,38 @@ function renderPrettyInsight(data) {
     const comms = data.commodity_impacts;
     const period = data.period;
     
+    let displayYear = period.tahun; 
+    
+    if (!displayYear && period.tanggal) {
+        const d = new Date(period.tanggal);
+        if (!isNaN(d.getFullYear())) {
+            displayYear = d.getFullYear();
+        }
+    }
+    
+    if (!displayYear && period.bulan && typeof period.bulan === 'string') {
+        const match = period.bulan.match(/'(\d{2})/);
+        if (match) {
+            displayYear = '20' + match[1];
+        }
+    }
+    
+    if (!displayYear) {
+        displayYear = new Date().getFullYear();
+    }
+    
     const isInflation = iph.value > 0;
     const colorClass = isInflation ? 'danger' : (iph.value < 0 ? 'success' : 'secondary');
     const trendIcon = isInflation ? 'fa-arrow-trend-up' : (iph.value < 0 ? 'fa-arrow-trend-down' : 'fa-minus');
-    const trendText = isInflation ? 'Inflasi' : (iph.value < 0 ? 'Deflasi' : 'Stabil');
 
     return `
         <div class="row g-0 align-items-center">
             <div class="col-md-4 text-center p-4 border-end border-light">
                 <h6 class="text-muted text-uppercase small mb-1">${period.kota || 'KOTA BATU'}</h6>
-                <h5 class="fw-bold mb-3">${period.bulan} ${period.tahun} <span class="badge bg-light text-dark border">${period.minggu}</span></h5>
+                <h5 class="fw-bold mb-3"><span class="badge bg-light text-dark border">${period.minggu}</span> ${period.bulan} ${displayYear} </h5>
                 
                 <div class="display-4 fw-bold text-${colorClass} mb-0">
                     ${iph.value > 0 ? '+' : ''}${iph.value.toFixed(2)}%
-                </div>
-                <div class="badge bg-${colorClass} bg-opacity-10 text-${colorClass} px-3 py-2 mt-2 rounded-pill">
-                    <i class="fas ${trendIcon} me-1"></i> ${trendText}
                 </div>
             </div>
 

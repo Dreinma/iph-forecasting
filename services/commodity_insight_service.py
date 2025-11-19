@@ -1284,128 +1284,117 @@ class CommodityInsightService:
         except Exception as e:
             print(f" Error generating enhanced recommendations: {e}")
             return []
-        
-    
+         
     def get_full_commodity_insights(self, start_key=None, end_key=None):
-        """
-        MODIFIED: Menghasilkan data untuk Sparkline (dengan hover) 
-        dan dua Bar Chart (Frekuensi & Dampak).
-        """
-        try:
-            df = self.load_commodity_data()
-            if df.empty:
-                return {'success': False, 'error': 'Tidak ada data komoditas tersedia'}
+            """
+            MODIFIED: Menghasilkan data Tren (Bar Chart dengan warna dinamis) 
+            dan Frekuensi (Top 5). Dampak Akumulatif dihapus.
+            """
+            try:
+                df = self.load_commodity_data()
+                # Struktur default
+                empty_response = {
+                    'success': True,
+                    'trend_sparkline_data': [],
+                    'frequency_chart_data': {'x': [], 'y': []},
+                    'impact_chart_data': {} 
+                }
 
-            # --- 1. Filter Rentang Waktu (Tetap Sama) ---
-            df_filtered = df.copy()
-            if start_key or end_key:
-                try:
-                    df_filtered['Tanggal'] = pd.to_datetime(df_filtered['Tanggal'])
-                    df_filtered['year'] = df_filtered['Tanggal'].dt.year
-                    df_filtered['month'] = df_filtered['Tanggal'].dt.month
-                    df_filtered['_ym'] = df_filtered['year'] * 100 + df_filtered['month']
+                if df.empty:
+                    return empty_response
+
+                # --- 1. Filter Rentang Waktu (Logika Standar) ---
+                df_filtered = df.copy()
+                if start_key or end_key:
+                    try:
+                        df_filtered['Tanggal'] = pd.to_datetime(df_filtered['Tanggal'])
+                        df_filtered['_ym'] = df_filtered['Tanggal'].dt.year * 100 + df_filtered['Tanggal'].dt.month
+                        
+                        start_ym = int(start_key.replace('-', '')) if start_key else 0
+                        end_ym = int(end_key.replace('-', '')) if end_key else 999999
+
+                        if start_ym and end_ym:
+                            df_filtered = df_filtered[(df_filtered['_ym'] >= start_ym) & (df_filtered['_ym'] <= end_ym)]
+                    except Exception as e:
+                        print(f"Error filtering dates: {e}")
+                        return empty_response
+                
+                if df_filtered.empty:
+                    return empty_response
+
+                # --- 2. Parsing Komoditas ---
+                all_commodities = []
+                for _, row in df_filtered.iterrows():
+                    if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
+                        commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
+                        for comm in commodities:
+                            comm['tanggal'] = row['Tanggal']
+                            # PERUBAHAN 1: Siapkan label periode (Bulan X Minggu Y) untuk tooltip
+                            comm['periode_label'] = f"{row.get('Bulan', '')} {row.get('Tahun', '')} {row.get('Minggu', '')}".strip()
+                        all_commodities.extend(commodities)
+                
+                if not all_commodities:
+                    return empty_response
+                
+                commodities_df = pd.DataFrame(all_commodities)
+                commodities_df['tanggal'] = pd.to_datetime(commodities_df['tanggal'])
+
+                # --- 3. Hitung Agregat ---
+                
+                # A. DATA TREN (Disesuaikan untuk Bar Chart Warna-warni)
+                trend_stats = commodities_df.groupby('name').agg(
+                    frequency=pd.NamedAgg(column='name', aggfunc='size')
+                ).sort_values(by='frequency', ascending=False)
+
+                trend_data_final = []
+                # Ambil Top 5 Komoditas Saja
+                for name in trend_stats.head(5).index:
+                    comm_data = commodities_df[commodities_df['name'] == name].sort_values('tanggal')
                     
-                    start_ym = None
-                    end_ym = None
-                    if start_key:
-                        sy, sm = [int(x) for x in str(start_key).split('-')[:2]]
-                        start_ym = sy * 100 + sm
-                    if end_key:
-                        ey, em = [int(x) for x in str(end_key).split('-')[:2]]
-                        end_ym = ey * 100 + em
+                    chart_x = [d.strftime('%Y-%m-%d') for d in comm_data['tanggal']]
+                    chart_y = [float(i) for i in comm_data['impact']]
+                    
+                    # PERUBAHAN 2: Custom Tooltip Text
+                    chart_text = [
+                        f"{row.periode_label}<br>Indeks: {row.impact:.3f}%" 
+                        for _, row in comm_data.iterrows()
+                    ]
+                    
+                    # PERUBAHAN 3: Warna Dinamis (Merah=Inflasi, Hijau=Deflasi)
+                    chart_color = ['#dc3545' if val > 0 else '#198754' for val in chart_y]
 
-                    if start_ym is not None and end_ym is not None:
-                        df_filtered = df_filtered[(df_filtered['_ym'] >= start_ym) & (df_filtered['_ym'] <= end_ym)]
-                    elif start_ym is not None:
-                        df_filtered = df_filtered[df_filtered['_ym'] >= start_ym]
-                    elif end_ym is not None:
-                        df_filtered = df_filtered[df_filtered['_ym'] <= end_ym]
-                except Exception as e:
-                    print(f"Error filtering dates: {e}")
-                    df_filtered = df.copy()
-            
-            if df_filtered.empty:
-                return {'success': False, 'error': 'Tidak ada data untuk rentang waktu yang dipilih'}
+                    trend_data_final.append({
+                        'name': self._standardize_commodity_name(name).replace('_', ' ').lower(),
+                        'frequency': int(trend_stats.loc[name, 'frequency']),
+                        'chart': { 
+                            'x': chart_x,
+                            'y': chart_y,
+                            'text': chart_text,         # Text khusus untuk hover
+                            'marker_color': chart_color # Warna khusus per bar
+                        }
+                    })
 
-            # --- 2. Parsing Komoditas (Tetap Sama) ---
-            all_commodities = []
-            for _, row in df_filtered.iterrows():
-                if pd.notna(row.get('Komoditas_Andil')) and row.get('Komoditas_Andil') != 'DATA_TIDAK_TERSEDIA':
-                    commodities = self.parse_commodity_impacts(row['Komoditas_Andil'])
-                    for comm in commodities:
-                        comm['tanggal'] = row['Tanggal'] # Tambahkan tanggal ke setiap komoditas
-                        comm['periode_label'] = f"{row.get('Bulan', '')} {row.get('Minggu', '')}".strip()
-                    all_commodities.extend(commodities)
-            
-            if not all_commodities:
-                return {'success': False, 'error': 'Tidak ada data dampak komoditas di rentang ini'}
-            
-            commodities_df = pd.DataFrame(all_commodities)
-            if 'tanggal' not in commodities_df.columns:
-                 return {'success': False, 'error': 'Gagal mem-parsing tanggal komoditas'}
-                 
-            commodities_df['tanggal'] = pd.to_datetime(commodities_df['tanggal'])
+                # B. DATA FREKUENSI (Top 5 Bar Chart)
+                freq_series = commodities_df.groupby('name').size().sort_values(ascending=False).head(5)
+                frequency_chart_data = {
+                    'x': [self._standardize_commodity_name(n).replace('_', ' ').lower() for n in freq_series.index],
+                    'y': [int(v) for v in freq_series.values]
+                }
 
-            # --- 3. Hitung SEMUA Agregat ---
-            
-            # A. Data Tren (untuk Sparkline)
-            trend_data_grouped = commodities_df.groupby('name').apply(
-                lambda x: x.sort_values('tanggal')[['tanggal', 'impact', 'periode_label']].to_dict('records')            
-            )
-            
-            trend_stats = commodities_df.groupby('name').agg(
-                total_impact=pd.NamedAgg(column='impact', aggfunc='sum'),
-                frequency=pd.NamedAgg(column='name', aggfunc='size')
-            ).sort_values(by='frequency', ascending=False) # Urutkan berdasarkan frekuensi
+                # PERUBAHAN 4: Impact Chart dikosongkan (karena dihapus dari UI)
+                impact_chart_data = {}
 
-            trend_data_final = []
-            for name, stats in trend_stats.head(5).iterrows(): # Top 5 berdasarkan frekuensi
-                sparkline_data = trend_data_grouped.get(name, [])
+                return {
+                    'success': True,
+                    'trend_sparkline_data': trend_data_final,
+                    'frequency_chart_data': frequency_chart_data,
+                    'impact_chart_data': impact_chart_data
+                }
                 
-                # --- MODIFIKASI DI SINI ---
-                # Siapkan data hover (text) untuk Plotly
-                hover_text = [
-                    f"{d['periode_label']}<br>Indeks Perubahan: {float(d['impact']):.3f}%"                    f"Tgl: {d['tanggal'].strftime('%Y-%m-%d')}<br>Dampak: {float(d['impact']):.2f}%" 
-                    for d in sparkline_data
-                ]
-                # --- AKHIR MODIFIKASI ---
-                
-                trend_data_final.append({
-                    'name': self._standardize_commodity_name(name).replace('_', ' ').lower(),
-                    # 'total_impact': float(stats['total_impact']), # <-- DIHAPUS SESUAI PERMINTAAN
-                    'frequency': int(stats['frequency']),
-                    'sparkline': {
-                        'x': [d['tanggal'].strftime('%Y-%m-%d') for d in sparkline_data],
-                        'y': [float(d['impact']) for d in sparkline_data],
-                        'text': hover_text # <-- TAMBAHKAN DATA HOVER
-                    }
-                })
+            except Exception as e:
+                print(f"Error in get_full_commodity_insights: {e}")
+                return {'success': False, 'error': str(e)}
 
-            # B. Data Frekuensi (untuk Bar Chart 1) - (Tetap Sama)
-            freq_data_series = commodities_df.groupby('name').size().sort_values(ascending=False).head(5)
-            frequency_chart_data = {
-                'x': [self._standardize_commodity_name(name).replace('_', ' ').lower() for name in freq_data_series.index],
-                'y': [int(freq) for freq in freq_data_series.values],
-                'type': 'bar',
-                'name': 'Frekuensi',
-                'marker': {'color': '#0d6efd', 'opacity': 0.8}
-            }
-
-            impact_chart_data = {}
-
-            return {
-                'success': True,
-                'trend_sparkline_data': trend_data_final,
-                'frequency_chart_data': frequency_chart_data,
-                'impact_chart_data': impact_chart_data
-            }
-            
-        except Exception as e:
-            print(f"Error in get_full_commodity_insights: {e}")
-            import traceback
-            traceback.print_exc()
-            return {'success': False, 'error': str(e)}
-        
     def _generate_enhanced_trend_summary(trends):
         """Generate enhanced trend summary"""
         if not trends:

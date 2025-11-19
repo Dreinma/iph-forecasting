@@ -591,207 +591,134 @@ class ForecastService:
             return {'success': False, 'error': str(e), 'alerts': []}
             
     def get_real_economic_alerts(self):
-        """
-        MODIFIED: Generate real-time economic alerts, statistics, and dynamic recommendations.
-        """
-        try:
-            current_time = datetime.now()
-            # Cek cache
-            if (self._alerts_cache and self._alerts_cache_time and 
-                (current_time - self._alerts_cache_time).seconds < 300): # Cache 5 menit
-                logger.debug("Using cached alerts and recommendations")
-                return self._alerts_cache
-            
-            logger.debug("Generating fresh alerts and recommendations")
-            alerts = []
-            recommendations = [] # List baru untuk rekomendasi
-            
-            # 1. Load Data
-            df = self.data_handler.load_historical_data()
-            if df.empty or len(df) < 10:
-                return {'success': False, 'alerts': [], 'recommendations': [], 'statistics': {}, 'message': 'Insufficient data'}
-            
-            df['Tanggal'] = pd.to_datetime(df['Tanggal'])
-            df = df.sort_values('Tanggal').reset_index(drop=True)
-            
-            latest_iph = df['Indikator_Harga'].iloc[-1]
-            latest_date = df['Tanggal'].iloc[-1]
-            
-            # 2. Analisis Statistik & Volatilitas
-            mean_iph = df['Indikator_Harga'].mean()
-            std_iph = df['Indikator_Harga'].std()
-            upper_2sigma = mean_iph + 2 * std_iph
-            lower_2sigma = mean_iph - 2 * std_iph
-            
-            # Statistik untuk card atas
-            recent_volatility = df['Indikator_Harga'].tail(14).std()
-            historical_volatility = df['Indikator_Harga'].std()
-            trend_4_minggu = df['Indikator_Harga'].tail(4).mean()
-
-            statistics = {
-                'latest_value': float(latest_iph),
-                'std': float(recent_volatility),
-                'mean': float(trend_4_minggu)
-            }
-
-            # 3. Get Forecast Data (untuk rekomendasi)
-            forecast_data = None
-            forecast_summary = None
+            """
+            MODIFIED: Menghasilkan alert, statistik, rekomendasi, DAN narasi insight.
+            """
             try:
-                forecast_result = self.get_current_forecast()
-                if forecast_result['success']:
-                    forecast_data = forecast_result['forecast']['data']
-                    forecast_summary = forecast_result['forecast']['summary']
-            except Exception as e:
-                logger.warning(f"Could not load forecast data for alerts: {e}")
-
-            # 4. Get Commodity Data (untuk rekomendasi)
-            comm_insights = None
-            try:
-                # Kita panggil commodity service untuk data minggu ini
-                from services.commodity_insight_service import CommodityInsightService
-                comm_service = CommodityInsightService() # Asumsi path default
-                comm_insights = comm_service.get_current_week_insights()
-            except Exception as e:
-                logger.warning(f"Could not load commodity insights for alerts: {e}")
-
-            # BUAT ALERTS (Logika lama Anda, bisa dipertahankan)
-            #             
-            # (Alert 1: Statistical Boundary)
-            if latest_iph > upper_2sigma:
-                alerts.append({
-                    'type': 'boundary_warning',
-                    'severity': 'warning',
-                    'icon': 'fa-arrow-up',
-                    'color': 'warning',
-                    'title': 'IPH Mendekati Batas Atas Statistik (2-Sigma)',
-                    'message': f'IPH saat ini ({latest_iph:.3f}%) berada di atas batas wajar ({upper_2sigma:.3f}%).',
-                    'date': latest_date.strftime('%d/%m/%Y'),
-                    'priority': 'medium'
-                })
-            elif latest_iph < lower_2sigma:
-                 alerts.append({
-                    'type': 'boundary_warning',
-                    'severity': 'warning',
-                    'icon': 'fa-arrow-down',
-                    'color': 'info',
-                    'title': 'IPH Mendekati Batas Bawah Statistik (2-Sigma)',
-                    'message': f'IPH saat ini ({latest_iph:.3f}%) berada di bawah batas wajar ({lower_2sigma:.3f}%).',
-                    'date': latest_date.strftime('%d/%m/%Y'),
-                    'priority': 'medium'
-                })
-            
-            # (Alert 2: Menambahkan alert dari commodity insights jika ada)
-            if comm_insights and comm_insights['success']:
-                 # Ambil 2 komoditas teratas
-                top_pos = comm_insights['commodity_impacts'].get('significant_positive', [])
-                top_neg = comm_insights['commodity_impacts'].get('significant_negative', [])
+                current_time = datetime.now()
+                # Cek cache (opsional, bisa dikomentari saat debug)
+                # if (self._alerts_cache and ...): return self._alerts_cache
                 
-                if top_pos:
-                    c = top_pos[0]
+                alerts = []
+                recommendations = []
+                
+                # 1. Load Data Aktual dari DB
+                df = self.data_handler.load_historical_data()
+                if df.empty or len(df) < 5:
+                    return {'success': False, 'message': 'Data tidak cukup'}
+                
+                # Pastikan urutan data benar
+                df['Tanggal'] = pd.to_datetime(df['Tanggal'])
+                df = df.sort_values('Tanggal').reset_index(drop=True)
+                
+                # Data Terbaru vs Sebelumnya
+                latest_rec = df.iloc[-1]
+                prev_rec = df.iloc[-2]
+                
+                latest_iph = float(latest_rec['Indikator_Harga'])
+                prev_iph = float(prev_rec['Indikator_Harga'])
+                iph_change = latest_iph - prev_iph
+                
+                # Statistik Volatilitas
+                recent_data = df.tail(14) # 2 minggu terakhir
+                std_dev = recent_data['Indikator_Harga'].std()
+                avg_recent = recent_data['Indikator_Harga'].mean()
+
+                # 2. Buat Narasi Insight (Untuk Card Tengah)
+                insight_narrative = {
+                    'title': 'Kondisi Stabil' if abs(iph_change) < 0.5 else ('Tren Inflasi' if iph_change > 0 else 'Tren Deflasi'),
+                    'description': f"IPH saat ini berada di level **{latest_iph:.2f}%**, mengalami {'kenaikan' if iph_change > 0 else 'penurunan'} sebesar **{abs(iph_change):.2f}%** dibandingkan periode sebelumnya ({prev_iph:.2f}%).",
+                    'volatility_status': 'Rendah' if std_dev < 0.5 else ('Sedang' if std_dev < 1.5 else 'Tinggi'),
+                    'volatility_desc': f"Volatilitas pasar terpantau **{'Tinggi' if std_dev > 1.5 else 'Normal'}** (Std Dev: {std_dev:.2f}).",
+                    'last_updated': latest_rec['Tanggal'].strftime('%d %B %Y')
+                }
+
+                # 3. Logika Alert Adaptif (Menyesuaikan Data)
+                
+                # Case A: Perubahan Signifikan (Naik/Turun > 0.5%)
+                if iph_change > 0.5:
                     alerts.append({
-                        'type': 'commodity', 'severity': 'info', 'icon': 'fa-seedling', 'color': 'danger',
-                        'title': f"Pendorong Inflasi: {c['name'].replace('_', ' ').title()}",
-                        'message': f"Komoditas {c['name'].replace('_', ' ').title()} berkontribusi signifikan ({c['impact']:.2f}%) terhadap IPH minggu ini.",
-                        'date': latest_date.strftime('%d/%m/%Y'), 'priority': 'medium'
+                        'type': 'trend', 'severity': 'warning', 'icon': 'fa-arrow-trend-up', 'color': 'warning',
+                        'title': 'Kenaikan IPH Terdeteksi',
+                        'message': f'Terjadi kenaikan IPH sebesar {iph_change:.2f}% dibanding minggu lalu.',
+                        'date': latest_rec['Tanggal'].strftime('%d/%m/%Y')
                     })
-                if top_neg:
-                    c = top_neg[0]
+                elif iph_change < -0.5:
                     alerts.append({
-                        'type': 'commodity', 'severity': 'info', 'icon': 'fa-leaf', 'color': 'success',
-                        'title': f"Pendorong Deflasi: {c['name'].replace('_', ' ').title()}",
-                        'message': f"Komoditas {c['name'].replace('_', ' ').title()} menahan IPH minggu ini ({c['impact']:.2f}%).",
-                        'date': latest_date.strftime('%d/%m/%Y'), 'priority': 'medium'
+                        'type': 'trend', 'severity': 'info', 'icon': 'fa-arrow-trend-down', 'color': 'info',
+                        'title': 'Penurunan IPH Terdeteksi',
+                        'message': f'Terjadi penurunan IPH sebesar {abs(iph_change):.2f}% dibanding minggu lalu.',
+                        'date': latest_rec['Tanggal'].strftime('%d/%m/%Y')
+                    })
+                
+                # Case B: Volatilitas Tinggi
+                if std_dev > 1.5:
+                    alerts.append({
+                        'type': 'volatility', 'severity': 'critical', 'icon': 'fa-wave-square', 'color': 'danger',
+                        'title': 'Volatilitas Pasar Tinggi',
+                        'message': f'Fluktuasi harga sangat tinggi (Std Dev: {std_dev:.2f}). Pasar tidak stabil.',
+                        'date': latest_rec['Tanggal'].strftime('%d/%m/%Y')
+                    })
+                
+                # Case C: Level IPH Ekstrem ( > 3% atau < -3%)
+                if latest_iph > 3.0:
+                    alerts.append({
+                        'type': 'price', 'severity': 'critical', 'icon': 'fa-fire', 'color': 'danger',
+                        'title': 'Level Inflasi Tinggi',
+                        'message': f'IPH mencapai {latest_iph:.2f}%, jauh di atas batas wajar.',
+                        'date': latest_rec['Tanggal'].strftime('%d/%m/%Y')
                     })
 
-            # BUAT REKOMENDASI 
-
-            # Rekomendasi 1: Berdasarkan Tren Prediksi
-            if forecast_data and forecast_summary:
-                if forecast_summary['trend'] == 'Naik' and forecast_summary['avg_prediction'] > 0.5:
-                    recommendations.append({
-                        'icon': 'fa-arrow-trend-up', 'color': 'danger',
-                        'title': 'Antisipasi Tren Inflasi',
-                        'text': f"Model memprediksi tren IPH akan **naik** dalam {len(forecast_data)} minggu ke depan (rata-rata {forecast_summary['avg_prediction']:.2f}%). Pertimbangkan langkah-langkah stabilisasi harga."
+                # Case D: Normal (Jika tidak ada alert lain)
+                if not alerts:
+                    alerts.append({
+                        'type': 'normal', 'severity': 'success', 'icon': 'fa-check-circle', 'color': 'success',
+                        'title': 'Kondisi Pasar Stabil',
+                        'message': f'IPH ({latest_iph:.2f}%) berada dalam rentang wajar dengan pergerakan stabil.',
+                        'date': latest_rec['Tanggal'].strftime('%d/%m/%Y')
                     })
-                elif forecast_summary['trend'] == 'Turun' and forecast_summary['avg_prediction'] < -0.5:
+
+                # 4. Rekomendasi Tindakan (Adaptif)
+                if latest_iph > 0.5:
                     recommendations.append({
-                        'icon': 'fa-arrow-trend-down', 'color': 'success',
-                        'title': 'Tren Deflasi Terprediksi',
-                        'text': f"Model memprediksi tren IPH akan **turun** dalam {len(forecast_data)} minggu ke depan (rata-rata {forecast_summary['avg_prediction']:.2f}%). Awasi agar deflasi tidak terlalu dalam."
+                        'icon': 'fa-shield-halved', 'color': 'warning', 'title': 'Stabilisasi Harga',
+                        'text': 'Lakukan **operasi pasar** untuk menekan tren kenaikan harga, terutama pada komoditas penyumbang inflasi terbesar.'
+                    })
+                elif latest_iph < -0.5:
+                    recommendations.append({
+                        'icon': 'fa-hand-holding-dollar', 'color': 'info', 'title': 'Jaga Harga Petani',
+                        'text': 'Pastikan harga di tingkat petani tidak jatuh terlalu dalam akibat **deflasi**.'
+                    })
+                
+                if std_dev > 1.0:
+                    recommendations.append({
+                        'icon': 'fa-magnifying-glass-chart', 'color': 'danger', 'title': 'Monitoring Intensif',
+                        'text': 'Lakukan **pemantauan harian** karena volatilitas pasar sedang tinggi.'
                     })
                 else:
                     recommendations.append({
-                        'icon': 'fa-arrows-left-right', 'color': 'primary',
-                        'title': 'Kondisi Harga Diprediksi Stabil',
-                        'text': f"Model memprediksi IPH akan relatif stabil ({forecast_summary['avg_prediction']:.2f}%). Lanjutkan monitoring rutin."
+                        'icon': 'fa-clipboard-check', 'color': 'success', 'title': 'Monitoring Rutin',
+                        'text': 'Pertahankan pemantauan berkala. Kondisi pasar relatif **kondusif**.'
                     })
 
-            # Rekomendasi 2: Berdasarkan Volatilitas
-            if recent_volatility > historical_volatility * 1.5:
-                recommendations.append({
-                    'icon': 'fa-wave-square', 'color': 'warning',
-                    'title': 'Waspada Volatilitas Tinggi',
-                    'text': f"Volatilitas harga 14 hari terakhir ({recent_volatility:.2f}) **lebih tinggi {((recent_volatility/historical_volatility)-1)*100:.0f}%** dibanding rata-rata historis ({historical_volatility:.2f}). Pasar sedang tidak stabil."
-                })
-                
-            # Rekomendasi 3: Berdasarkan Komoditas (Jika ada)
-            if comm_insights and comm_insights['success']:
-                top_inflasi = comm_insights['commodity_impacts'].get('significant_positive', [])
-                if top_inflasi:
-                    top_comm = top_inflasi[0]
-                    recommendations.append({
-                        'icon': 'fa-seedling', 'color': 'danger',
-                        'title': 'Fokus pada Komoditas Pendorong Inflasi',
-                        'text': f"**{top_comm['name'].replace('_', ' ').title()}** menjadi pendorong inflasi utama minggu ini dengan dampak **{top_comm['impact']:.2f}%**. Perlu monitoring khusus pada pasokan dan distribusi komoditas ini."
-                    })
-
-                top_deflasi = comm_insights['commodity_impacts'].get('significant_negative', [])
-                if top_deflasi:
-                    top_comm = top_deflasi[0]
-                    recommendations.append({
-                        'icon': 'fa-leaf', 'color': 'success',
-                        'title': 'Komoditas Pendorong Deflasi',
-                        'text': f"**{top_comm['name'].replace('_', ' ').title()}** menjadi pendorong deflasi utama minggu ini dengan dampak **{top_comm['impact']:.2f}%**. Pastikan harga di tingkat petani tetap wajar."
-                    })
-
-            # Rekomendasi 4: Rekomendasi Umum
-            if not recommendations:
-                recommendations.append({
-                    'icon': 'fa-check-circle', 'color': 'success',
-                    'title': 'Kondisi Terkendali',
-                    'text': 'Semua indikator (tren, volatilitas, dan dampak komoditas) berada dalam batas wajar. Lanjutkan monitoring rutin.'
-                })
-
-            # Simpan ke Cache
-            result = {
-                'success': True,
-                'alerts': alerts[:5], # Batasi 5 alert teratas
-                'recommendations': recommendations, # Kirim semua rekomendasi
-                'statistics': statistics, # Kirim statistik untuk card atas
-                'total_alerts': len(alerts),
-                'generated_at': datetime.now().isoformat(),
-                'cache_info': {'cached': False, 'generated_fresh': True},
-                'data_period': {
-                    'start': df['Tanggal'].min().strftime('%d/%m/%Y'),
-                    'end': df['Tanggal'].max().strftime('%d/%m/%Y'),
-                    'records': len(df)
+                # --- Return Result ---
+                result = {
+                    'success': True,
+                    'alerts': alerts,
+                    'recommendations': recommendations,
+                    'statistics': { # Data untuk 3 card paling atas
+                        'latest_value': latest_iph,
+                        'std': std_dev,
+                        'mean': avg_recent # Trend rata-rata
+                    },
+                    'insight_narrative': insight_narrative, # Data baru untuk card tengah
+                    'generated_at': datetime.now().isoformat()
                 }
-            }
-            
-            self._alerts_cache = result
-            self._alerts_cache_time = current_time
+                
+                self._alerts_cache = result
+                self._alerts_cache_time = current_time
+                return result
 
-            return result
-
-        except Exception as e:
-            logger.error(f"Error generating economic alerts: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return {
-                'success': False,
-                'alerts': [],
-                'recommendations': [],
-                'statistics': {},
-                'error': str(e)
-            }
+            except Exception as e:
+                logger.error(f"Alert error: {str(e)}")
+                return {'success': False, 'error': str(e)}
