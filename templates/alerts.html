@@ -12,12 +12,6 @@
         </h1>
         <p class="text-muted mb-0">Monitoring volatilitas dan peringatan perubahan harga komoditas</p>
     </div>
-    <div class="btn-toolbar">
-        <button type="button" class="btn btn-outline-primary" onclick="refreshAlerts()">
-            <i class="fas fa-sync-alt me-1"></i>
-            Refresh
-        </button>
-    </div>
 </div>
 
 <!-- IPH Komoditas Analysis -->
@@ -29,7 +23,6 @@
                     <div>
                         <h6 class="text-white-50">IPH Saat Ini</h6>
                         <h3 class="mb-0" id="currentIPH">-0.83%</h3>
-                        <small class="text-white-50">vs minggu lalu</small>
                     </div>
                     <i class="fas fa-chart-line fa-2x opacity-50"></i>
                 </div>
@@ -43,7 +36,7 @@
                     <div>
                         <h6 class="text-white-50">Volatilitas IPH</h6>
                         <h3 class="mb-0" id="iphVolatility">1.24</h3>
-                        <small class="text-white-50">Standard Deviation</small>
+                        <small class="text-white-50">Standar Deviasi</small>
                     </div>
                     <i class="fas fa-wave-square fa-2x opacity-50"></i>
                 </div>
@@ -79,8 +72,7 @@
             </div>
             <div class="card-body">
                 <div id="economicAlertsList">
-                    <!-- Economic alerts will be loaded here -->
-                </div>
+=                </div>
             </div>
         </div>
     </div>
@@ -97,46 +89,9 @@
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="alert alert-info border-0 h-100">
-                            <div class="d-flex align-items-start">
-                                <div class="flex-shrink-0 me-3">
-                                    <i class="fas fa-info-circle fa-lg mt-1"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="alert-heading mb-2 fw-bold">Analisis IPH Terkini</h6>
-                                    <p class="mb-2 text-dark">
-                                        IPH menunjukkan penurunan -0.83% dibanding minggu lalu, 
-                                        dipengaruhi penurunan harga beras (-1.26%) dan bawang merah (-0.29%).
-                                    </p>
-                                    <small class="text-muted d-flex align-items-center">
-                                        <i class="fas fa-clock me-1"></i>
-                                        Terakhir diperbarui: 25 Oktober 2025
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="alert alert-warning border-0 h-100">
-                            <div class="d-flex align-items-start">
-                                <div class="flex-shrink-0 me-3">
-                                    <i class="fas fa-exclamation-triangle fa-lg mt-1"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="alert-heading mb-2 fw-bold">Peringatan Volatilitas Tinggi</h6>
-                                    <p class="mb-2 text-dark">
-                                        Volatilitas IPH mencapai 1.24 (standar deviasi), menunjukkan fluktuasi harga komoditas yang tinggi. 
-                                        Cabai rawit dan bawang merah menunjukkan volatilitas ekstrem.
-                                    </p>
-                                    <small class="text-muted d-flex align-items-center">
-                                        <i class="fas fa-clock me-1"></i>
-                                        Terakhir diperbarui: 25 Oktober 2025
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
+                <div id="insightsList">
+                    <div class="text-center py-4">
+                        <p class="mt-2 text-muted">Memuat insights...</p>
                     </div>
                 </div>
             </div>
@@ -171,16 +126,16 @@
 {% block scripts %}
 <script>
 // =========================================================================
-// SCRIPT BARU UNTUK HALAMAN ALERTS (v2 - Rekomendasi Dinamis)
+// SCRIPT UNTUK HALAMAN ALERTS - DYNAMIC INSIGHTS & BOLD RECOMMENDATIONS
 // =========================================================================
 
 // Variabel global untuk menyimpan data
 let economicAlerts = [];
 let economicIndicators = {};
-let recommendations = []; // Variabel baru
-
+let recommendations = []; 
+let insights = [];
 /**
- * Panggilan API yang aman dengan timeout dan error handling.
+ * API dengan timeout dan error handling.
  */
 async function safeApiCall(url) {
     try {
@@ -221,12 +176,13 @@ async function loadData() {
     
     if (data.success) {
         economicAlerts = data.alerts || [];
-        recommendations = data.recommendations || []; // Ambil rekomendasi baru
-        
+        recommendations = data.recommendations || []; 
+        insights = data.insights || [];
+
         displayEconomicAlerts();
-        displayRecommendations(); // Panggil fungsi render baru
-        
-        // Perbarui card statistik dari data yang sama
+        displayRecommendations(); 
+        displayInsights();
+
         if (data.statistics) { 
             updateEconomicIndicators(data.statistics);
         }
@@ -236,6 +192,7 @@ async function loadData() {
         const errorMsg = data.error || 'Gagal memuat data';
         showError('economicAlertsList', errorMsg, 'loadData()');
         showError('recommendationsList', errorMsg, 'loadData()');
+        showError('insightsList', errorMsg, 'loadData()');
     }
 }
 
@@ -284,6 +241,67 @@ function displayEconomicAlerts() {
 }
 
 /**
+ * Render Dynamic Insights
+ */
+function displayInsights() {
+    const container = document.getElementById('insightsList');
+    if (!container) return;
+
+    if (!insights || insights.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-lightbulb fa-3x mb-3"></i>
+                <p>Belum ada insight yang tersedia.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Map insight type to Bootstrap alert class
+    const typeClassMap = {
+        'success': 'success',
+        'info': 'info',
+        'warning': 'warning',
+        'danger': 'danger'
+    };
+
+    let html = '<div class="row g-4">';
+    
+    insights.forEach((insight, index) => {
+        const alertClass = typeClassMap[insight.type] || 'info';
+        const icon = insight.icon || 'fa-info-circle';
+        
+        // Determine column size based on number of insights
+        const colClass = insights.length === 1 ? 'col-12' : 
+                        insights.length === 2 ? 'col-md-6' : 
+                        'col-md-6 col-lg-4';
+        
+        html += `
+            <div class="${colClass}">
+                <div class="alert alert-${alertClass} border-0 h-100">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-shrink-0 me-3">
+                            <i class="fas ${icon} fa-lg mt-1"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="alert-heading mb-2 fw-bold">${insight.title}</h6>
+                            <p class="mb-2 text-dark">${insight.message}</p>
+                            <small class="text-muted d-flex align-items-center">
+                                <i class="fas fa-clock me-1"></i>
+                                Terakhir diperbarui: ${insight.timestamp}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+/**
  * FUNGSI BARU: Render Rekomendasi Dinamis
  */
 function displayRecommendations() {
@@ -304,13 +322,14 @@ function displayRecommendations() {
     recommendations.forEach(rec => {
         const color = rec.color || 'primary';
         const icon = rec.icon || 'fa-list-check';
-        
+        const displayText = rec.text_html || rec.text || '';
+
         html += `
             <div class="list-group-item d-flex align-items-start px-0 py-3">
                 <i class="fas ${icon} text-${color} fa-lg me-3 mt-1"></i>
                 <div class="flex-grow-1">
                     <h6 class="mb-1 fw-bold text-dark">${rec.title}</h6>
-                    <span class="small">${rec.text}</span>
+                    <span class="small">${displayText}</span>
                 </div>
             </div>
         `;
@@ -324,15 +343,12 @@ function displayRecommendations() {
  * Update 3 card statistik di atas
  */
 function updateEconomicIndicators(stats) {
-    // 'stats' sekarang berasal dari get_real_economic_alerts
-    // Pastikan nama field ini cocok dengan yang ada di services/forecast_service.py
     const indicators = {
         currentIPH: (stats.latest_value !== undefined ? stats.latest_value.toFixed(2) : "-") + "%",
         iphVolatility: (stats.std !== undefined ? stats.std.toFixed(2) : "-"),
         iphTrend: (stats.mean !== undefined ? stats.mean.toFixed(2) : "-") + "%" 
     };
     
-    // Pastikan elemen ini ada di HTML Anda
     const currentIPHEl = document.getElementById('currentIPH');
     const iphVolatilityEl = document.getElementById('iphVolatility');
     const iphTrendEl = document.getElementById('iphTrend');
@@ -340,14 +356,6 @@ function updateEconomicIndicators(stats) {
     if (currentIPHEl) currentIPHEl.textContent = indicators.currentIPH;
     if (iphVolatilityEl) iphVolatilityEl.textContent = indicators.iphVolatility;
     if (iphTrendEl) iphTrendEl.textContent = indicators.iphTrend;
-}
-
-/**
- * Fungsi Refresh Tombol
- */
-function refreshAlerts() {
-    loadData(); // Cukup panggil satu fungsi ini
-    showAlert('Data peringatan dan rekomendasi diperbarui!', 'info');
 }
 
 /**

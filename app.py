@@ -952,7 +952,7 @@ def get_forecast_history():
         }), 500
 
 
-# ✅ TAMBAHAN: API untuk Statistics
+# API untuk Statistics
 @app.route('/admin/api/forecasts/statistics', methods=['GET'])
 @login_required
 @admin_required
@@ -1011,59 +1011,6 @@ def get_forecast_statistics():
             'error': str(e)
         }), 500
 
-
-# ✅ TAMBAHAN: API untuk Export
-@app.route('/admin/api/forecasts/export', methods=['GET'])
-@login_required
-@admin_required
-def export_forecast_history():
-    """Export forecast history ke CSV"""
-    try:
-        from database import db, ForecastHistory
-        import csv
-        from io import StringIO
-        from flask import make_response
-        
-        # Rollback dulu
-        try:
-            db.session.rollback()
-        except:
-            pass
-        
-        # Get all forecasts
-        forecasts = ForecastHistory.query.order_by(ForecastHistory.created_at.desc()).all()
-        
-        # Create CSV
-        si = StringIO()
-        cw = csv.writer(si)
-        
-        # Header
-        cw.writerow(['ID', 'Date', 'Model', 'Weeks', 'Avg Prediction', 'Trend', 'MAE', 'RMSE', 'Created By'])
-        
-        # Data
-        for f in forecasts:
-            cw.writerow([
-                f.id,
-                f.created_at.strftime('%Y-%m-%d %H:%M') if f.created_at else '',
-                f.model_name,
-                f.forecast_weeks,
-                f'{f.avg_prediction:.4f}' if f.avg_prediction else '',
-                f.trend,
-                f'{f.validation_mae:.4f}' if f.validation_mae else '',
-                f'{f.validation_rmse:.4f}' if f.validation_rmse else '',
-                f.created_by
-            ])
-        
-        # Create response
-        output = make_response(si.getvalue())
-        output.headers["Content-Disposition"] = "attachment; filename=forecast_history.csv"
-        output.headers["Content-type"] = "text/csv"
-        
-        return output
-        
-    except Exception as e:
-        logger.error(f"❌ Error exporting forecast history: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 # 4. VISUALIZATION APIs
 
@@ -1581,6 +1528,176 @@ def api_commodity_data_status():
 
 # 6. ALERTS APIs
 
+@app.route('/api/economic-alerts')
+def economic_alerts():
+    """API endpoint untuk mendapatkan economic alerts dan insights dinamis"""
+    try:
+        from services.forecast_service import ForecastService
+        from services.data_handler import DataHandler
+        
+        forecast_service = ForecastService()
+        data_handler = DataHandler()
+        
+        # Get real alerts
+        alerts_data = forecast_service.get_real_economic_alerts()
+        
+        if not alerts_data or not alerts_data.get('success'):
+            return jsonify({
+                'success': False,
+                'error': 'Failed to generate alerts',
+                'alerts': [],
+                'recommendations': [],
+                'insights': [],
+                'statistics': {}
+            })
+        
+        # ✅ GENERATE DYNAMIC INSIGHTS
+        insights = generate_dynamic_insights(alerts_data.get('statistics', {}))
+        
+        # ✅ FIX: Parse recommendations to enable bold formatting
+        recommendations = alerts_data.get('recommendations', [])
+        for rec in recommendations:
+            if 'text' in rec:
+                # Convert **text** to <strong>text</strong>
+                rec['text_html'] = rec['text'].replace('**', '<strong>', 1).replace('**', '</strong>', 1)
+                # Handle multiple bold patterns
+                import re
+                rec['text_html'] = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', rec['text'])
+        
+        return jsonify({
+            'success': True,
+            'alerts': alerts_data.get('alerts', []),
+            'recommendations': recommendations,
+            'insights': insights,  # ✅ NEW: Dynamic insights
+            'statistics': alerts_data.get('statistics', {}),
+            'data_period': alerts_data.get('data_period', {}),
+            'total_alerts': len(alerts_data.get('alerts', []))
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error in economic_alerts API: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'alerts': [],
+            'recommendations': [],
+            'insights': [],
+            'statistics': {}
+        }), 500
+
+def generate_dynamic_insights(statistics):
+    """
+    Generate dynamic insights based on IPH statistics
+    Returns list of insight objects with different scenarios
+    """
+    insights = []
+    
+    if not statistics:
+        return [{
+            'type': 'info',
+            'icon': 'fa-info-circle',
+            'title': 'Data Tidak Tersedia',
+            'message': 'Belum ada data statistik IPH yang tersedia.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }]
+    
+    latest_value = statistics.get('latest_value', 0)
+    mean_value = statistics.get('mean', 0)
+    std_value = statistics.get('std', 0)
+    min_value = statistics.get('min', 0)
+    max_value = statistics.get('max', 0)
+    
+    # ✅ SCENARIO 1: Current IPH Analysis
+    if latest_value < -1.0:
+        iph_insight = {
+            'type': 'warning',
+            'icon': 'fa-arrow-trend-down',
+            'title': 'Penurunan IPH Signifikan',
+            'message': f'IPH menunjukkan penurunan tajam sebesar {latest_value:.2f}% dibanding rata-rata ({mean_value:.2f}%). '
+                      f'Ini mengindikasikan deflasi harga komoditas yang perlu diwaspadai.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    elif latest_value > 1.0:
+        iph_insight = {
+            'type': 'danger',
+            'icon': 'fa-arrow-trend-up',
+            'title': 'Kenaikan IPH Tinggi',
+            'message': f'IPH mengalami kenaikan signifikan {latest_value:.2f}% dibanding rata-rata ({mean_value:.2f}%). '
+                      f'Inflasi komoditas memerlukan perhatian khusus.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    elif -0.5 <= latest_value <= 0.5:
+        iph_insight = {
+            'type': 'success',
+            'icon': 'fa-check-circle',
+            'title': 'IPH Stabil',
+            'message': f'IPH berada pada level stabil {latest_value:.2f}%, mendekati rata-rata historis ({mean_value:.2f}%). '
+                      f'Harga komoditas dalam kondisi normal.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    else:
+        iph_insight = {
+            'type': 'info',
+            'icon': 'fa-info-circle',
+            'title': 'Analisis IPH Terkini',
+            'message': f'IPH saat ini {latest_value:.2f}% dengan rata-rata {mean_value:.2f}%. '
+                      f'Pergerakan harga komoditas dalam batas wajar.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    
+    insights.append(iph_insight)
+    
+    # ✅ SCENARIO 2: Volatility Analysis
+    if std_value > 1.5:
+        volatility_insight = {
+            'type': 'danger',
+            'icon': 'fa-wave-square',
+            'title': 'Volatilitas Ekstrem Terdeteksi',
+            'message': f'Volatilitas IPH mencapai {std_value:.2f} (standar deviasi), menunjukkan fluktuasi harga yang sangat tinggi. '
+                      f'Rentang pergerakan: {min_value:.2f}% hingga {max_value:.2f}%. '
+                      f'Diperlukan monitoring ketat terhadap komoditas sensitif.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    elif std_value > 1.0:
+        volatility_insight = {
+            'type': 'warning',
+            'icon': 'fa-wave-square',
+            'title': 'Volatilitas Tinggi',
+            'message': f'Volatilitas IPH sebesar {std_value:.2f} menunjukkan fluktuasi harga yang cukup tinggi. '
+                      f'Rentang: {min_value:.2f}% - {max_value:.2f}%. '
+                      f'Perlu perhatian pada komoditas dengan perubahan harga ekstrem.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    else:
+        volatility_insight = {
+            'type': 'info',
+            'icon': 'fa-wave-square',
+            'title': 'Volatilitas Terkendali',
+            'message': f'Volatilitas IPH berada pada level {std_value:.2f}, menunjukkan stabilitas harga komoditas. '
+                      f'Fluktuasi harga dalam rentang normal {min_value:.2f}% - {max_value:.2f}%.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+    
+    insights.append(volatility_insight)
+    
+    # ✅ SCENARIO 3: Trend Analysis (if mean is significantly different from 0)
+    if abs(mean_value) > 0.5:
+        trend_direction = "naik" if mean_value > 0 else "turun"
+        trend_icon = "fa-arrow-up" if mean_value > 0 else "fa-arrow-down"
+        trend_type = "warning" if abs(mean_value) > 1.0 else "info"
+        
+        trend_insight = {
+            'type': trend_type,
+            'icon': trend_icon,
+            'title': f'Trend IPH Cenderung {trend_direction.capitalize()}',
+            'message': f'Rata-rata perubahan IPH menunjukkan kecenderungan {trend_direction} sebesar {abs(mean_value):.2f}%. '
+                      f'Trend ini perlu dipantau untuk antisipasi perubahan harga jangka menengah.',
+            'timestamp': datetime.now().strftime('%d %B %Y')
+        }
+        insights.append(trend_insight)
+    
+    return insights
+
 @app.route('/api/alerts/statistical')
 def api_statistical_alerts():
     """API endpoint for statistical alerts"""
@@ -1650,6 +1767,58 @@ def api_recent_alerts():
     })
 
 # 7. EXPORT APIs
+
+@app.route('/admin/api/forecasts/export', methods=['GET'])
+@login_required
+@admin_required
+def export_forecast_history():
+    """Export forecast history ke CSV"""
+    try:
+        from database import db, ForecastHistory
+        import csv
+        from io import StringIO
+        from flask import make_response
+        
+        # Rollback dulu
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # Get all forecasts
+        forecasts = ForecastHistory.query.order_by(ForecastHistory.created_at.desc()).all()
+        
+        # Create CSV
+        si = StringIO()
+        cw = csv.writer(si)
+        
+        # Header
+        cw.writerow(['ID', 'Date', 'Model', 'Weeks', 'Avg Prediction', 'Trend', 'MAE', 'RMSE', 'Created By'])
+        
+        # Data
+        for f in forecasts:
+            cw.writerow([
+                f.id,
+                f.created_at.strftime('%Y-%m-%d %H:%M') if f.created_at else '',
+                f.model_name,
+                f.forecast_weeks,
+                f'{f.avg_prediction:.4f}' if f.avg_prediction else '',
+                f.trend,
+                f'{f.validation_mae:.4f}' if f.validation_mae else '',
+                f'{f.validation_rmse:.4f}' if f.validation_rmse else '',
+                f.created_by
+            ])
+        
+        # Create response
+        output = make_response(si.getvalue())
+        output.headers["Content-Disposition"] = "attachment; filename=forecast_history.csv"
+        output.headers["Content-type"] = "text/csv"
+        
+        return output
+        
+    except Exception as e:
+        logger.error(f"❌ Error exporting forecast history: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/export-data', methods=['GET'])
 @admin_required

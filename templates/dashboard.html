@@ -64,7 +64,7 @@
             </h1>
             <p class="text-muted mb-0">Dashboard Peramalan IPH</p>
         </div>
-    </div>
+        </div>
     <div class="d-flex align-items-center gap-2">
         <button type="button" class="btn btn-primary btn-lg shadow-sm" onclick="showForecastModal()">
             <i class="fas fa-chart-line me-2"></i>Buat Forecast
@@ -96,9 +96,7 @@
             </div>
             <div class="card-body p-0">
                 <div id="forecastChart" data-chart-id="historicalChart" style="height: 500px;">
-                    <div class="d-flex justify-content-center align-items-center h-100">
                     </div>
-                </div>
             </div>
         </div>
     </div>
@@ -114,9 +112,7 @@
                 </h6>
             </div>
             <div class="card-body" id="economicAlertsContainer">
-                <div class="text-center py-3">
                 </div>
-            </div>
         </div>
     </div>
 </div>
@@ -134,11 +130,7 @@
             </div>
             <div class="card-body p-0">
                 <div id="forecastTable" class="table-responsive">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary"></div>
-                        <p class="mt-2 text-muted">Memuat tabel peramalan...</p>
                     </div>
-                </div>
             </div>
         </div>
     </div>
@@ -155,17 +147,18 @@
             </div>
             <div class="card-body">
                 <div id="modelPerformanceGrid">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-warning"></div>
-                        <p class="mt-2 text-muted">Memuat ringkasan performa...</p>
                     </div>
-                </div>
                 <hr>
                 <div id="modelPerformanceCards">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-info mb-2"></div>
-                        <div class="text-muted">Memuat metrik tiap model...</div>
                     </div>
+                <div class="alert alert-light border-secondary-subtle small mt-3 p-3">
+                    <h6 class="mb-2 fw-bold"><i class="fas fa-question-circle me-2"></i>Tentang Metrik Peramalan</h6>
+                    <ul class="mb-0 ps-3">
+                        <li>**MAE (Mean Absolute Error):** Rata-rata selisih mutlak antara prediksi dan nilai aktual. Semakin kecil, semakin baik.</li>
+                        <li>**RMSE (Root Mean Square Error):** Mirip dengan MAE, tetapi memberi bobot lebih besar pada *error* yang besar. Semakin kecil, semakin baik.</li>
+                        <li>**R² (R-squared Score):** Mengukur seberapa baik model Anda cocok dengan data. Nilai ideal adalah **1.0** (atau 100%). Nilai yang mendekati 0 atau negatif berarti model tidak berguna.</li>
+                        <li>**MAPE (Mean Absolute Percentage Error):** Rata-rata error dalam persentase. Lebih mudah dipahami: "Model Anda salah sebesar X%". Semakin kecil, semakin baik.</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -178,11 +171,11 @@
             <div class="card-header bg-white py-3">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-balance-scale text-info me-2"></i>
-                    Perbedaan Model
+                    Perbedaan Model 
                 </h5>
             </div>
             <div class="card-body" id="modelDifferencesContainer">
-            </div>
+                </div>
         </div>
     </div>
 </div>
@@ -250,6 +243,24 @@ async function loadAllDashboardData() {
 }
 
 // --- Model Performance Functions ---
+function formatDateToWeekLabel(dateStr) {
+    if (!dateStr) return '';
+    
+    const parts = dateStr.split('-');
+    const year = parseInt(parts[0]);
+    const monthIndex = parseInt(parts[1]) - 1; // JS months 0-11
+    const day = parseInt(parts[2]);
+    
+    const monthNames = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    
+    // Hitung minggu (sederhana: 1-7=M1, 8-14=M2, dst)
+    const weekNum = Math.ceil(day / 7);
+
+    return `M${weekNum} ${monthNames[monthIndex]} ${year}`;
+}
 
 async function loadDetailedModelPerformance() {
     console.log('🔄 Loading detailed model performance...');
@@ -295,6 +306,7 @@ async function loadDetailedModelPerformance() {
 }
 
 function updateModelPerformanceGrid(stats) {
+    const bestModelName = stats.best_model ? stats.best_model.replace('_', ' ') : 'Tidak Ada';
     const container = document.getElementById('modelPerformanceGrid');
     container.innerHTML = `
         <div class="row g-3">
@@ -438,7 +450,7 @@ async function loadForecastChart() {
         
         if (data.success && data.historical) {
             updateMetadataBadges(data.metadata);
-            
+            const lastHistoricalPoint = data.historical[data.historical.length - 1];
             const traces = [{
                 x: data.historical.map(i => i.date),
                 y: data.historical.map(i => i.value),
@@ -450,13 +462,21 @@ async function loadForecastChart() {
                 const forecastDates = data.forecast.map(item => item.date);
                 const forecastValues = data.forecast.map(item => item.prediction);
                 
+                const combinedForecastDates = [lastHistoricalPoint.date, ...forecastDates];
+                const combinedForecastValues = [lastHistoricalPoint.value, ...forecastValues];
+
                 // Calculate custom data for hover template
                 const forecastCustomData = data.forecast.map(item => [
                     item.lower_bound ?? null, 
                     item.upper_bound ?? null, 
-                    item.confidence ?? 0.8
+                    item.confidence_width  ?? 0.8
                 ]);
 
+                const combinedCustomData = [[lastHistoricalPoint.lower_bound ?? null, lastHistoricalPoint.upper_bound ?? null, null], ...forecastCustomData];
+                
+                const upper = data.forecast.map(i => i.upper_bound);
+                const lower = data.forecast.map(i => i.lower_bound);
+                
                 traces.push({
                     x: forecastDates,
                     y: forecastValues,
@@ -473,7 +493,6 @@ async function loadForecastChart() {
                     customdata: forecastCustomData,
                     hovertemplate: '<b>%{x}</b>' +
                                    '<br>Prediksi: %{y:.3f}%' +
-                                   '<br>Confidence: %{customdata[2]:.1%}' +
                                    '<br>Batas Bawah: %{customdata[0]:.3f}%' +
                                    '<br>Batas Atas: %{customdata[1]:.3f}%' +
                                    '<extra></extra>'
