@@ -1,4 +1,5 @@
-﻿from dotenv import load_dotenv
+﻿import io
+from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, render_template, request, jsonify, flash, Response, make_response
@@ -1820,73 +1821,6 @@ def export_forecast_history():
         logger.error(f"❌ Error exporting forecast history: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/export-data', methods=['GET'])
-def export_data():
-    """Export current data to CSV"""
-    try:
-        data_type = request.args.get('type', 'historical')
-        df = pd.DataFrame()
-        filename = f"export_{datetime.now().strftime('%Y%m%d')}.csv"
-        
-        if data_type == 'historical':
-            df = forecast_service.data_handler.load_historical_data()
-            if df.empty:
-                return jsonify({'success': False, 'message': 'No historical data available'})
-            
-            filename = f"historical_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            
-        elif data_type == 'forecast':
-            dashboard_data = forecast_service.get_dashboard_data()
-            if not dashboard_data['success'] or not dashboard_data.get('current_forecast'):
-                return jsonify({'success': False, 'message': 'No forecast data available'})
-            
-            forecast_data = dashboard_data['current_forecast']['data']
-            df = pd.DataFrame(forecast_data)
-            filename = f"forecast_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            
-        elif data_type == 'all':
-            historical_df = forecast_service.data_handler.load_historical_data()
-            dashboard_data = forecast_service.get_dashboard_data()
-            
-            if historical_df.empty:
-                return jsonify({'success': False, 'message': 'No data available for export'})
-            
-            df = historical_df.copy()
-            filename = f"complete_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            
-            if dashboard_data['success'] and dashboard_data.get('current_forecast'):
-                forecast_data = dashboard_data['current_forecast']['data']
-                forecast_df = pd.DataFrame(forecast_data)
-                
-                df['Data_Type'] = 'Historical'
-                forecast_df['Data_Type'] = 'Forecast'
-                forecast_df['Indikator_Harga'] = forecast_df['Prediksi']
-                
-                df = pd.concat([df, forecast_df[['Tanggal', 'Indikator_Harga', 'Data_Type']]], ignore_index=True)
-        
-        else:
-            return jsonify({'success': False, 'message': 'Invalid data type specified'})
-        
-        export_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        df.to_csv(export_path, index=False)
-        
-        file_size = os.path.getsize(export_path)
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'filepath': export_path,
-            'file_size': file_size,
-            'records': len(df),
-            'download_url': f'/download/{filename}'
-        })
-    
-    except Exception as e:
-        return jsonify({
-            'success': False, 
-            'message': f'Export failed: {str(e)}'
-        })
-
 @app.route('/download/<filename>')
 def download_file(filename):
     """Download exported file"""
@@ -2014,7 +1948,6 @@ def generate_forecast():
         })
 
 @app.route('/api/export-data', methods=['GET'])
-@admin_required
 def export_data():
     """MODIFIED: Export data to CSV from memory (Vercel/Render compatible) - Uses make_response"""
     try:
