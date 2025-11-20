@@ -103,33 +103,29 @@
 {% block scripts %}
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
+    
+// Variabel global
 let currentForecastPage = 1;
-const forecastPerPage = 20;
+const forecastPerPage = 10;
 
-// Load forecast statistics
-async function loadForecastStatistics() {
-    try {
-        const response = await fetch('/admin/api/forecasts/statistics');
-        const result = await response.json();
-        
-        if (result.success && result.statistics) {
-            document.getElementById('totalForecasts').textContent = result.statistics.total_forecasts || 0;
-            document.getElementById('forecastsThisMonth').textContent = result.statistics.this_month || 0;
-            document.getElementById('mostUsedModel').textContent = result.statistics.most_used_model || 'N/A';
-        }
-    } catch (error) {
-        console.error('Error loading statistics:', error);
-    }
-}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Forecast management page loaded');
+    loadForecastHistory(1); // Panggil dengan page 1
+    
+    // Event listener filter
+    document.getElementById('filterModel')?.addEventListener('change', () => loadForecastHistory(1));
+});
 
-// Load forecast history
-async function loadForecastHistory() {
+async function loadForecastHistory(page = 1) {
     const modelFilter = document.getElementById('filterModel')?.value || '';
+    
+    // PERBAIKAN: Gunakan URL '/admin/api/forecasts/history'
     const url = `/admin/api/forecasts/history?page=${page}&per_page=${forecastPerPage}${modelFilter ? '&model=' + encodeURIComponent(modelFilter) : ''}`;
     
-    document.getElementById('forecastHistoryBody').innerHTML = `
+    const tbody = document.getElementById('forecastHistoryBody');
+    tbody.innerHTML = `
         <tr>
-            <td colspan="5" class="text-center py-4">
+            <td colspan="6" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status"></div>
                 <p class="text-muted mt-2">Memuat history...</p>
             </td>
@@ -142,178 +138,76 @@ async function loadForecastHistory() {
         
         if (result.success && result.data) {
             renderForecastHistory(result.data);
+            // Update pagination controls jika ada
+            updateForecastPagination(result.pagination);
             currentForecastPage = page;
         } else {
-            showAlert('Gagal memuat forecast history: ' + (result.error || 'Unknown error'), 'danger');
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Gagal memuat: ${result.error || 'Unknown error'}</td></tr>`;
         }
     } catch (error) {
-        document.getElementById('forecastHistoryBody').innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-4">
-                    <div class="alert alert-danger">Error: ${error.message}</div>
-                </td>
-            </tr>
-        `;
+        console.error('Error loading history:', error);
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Error: ${error.message}</td></tr>`;
     }
 }
 
-function renderForecastHistory(data) {
+function renderForecastHistory(history) {
     const tbody = document.getElementById('forecastHistoryBody');
+    tbody.innerHTML = '';
     
-    if (!data.items || data.items.length === 0) {
-        tbody.innerHTML = `
+    if (history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">Belum ada riwayat peramalan.</td></tr>`;
+        return;
+    }
+    
+    history.forEach(item => {
+        const cleanModelName = item.model_name.replace(/_/g, ' ');
+        let trendBadge = 'bg-secondary';
+        if (item.trend === 'Naik') trendBadge = 'bg-danger';
+        else if (item.trend === 'Turun') trendBadge = 'bg-success';
+        
+        const row = `
             <tr>
-                <td colspan="5" class="text-center py-4">
-                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                    <p class="text-muted">Belum ada forecast history</p>
+                <td>${item.created_at}</td>
+                <td><span class="fw-medium">${cleanModelName}</span></td>
+                <td><span class="badge bg-info text-dark">${item.weeks} Minggu</span></td>
+                <td>${item.avg_prediction ? item.avg_prediction.toFixed(2) + '%' : '-'}</td>
+                <td><span class="badge ${trendBadge}">${item.trend || 'Stabil'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteForecast(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             </tr>
         `;
-        return;
-    }
-    
-    let html = '';
-    data.items.forEach(item => {
-        const date = item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID') : '-';
-        const avgPred = item.avg_prediction !== null && item.avg_prediction !== undefined 
-            ? item.avg_prediction.toFixed(2) + '%' : '-';
-        const trendBadge = item.trend === 'Naik' 
-            ? '<span class="badge bg-success">Naik</span>' 
-            : item.trend === 'Turun' 
-            ? '<span class="badge bg-danger">Turun</span>' 
-            : '<span class="badge bg-secondary">Stable</span>';
-        
-        html += `
-            <tr>
-                <td>#${item.id}</td>
-                <td>${date}</td>
-                <td><span class="badge bg-primary">${item.model_name || 'N/A'}</span></td>
-                <td>${item.weeks_forecasted || 0} minggu</td>
-                <td>${avgPred}</td>
-                <td>${trendBadge}</td>
-            </tr>
-        `;
+        tbody.innerHTML += row;
     });
-    
-    tbody.innerHTML = html;
-    
-    // Pagination
-    if (data.pagination && data.pagination.pages > 1) {
-        const paginationHtml = generatePagination(data.pagination, loadForecastHistory);
-        tbody.insertAdjacentHTML('afterend', `<tr><td colspan="6">${paginationHtml}</td></tr>`);
-    }
 }
 
-// Delete forecast removed - Forecast history should be preserved for audit trail
-
-// Export forecast history
-function exportForecastHistory() {
-    window.location.href = '/admin/api/forecasts/export';
-}
-
-// Load analytics chart
-async function loadForecastAnalytics() {
-    try {
-        // Get all forecasts for analytics
-        const response = await fetch('/admin/api/forecasts/history?per_page=1000');
-        const result = await response.json();
-        
-        if (result.success && result.data && result.data.items) {
-            renderAnalyticsChart(result.data.items);
-        }
-    } catch (error) {
-        console.error('Error loading analytics:', error);
-    }
-}
-
-function renderAnalyticsChart(forecasts) {
-    if (!forecasts || forecasts.length === 0) {
-        document.getElementById('forecastAnalyticsChart').innerHTML = `
-            <div class="text-center py-5 text-muted">
-                <i class="fas fa-chart-pie fa-3x mb-3"></i>
-                <p>Tidak ada data untuk analitik</p>
-            </div>
-        `;
-        return;
-    }
+function updateForecastPagination(pagination) {
+    // Implementasi pagination sederhana (Next/Prev)
+    // Pastikan ada elemen dengan ID 'forecastPagination' di HTML
+    const container = document.getElementById('forecastPagination');
+    if(!container) return;
     
-    // Group by model
-    const modelCounts = {};
-    const monthlyCounts = {};
-    
-    forecasts.forEach(forecast => {
-        const model = forecast.model_name || 'Unknown';
-        modelCounts[model] = (modelCounts[model] || 0) + 1;
-        
-        if (forecast.created_at) {
-            const month = new Date(forecast.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short' });
-            monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
-        }
-    });
-    
-    // Model distribution pie chart
-    const modelData = {
-        values: Object.values(modelCounts),
-        labels: Object.keys(modelCounts),
-        type: 'pie',
-        name: 'Model Usage'
-    };
-    
-    const modelLayout = {
-        title: 'Forecast Distribution by Model',
-        height: 300,
-        margin: { l: 20, r: 20, t: 40, b: 20 }
-    };
-    
-    Plotly.newPlot('forecastAnalyticsChart', [modelData], modelLayout, {responsive: true});
-}
-
-// Utility functions
-function showAlert(message, type) {
-    const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+    container.innerHTML = `
+        <button class="btn btn-sm btn-outline-secondary" 
+            ${pagination.current_page === 1 ? 'disabled' : ''} 
+            onclick="loadForecastHistory(${pagination.current_page - 1})">Prev</button>
+        <span class="mx-2">Halaman ${pagination.current_page} dari ${pagination.pages}</span>
+        <button class="btn btn-sm btn-outline-secondary" 
+            ${pagination.current_page === pagination.pages ? 'disabled' : ''} 
+            onclick="loadForecastHistory(${pagination.current_page + 1})">Next</button>
     `;
-    
-    const container = document.querySelector('.container-fluid') || document.body;
-    container.insertAdjacentHTML('afterbegin', alertHtml);
-    
-    setTimeout(() => {
-        const alert = container.querySelector('.alert');
-        if (alert) alert.remove();
-    }, 5000);
 }
 
-function generatePagination(pagination, callback) {
-    let html = `<nav aria-label="Page navigation">
-        <ul class="pagination justify-content-center">`;
-    
-    for (let i = 1; i <= pagination.pages; i++) {
-        html += `
-            <li class="page-item ${i === pagination.page ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="${callback.name}(${i}); return false;">${i}</a>
-            </li>
-        `;
-    }
-    
-    html += `</ul></nav>`;
-    return html;
+async function deleteForecast(id) {
+    if(!confirm('Hapus riwayat ini?')) return;
+    try {
+        const res = await fetch(`/admin/api/forecasts/${id}`, {method: 'DELETE'});
+        const data = await res.json();
+        if(data.success) loadForecastHistory(currentForecastPage);
+        else alert('Gagal hapus: ' + data.error);
+    } catch(e) { alert(e.message); }
 }
-
-// Event listeners
-document.getElementById('filterModel')?.addEventListener('change', function() {
-    loadForecastHistory(1);
-});
-
-// Load data on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadForecastStatistics();
-    loadForecastHistory(1);
-    loadForecastAnalytics();
-    console.log('Forecast management page loaded');
-});
 </script>
 {% endblock %}
-

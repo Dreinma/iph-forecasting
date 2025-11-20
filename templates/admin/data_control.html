@@ -95,6 +95,8 @@
 
 {% block scripts %}
 <script>
+
+    
 // Show upload modal (if needed in future)
 function showUploadModal() {
     // Currently using inline form, but can be converted to modal if needed
@@ -210,6 +212,108 @@ async function uploadData() {
 // Load data table
 let currentPage = 1;
 const perPage = 20;
+async function loadData(page = 1) {
+    const search = document.getElementById('searchInput')?.value || '';
+    
+    // PERBAIKAN: Gunakan URL '/admin/api/data/list'
+    const url = `/admin/api/data/list?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`;
+    
+    const tbody = document.getElementById('dataBody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="text-muted mt-2">Memuat data...</p>
+            </td>
+        </tr>
+    `;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            renderTable(result.data.items);
+            updatePagination(result.data.pagination);
+            
+            // Update total records counter jika ada
+            const totalEl = document.getElementById('totalRecords');
+            if (totalEl) totalEl.textContent = result.data.pagination.total;
+            
+            currentPage = page;
+        } else {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${result.error || 'Gagal memuat data'}</td></tr>`;
+        }
+    } catch (error) {
+        console.error('Error loading data:', error);
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error koneksi: ${error.message}</td></tr>`;
+    }
+}
+
+function renderTable(items) {
+    const tbody = document.getElementById('dataBody');
+    tbody.innerHTML = '';
+    
+    if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">Tidak ada data ditemukan</td></tr>`;
+        return;
+    }
+    
+    items.forEach(item => {
+        // Format tanggal
+        let dateStr = item.tanggal;
+        try {
+            dateStr = new Date(item.tanggal).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+        } catch(e) {}
+
+        // PERBAIKAN: Gunakan properti yang benar (sesuai JSON response dari to_dict)
+        const row = `
+            <tr>
+                <td>${dateStr}</td>
+                <td>${item.bulan || '-'}</td>
+                <td>${item.minggu || '-'}</td>
+                <td>${item.tahun || '-'}</td>
+                <td>${item.indikator_harga.toFixed(2)}%</td>
+                <td>
+                    <span class="badge ${item.data_source === 'manual_input' ? 'bg-info' : 'bg-secondary'}">
+                        ${item.data_source === 'manual_input' ? 'Manual' : 'Upload'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick='editData(${JSON.stringify(item)})' title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteData(${item.id})" title="Hapus">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+function updatePagination(pagination) {
+    const container = document.getElementById('paginationContainer'); // Pastikan ID ini ada di HTML
+    if (!container) return;
+
+    let html = `
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="loadData(${pagination.page - 1})">Previous</button>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">Halaman ${pagination.page} dari ${pagination.pages}</span>
+                </li>
+                <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+                    <button class="page-link" onclick="loadData(${pagination.page + 1})">Next</button>
+                </li>
+            </ul>
+        </nav>
+    `;
+    container.innerHTML = html;
+}
 
 function loadDataTable(page = 1) {
     const search = document.getElementById('searchInput')?.value || '';
