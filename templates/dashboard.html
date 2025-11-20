@@ -450,7 +450,11 @@ async function loadForecastChart() {
         
         if (data.success && data.historical) {
             updateMetadataBadges(data.metadata);
+            
+            // --- PERBAIKAN: Tangkap data historis terakhir untuk alignment ---
             const lastHistoricalPoint = data.historical[data.historical.length - 1];
+            
+            // 1. Data Historis
             const traces = [{
                 x: data.historical.map(i => i.date),
                 y: data.historical.map(i => i.value),
@@ -459,6 +463,7 @@ async function loadForecastChart() {
             }];
             
             if (data.forecast && data.forecast.length > 0) {
+                // 2. Data Prediksi (Gabungkan titik historis terakhir)
                 const forecastDates = data.forecast.map(item => item.date);
                 const forecastValues = data.forecast.map(item => item.prediction);
                 
@@ -468,18 +473,15 @@ async function loadForecastChart() {
                 // Calculate custom data for hover template
                 const forecastCustomData = data.forecast.map(item => [
                     item.lower_bound ?? null, 
-                    item.upper_bound ?? null, 
-                    item.confidence_width  ?? 0.8
+                    item.upper_bound ?? null
                 ]);
+                
+                // Data dummy untuk titik awal
+                const combinedCustomData = [[null, null], ...forecastCustomData];
 
-                const combinedCustomData = [[lastHistoricalPoint.lower_bound ?? null, lastHistoricalPoint.upper_bound ?? null, null], ...forecastCustomData];
-                
-                const upper = data.forecast.map(i => i.upper_bound);
-                const lower = data.forecast.map(i => i.lower_bound);
-                
                 traces.push({
-                    x: forecastDates,
-                    y: forecastValues,
+                    x: combinedForecastDates,
+                    y: combinedForecastValues,
                     type: 'scatter', 
                     mode: 'lines+markers', 
                     name: 'Prediksi',
@@ -490,27 +492,15 @@ async function loadForecastChart() {
                         color: '#ff6b6b',
                         line: {color: 'white', width: 2}
                     },
-                    customdata: forecastCustomData,
+                    customdata: combinedCustomData,
                     hovertemplate: '<b>%{x}</b>' +
                                    '<br>Prediksi: %{y:.3f}%' +
                                    '<br>Batas Bawah: %{customdata[0]:.3f}%' +
                                    '<br>Batas Atas: %{customdata[1]:.3f}%' +
-                                   '<extra></extra>'
+                                   '<extra></extra>' 
                 });
                 
-                // Confidence Interval
-                if (data.forecast[0].lower_bound !== undefined) {
-                    const upper = data.forecast.map(i => i.upper_bound);
-                    const lower = data.forecast.map(i => i.lower_bound);
-                    
-                    traces.push({
-                        x: [...forecastDates, ...forecastDates.reverse()],
-                        y: [...upper, ...lower.reverse()],
-                        fill: 'toself', fillcolor: 'rgba(255,107,107,0.2)',
-                        line: {color: 'transparent'}, name: 'Interval Kepercayaan',
-                        showlegend: true, hoverinfo: 'skip'
-                    });
-                }
+                // --- HAPUS BAGIAN INTERVAL KEPERCAYAAN DARI SINI ---
             }
             
             const layout = {
@@ -525,6 +515,52 @@ async function loadForecastChart() {
     } catch (e) {
         console.error(e);
         container.innerHTML = `<div class="alert alert-danger">Gagal memuat grafik</div>`;
+    }
+}
+
+// --- Forecast Table Functions (Updated: No Confidence Column) ---
+
+async function loadForecastTable() {
+    const container = document.getElementById('forecastTable');
+    const badges = document.getElementById('forecastTableBadges');
+    
+    try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/forecast-chart-data?t=${timestamp}`);
+        const data = await response.json();
+        
+        if (data.success && data.forecast && data.forecast.length > 0) {
+            if (badges) {
+                badges.innerHTML = `
+                    <span class="badge bg-success">${data.metadata.model_name.replace('_', ' ')}</span>
+                    <span class="badge bg-info">${data.metadata.weeks_forecasted} minggu</span>
+                `;
+            }
+
+            // --- HAPUS HEADER 'Confidence' ---
+            let html = `<table class="table table-hover mb-0"><thead class="table-light"><tr>
+                <th class="py-3">Tanggal</th><th class="py-3">Prediksi</th><th class="py-3">Batas Bawah</th><th class="py-3">Batas Atas</th>
+            </tr></thead><tbody>`;
+            
+            data.forecast.forEach(item => {
+                // --- HAPUS KOLOM Confidence ---
+                html += `<tr>
+                    <td class="py-3"><strong>${item.date}</strong></td>
+                    <td class="py-3"><span class="badge bg-primary">${item.prediction.toFixed(2)}%</span></td>
+                    <td class="py-3 text-danger">${item.lower_bound.toFixed(2)}%</td>
+                    <td class="py-3 text-success">${item.upper_bound.toFixed(2)}%</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div class="text-center py-5 text-muted"><p>Belum ada data peramalan</p></div>`;
+            if (badges) badges.innerHTML = '<span class="badge bg-secondary">Tidak Ada Data</span>';
+        }
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div class="alert alert-danger">Gagal memuat tabel</div>`;
     }
 }
 
