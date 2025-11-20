@@ -284,45 +284,61 @@ function renderTrendBarCharts(trendData) {
 function renderFrequencyChart(freqData, rangeText) {
     const container = document.getElementById('rankingChartFreq');
     
+    // Hitung nilai maksimum untuk skala Y agar bar tidak mentok atas
+    const maxY = Math.max(...freqData.y) + 1;
+
     const trace = {
         x: freqData.x,
         y: freqData.y,
         type: 'bar',
         marker: {
-            color: '#4361ee', // Warna biru
+            color: '#4361ee',
             opacity: 0.9,
             line: { width: 0 }
         },
-        text: freqData.y.map(v => String(v)), // Angka di atas bar
+        // Atur lebar bar secara eksplisit dalam satuan plot (bukan pixel)
+        // Nilai ini relatif terhadap jumlah kategori.
+        width: 0.5, 
+        text: freqData.y.map(v => String(v)),
         textposition: 'auto',
         hoverinfo: 'x+y'
     };
 
     const layout = {
         title: {
-            text: `<span style="font-size: 12px; color: #777;">${rangeText}</span>`,
+            text: `Top 5 Paling Sering Muncul<br><span style="font-size: 12px; color: #777;">${rangeText}</span>`,
             font: { size: 16 },
-            x: 0.5, // Judul di tengah (0 = kiri, 1 = kanan)
+            x: 0.5,
             xanchor: 'center'
         },
-        // Margin seimbang kiri-kanan agar chart di tengah
-        margin: { t: 60, b: 40, l: 50, r: 50 }, 
+        // Padding kiri kanan yang BESAR memaksa chart ke tengah
+        margin: { t: 60, b: 40, l: 100, r: 100 }, 
         yaxis: { 
             title: 'Frekuensi',
-            showgrid: true,
-            gridcolor: '#f0f0f0'
+            visible: false,
+            range: [0, maxY], // Memberi ruang di atas bar tertinggi
+            fixedrange: true
         },
         xaxis: { 
-            title: '',
-            tickfont: {size: 11}
+            tickfont: {size: 11},
+            fixedrange: true
         },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
         showlegend: false,
-        bargap: 0.4 // Jarak antar bar agar tidak terlalu gemuk
+        bargap: 0.5, // Jarak antar bar yang lebar membuat bar lebih kurus
+        autosize: true
     };
+    
+    // Responsivitas: Kurangi margin di layar kecil
+    if (window.innerWidth < 768) {
+        layout.margin.l = 20;
+        layout.margin.r = 20;
+        layout.bargap = 0.3;
+    }
 
-    Plotly.newPlot(container, [trace], layout, {displayModeBar: false, responsive: true});
+    const config = {displayModeBar: false, responsive: true};
+    Plotly.newPlot(container, [trace], layout, config);
 }
 
 // --- FILTER & INIT ---
