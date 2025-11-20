@@ -630,7 +630,7 @@ async function loadForecastTable() {
             }
 
             let html = `<table class="table table-hover mb-0"><thead class="table-light"><tr>
-                <th class="py-3">Tanggal</th><th class="py-3">Prediksi</th><th class="py-3">Batas Bawah</th><th class="py-3">Batas Atas</th><th class="py-3">Confidence</th>
+                <th class="py-3">Tanggal</th><th class="py-3">Prediksi</th><th class="py-3">Batas Bawah</th><th class="py-3">Batas Atas</th>
             </tr></thead><tbody>`;
             
             data.forecast.forEach(item => {
@@ -644,7 +644,6 @@ async function loadForecastTable() {
                     <td class="py-3"><span class="badge bg-primary">${item.prediction.toFixed(2)}%</span></td>
                     <td class="py-3 text-danger">${item.lower_bound.toFixed(2)}%</td>
                     <td class="py-3 text-success">${item.upper_bound.toFixed(2)}%</td>
-                    <td class="py-3"><span class="fw-medium ${confClass}">${confidencePct}%</span></td>
                 </tr>`;
             });
             
