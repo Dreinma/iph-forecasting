@@ -18,7 +18,7 @@ from sqlalchemy import func, or_, distinct
 
 # Create admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
-
+from auth.utils import load_user, User
 # =================================================================
 # AUTHENTICATION ROUTES
 # =================================================================

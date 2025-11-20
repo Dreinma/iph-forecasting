@@ -22,6 +22,7 @@ from services.data_handler import DataHandler
 
 from auth.decorators import admin_required, login_required
 
+
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -166,6 +167,10 @@ app.json_encoder = CustomJSONEncoder
 # Configure logging
 import logging
 from logging import StreamHandler
+
+
+from admin.routes import admin_bp
+app.register_blueprint(admin_bp)
 
 # Set up clean console logging
 log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'), logging.INFO)
