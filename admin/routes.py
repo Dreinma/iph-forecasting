@@ -1,6 +1,6 @@
 """
 Admin routes untuk IPH Forecasting Platform
-VERSI PRESENTASI / DEMO MODE (Login Bypass)
+VERSI PRESENTASI / DEMO MODE (Login Bypass + Safe Dashboard)
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
@@ -97,15 +97,18 @@ def dashboard():
     last_login_str = "-"
     if current_user.is_authenticated:
         try:
-            # Ambil ID dari session
-            uid = int(current_user.get_id())
-            # Query ke tabel asli
-            real_user = AdminUser.query.get(uid)
-            if real_user and real_user.last_login:
-                # Format menjadi string agar aman dikirim ke template
-                last_login_str = real_user.last_login.strftime('%d %b %Y %H:%M')
+            # Ambil ID dari session (pastikan int)
+            uid_str = current_user.get_id()
+            if uid_str:
+                uid = int(uid_str)
+                # Query ke tabel asli
+                real_user = AdminUser.query.get(uid)
+                if real_user and real_user.last_login:
+                    # Format menjadi string agar aman dikirim ke template
+                    last_login_str = real_user.last_login.strftime('%d %b %Y %H:%M')
         except Exception as e:
             print(f"Warning: Gagal ambil last login: {e}")
+            # Jangan crash, gunakan default
             last_login_str = "Baru saja"
     
     return render_template('admin/dashboard.html', 
@@ -308,7 +311,7 @@ def add_manual_record():
 @admin_bp.route('/api/data/update', methods=['POST'])
 @admin_required
 def api_data_update():
-    """Update data IPH secara manual"""
+    """Update data IPH secara manual (Edit dari Tabel)"""
     try:
         data = request.get_json()
         record_id = data.get('id')
@@ -392,7 +395,7 @@ def api_models_performance_history():
 @admin_bp.route('/api/generate-forecast', methods=['POST'])
 @admin_required
 def generate_forecast():
-    """Generate forecast on demand"""
+    """Generate forecast on demand (Admin Button)"""
     from services.forecast_service import forecast_service
     
     try:

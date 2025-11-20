@@ -97,7 +97,6 @@ class ForecastService:
                 return {'success': False, 'error': 'Forecast weeks must be between 4 and 12'}
             
             # 1. Generate forecast (Menggunakan Engine ONNX)
-            # Pastikan model_manager memiliki akses ke engine
             forecast_df, model_performance, forecast_summary = self.model_manager.engine.generate_forecast(
                 model_name, forecast_weeks
             )
@@ -188,25 +187,22 @@ class ForecastService:
 
     def get_real_economic_alerts(self):
         """
-        Generate real alerts based on database data.
+        MODIFIED: Generate real alerts based on database data.
         Menangani kasus Inflasi, Deflasi, dan Volatilitas secara dinamis.
         """
         try:
             # 1. Load Data Real dari Database
             df = self.data_handler.load_historical_data()
             
-            if df.empty or len(df) < 2:
-                return {
-                    'success': True,
+            # Fallback jika data kosong
+            if df.empty:
+                 return {
+                    'success': True, 
                     'alerts': [],
-                    'recommendations': [{
-                        'icon': 'fa-database', 'color': 'secondary',
-                        'title': 'Menunggu Data',
-                        'text': 'Belum ada data historis yang cukup untuk analisis.'
-                    }],
+                    'recommendations': [],
                     'statistics': {'latest_value': 0, 'std': 0, 'mean': 0},
                     'insight_narrative': {
-                        'title': 'Data Kosong', 'description': 'Silakan upload data.',
+                        'title': 'Data Kosong', 'description': 'Silakan upload data di menu Data Management.',
                         'volatility_status': '-', 'volatility_desc': '-'
                     }
                 }
@@ -216,8 +212,13 @@ class ForecastService:
             df = df.sort_values('Tanggal').reset_index(drop=True)
             
             latest_val = float(df['Indikator_Harga'].iloc[-1])
-            prev_val = float(df['Indikator_Harga'].iloc[-2])
-            change = latest_val - prev_val
+            # Handle jika data < 2
+            if len(df) >= 2:
+                prev_val = float(df['Indikator_Harga'].iloc[-2])
+                change = latest_val - prev_val
+            else:
+                prev_val = latest_val
+                change = 0.0
             
             # Statistik
             recent_df = df.tail(14)
@@ -257,20 +258,30 @@ class ForecastService:
             if change > 0.5:
                 alerts.append({'title': 'Lonjakan Harga', 'message': f'Kenaikan {change:.2f}% periode ini.', 'color': 'warning', 'icon': 'fa-arrow-trend-up'})
             
-            # Analisis Komoditas (Safe Import)
+            # Analisis Komoditas (Safe Import & Logic)
             try:
                 from services.commodity_insight_service import CommodityInsightService
                 comm_service = CommodityInsightService()
                 # Gunakan key terbaru yyyy-mm
                 latest_date = df['Tanggal'].iloc[-1]
                 key = f"{latest_date.year}-{latest_date.month:02d}"
+                
+                # PANGGIL FUNGSI BARU: get_full_commodity_insights
                 comm_data = comm_service.get_full_commodity_insights(start_key=key, end_key=key)
                 
                 if comm_data['success']:
-                     # Cek Top 5 Frekuensi dari chart data
-                     if comm_data['frequency_chart_data']['x']:
-                         top_comm = comm_data['frequency_chart_data']['x'][0]
-                         alerts.append({'title': 'Komoditas Dominan', 'message': f'{top_comm.title()} paling sering mempengaruhi pasar.', 'color': 'info', 'icon': 'fa-basket-shopping'})
+                     # Cek Frekuensi Chart Data
+                     if comm_data.get('frequency_chart_data') and comm_data['frequency_chart_data'].get('x'):
+                         # Ambil komoditas pertama (paling sering muncul)
+                         top_comm_name = comm_data['frequency_chart_data']['x'][0]
+                         # Format nama agar cantik (Title Case)
+                         top_comm_title = top_comm_name.replace('_', ' ').title()
+                         alerts.append({
+                             'title': 'Komoditas Dominan', 
+                             'message': f'{top_comm_title} paling sering mempengaruhi pasar periode ini.', 
+                             'color': 'info', 
+                             'icon': 'fa-basket-shopping'
+                         })
             except Exception as e:
                 logger.warning(f"Commodity insight skip: {e}")
 
@@ -288,6 +299,15 @@ class ForecastService:
                 recommendations.append({'icon': 'fa-eye', 'color': 'danger', 'title': 'Pantau Harian', 'text': 'Tingkatkan frekuensi monitoring.'})
             else:
                 recommendations.append({'icon': 'fa-clipboard-check', 'color': 'success', 'title': 'Pantau Berkala', 'text': 'Lanjutkan monitoring rutin.'})
+                
+            # Tambahkan rekomendasi komoditas jika ada
+            if 'top_comm_title' in locals():
+                 recommendations.append({
+                    'icon': 'fa-magnifying-glass', 
+                    'color': 'primary', 
+                    'title': f'Fokus: {top_comm_title}', 
+                    'text': f'Perhatikan distribusi dan stok **{top_comm_title}**.'
+                })
 
             return {
                 'success': True,
