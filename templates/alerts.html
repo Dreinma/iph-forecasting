@@ -1,433 +1,174 @@
 {% extends "base.html" %}
 
-{% block title %}Peringatan & Notifikasi Ekonomi - IPH Forecasting{% endblock %}
+{% block title %}Sistem Peringatan IPH{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
     <div>
         <h1 class="h2 text-gradient mb-1">
-            <i class="fas fa-chart-line me-2"></i>
-            Analisis & Peringatan IPH Komoditas
+            <i class="fas fa-bell me-2"></i>Sistem Peringatan Dini
         </h1>
-        <p class="text-muted mb-0">Monitoring volatilitas dan peringatan perubahan harga komoditas</p>
+        <p class="text-muted mb-0">Deteksi anomali dan rekomendasi kebijakan</p>
     </div>
 </div>
 
-<!-- IPH Komoditas Analysis -->
-<div class="row g-4 mb-4 align-items-stretch">
-    <div class="col-sm-12 col-md-4 col-lg-4">
-        <div class="card bg-primary text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-white-50">IPH Saat Ini</h6>
-                        <h3 class="mb-0" id="currentIPH">-0.83%</h3>
-                    </div>
-                    <i class="fas fa-chart-line fa-2x opacity-50"></i>
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="alert alert-info border-0 h-100 shadow-sm">
+            <div class="d-flex">
+                <div class="flex-shrink-0 me-3">
+                    <i class="fas fa-circle-info fa-2x mt-1"></i>
                 </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-12 col-md-4 col-lg-4">
-        <div class="card bg-warning text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-white-50">Volatilitas IPH</h6>
-                        <h3 class="mb-0" id="iphVolatility">1.24</h3>
-                        <small class="text-white-50">Standar Deviasi</small>
-                    </div>
-                    <i class="fas fa-wave-square fa-2x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-12 col-md-4 col-lg-4">
-        <div class="card bg-info text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-white-50">Trend 4 Minggu</h6>
-                        <h3 class="mb-0" id="iphTrend">-0.45%</h3>
-                        <small class="text-white-50">Rata-rata perubahan</small>
-                    </div>
-                    <i class="fas fa-arrow-trend-down fa-2x opacity-50"></i>
+                <div>
+                    <h5 class="alert-heading fw-bold" id="insightTitle">Memuat Analisis...</h5>
+                    <p class="mb-0 text-dark" id="insightDesc">Mengambil data terbaru dari sistem...</p>
                 </div>
             </div>
         </div>
     </div>
     
-</div>
-
-<!-- Peringatan & Notifikasi IPH Komoditas (Full Width) -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-bell text-warning me-2"></i>
-                    Peringatan & Notifikasi IPH Komoditas
-                </h5>
-            </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" id="volCard">
             <div class="card-body">
-                <div id="economicAlertsList">
-=                </div>
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas fa-wave-square text-secondary me-2"></i>
+                    <h6 class="card-title mb-0 text-muted text-uppercase small fw-bold">Status Volatilitas</h6>
+                </div>
+                <h3 class="mb-2" id="volStatus">-</h3>
+                <p class="text-muted small mb-0" id="volDesc">Menghitung variabilitas harga...</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Insight IPH Komoditas (Full Width) -->
 <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="alert alert-info border-0 h-100">
-                            <div class="d-flex align-items-start">
-                                <div class="flex-shrink-0 me-3">
-                                    <i class="fas fa-info-circle fa-lg mt-1"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="alert-heading mb-2 fw-bold" id="insightTitle">Memuat Analisis...</h6>
-                                    <p class="mb-2 text-dark" id="insightDesc">
-                                        Mengambil data terbaru...
-                                    </p>
-                                    <small class="text-muted d-flex align-items-center">
-                                        <i class="fas fa-clock me-1"></i>
-                                        <span id="insightDate">-</span>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="alert alert-light border-0 h-100" id="volatilityCard">
-                            <div class="d-flex align-items-start">
-                                <div class="flex-shrink-0 me-3">
-                                    <i class="fas fa-wave-square fa-lg mt-1"></i>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="alert-heading mb-2 fw-bold">Status Volatilitas</h6>
-                                    <p class="mb-2 text-dark" id="volatilityDesc">
-                                        Menganalisis fluktuasi harga...
-                                    </p>
-                                    <span class="badge bg-secondary" id="volatilityBadge">Memuat</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-</div>
-<!-- Analisis Komoditas Utama & Trend & Prediksi IPH (Side by Side) -->
-<div class="row g-4">
-    
-        <div class="col-lg-12"> <div class="card h-100">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list-check text-success me-2"></i>
-                        Rekomendasi Tindakan
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div id="recommendationsList">
-                        <div class="text-center py-4">
-                            <div class="spinner-border text-success" role="status"></div>
-                            <p class="mt-2 text-muted">Memuat rekomendasi...</p>
-                        </div>
-                    </div>
+    <div class="col-lg-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-triangle-exclamation text-warning me-2"></i>Daftar Peringatan Aktif</h6>
+            </div>
+            <div class="card-body" id="alertsList">
+                <div class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm mb-2"></div>
+                    <p>Memindai anomali data...</p>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="col-lg-12">
+        <div class="card shadow-sm border-success">
+            <div class="card-header bg-success text-white py-3">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-clipboard-check me-2"></i>Rekomendasi Tindakan Strategis</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="recommendationsList">
+                    </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-// =========================================================================
-// SCRIPT UNTUK HALAMAN ALERTS - DYNAMIC INSIGHTS & BOLD RECOMMENDATIONS
-// =========================================================================
+// === SCRIPT ALERT SYSTEM ===
 
-// Variabel global untuk menyimpan data
-let economicAlerts = [];
-let economicIndicators = {};
-let recommendations = []; 
-let insights = [];
-/**
- * API dengan timeout dan error handling.
- */
-async function safeApiCall(url) {
+async function loadAlertsData() {
     try {
-        console.log(`🌐 Memanggil API: ${url}`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); 
-
-        const response = await fetch(url, {
-            signal: controller.signal,
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${response.statusText} | ${errorText}`);
-        }
-        
+        // Panggil API
+        const response = await fetch('/api/economic-alerts');
         const data = await response.json();
-        console.log(`✅ Sukses API: ${url}`, data);
-        return data;
+
+        if (data.success) {
+            updateInsight(data.insight_narrative);
+            renderAlerts(data.alerts);
+            renderRecommendations(data.recommendations);
+        } else {
+            console.error("API Error:", data.error);
+        }
     } catch (error) {
-        console.error(`❌ Error API: ${url}`, error);
-        if (error.name === 'AbortError') {
-            return { success: false, error: 'Timeout', message: 'Permintaan API memakan waktu terlalu lama.' };
-        }
-        return { success: false, error: error.message, message: `Error Jaringan: ${error.message}` };
+        console.error("Network Error:", error);
     }
 }
 
-/**
- * FUNGSI UTAMA: Memuat semua data untuk halaman ini
- */
-async function loadData() {
-    console.log('Memuat data alerts & rekomendasi...');
+function updateInsight(insight) {
+    if (!insight) return;
     
-    const data = await safeApiCall('/api/economic-alerts');
-    
-    if (data.success) {
-        economicAlerts = data.alerts || [];
-        recommendations = data.recommendations || []; 
-        insights = data.insights || [];
-
-        displayEconomicAlerts();
-        displayRecommendations(); 
-        displayInsights();
-
-        if (data.statistics) { 
-            updateEconomicIndicators(data.statistics);
-        }
-        
-    } else {
-        // Tampilkan error
-        const errorMsg = data.error || 'Gagal memuat data';
-        showError('economicAlertsList', errorMsg, 'loadData()');
-        showError('recommendationsList', errorMsg, 'loadData()');
-        showError('insightsList', errorMsg, 'loadData()');
-    }
-}
-
-/**
- * Render Peringatan & Notifikasi
- */
-function displayEconomicAlerts() {
-    const container = document.getElementById('economicAlertsList');
-    if (!container) return;
-    
-    if (economicAlerts.length === 0) {
-        container.innerHTML = `
-            <div class="alert alert-success border-0">
-                <i class="fas fa-check-circle me-2"></i>
-                Tidak ada peringatan aktif. Semua indikator dalam batas normal.
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '';
-    economicAlerts.forEach(alert => {
-        const priorityClass = alert.color || 'secondary';
-        const icon = alert.icon || 'fa-bell';
-        const msg = alert.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        html += `
-            <div class="alert alert-${alert.color || 'primary'} border-0 mb-3" role="alert">
-                <div class="d-flex align-items-start">
-                    <div class="flex-shrink-0 me-3"><i class="fas ${alert.icon} fa-lg mt-1"></i></div>
-                    <div class="flex-grow-1">
-                        <h6 class="alert-heading mb-2 fw-bold">${alert.title}</h6>
-                        <p class="mb-2 text-dark">${msg}</p>
-                        <small class="text-muted"><i class="fas fa-calendar me-1"></i>${alert.date}</small>
-                    </div>
-                </div>
-            </div>`;
-    });
-    
-    container.innerHTML = html;
-}
-
-/**
- * Render Dynamic Insights
- */
-function displayInsights() {
-    const container = document.getElementById('insightsList');
-    if (!container) return;
-
-    if (!insights || insights.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-lightbulb fa-3x mb-3"></i>
-                <p>Belum ada insight yang tersedia.</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Map insight type to Bootstrap alert class
-    const typeClassMap = {
-        'success': 'success',
-        'info': 'info',
-        'warning': 'warning',
-        'danger': 'danger'
-    };
-
-    let html = '<div class="row g-4">';
-    
-    insights.forEach((insight, index) => {
-        const alertClass = typeClassMap[insight.type] || 'info';
-        const icon = insight.icon || 'fa-info-circle';
-        
-        // Determine column size based on number of insights
-        const colClass = insights.length === 1 ? 'col-12' : 
-                        insights.length === 2 ? 'col-md-6' : 
-                        'col-md-6 col-lg-4';
-        
-        html += `
-            <div class="${colClass}">
-                <div class="alert alert-${alertClass} border-0 h-100">
-                    <div class="d-flex align-items-start">
-                        <div class="flex-shrink-0 me-3">
-                            <i class="fas ${icon} fa-lg mt-1"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <h6 class="alert-heading mb-2 fw-bold">${insight.title}</h6>
-                            <p class="mb-2 text-dark">${insight.message}</p>
-                            <small class="text-muted d-flex align-items-center">
-                                <i class="fas fa-clock me-1"></i>
-                                Terakhir diperbarui: ${insight.timestamp}
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-/**
- * FUNGSI BARU: Render Rekomendasi Dinamis
- */
-function displayRecommendations() {
-    const container = document.getElementById('recommendationsList');
-    if (!container) return;
-
-    if (!recommendations || recommendations.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-inbox fa-3x mb-3"></i>
-                <p>Tidak ada rekomendasi spesifik saat ini.</p>
-            </div>
-        `;
-        return;
-    }
-
-    let html = '<div class="list-group list-group-flush">';
-    recommendations.forEach(rec => {
-        const color = rec.color || 'primary';
-        const icon = rec.icon || 'fa-list-check';
-        const formattedText = rec.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        html += `
-            <div class="list-group-item d-flex align-items-start px-0 py-3">
-                <i class="fas ${icon} text-${color} fa-lg me-3 mt-1"></i>
-                <div class="flex-grow-1">
-                    <h6 class="mb-1 fw-bold text-dark">${rec.title}</h6>
-                    <span class="small" style="display:block; line-height:1.5;">${formattedText}</span>
-                </div>
-            </div>        `;
-    });
-    html += '</div>';
-    
-    container.innerHTML = html;
-}
-
-/**
- * Update 3 card statistik di atas
- */
-function updateInsightNarrative(insight) {
-    // Update Teks
+    // Update Teks Narasi
     document.getElementById('insightTitle').textContent = insight.title;
-    
-    // Gunakan innerHTML karena kita mengirim teks dengan format <strong> dari backend
+    // Gunakan innerHTML untuk support **bold** formatting dari backend
     document.getElementById('insightDesc').innerHTML = insight.description.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    document.getElementById('insightDate').textContent = "Data per: " + insight.last_updated;
     
-    // Update Card Volatilitas
-    const volCard = document.getElementById('volatilityCard');
-    const volBadge = document.getElementById('volatilityBadge');
+    // Update Volatilitas
+    const volStatusEl = document.getElementById('volStatus');
+    volStatusEl.textContent = insight.volatility_status;
     
-    document.getElementById('volatilityDesc').innerHTML = insight.volatility_desc.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Warna dinamis berdasarkan status
+    let colorClass = 'text-secondary';
+    if (insight.volatility_status === 'Tinggi') colorClass = 'text-danger';
+    else if (insight.volatility_status === 'Sedang') colorClass = 'text-warning';
+    else if (insight.volatility_status === 'Rendah') colorClass = 'text-success';
     
-    // Update Warna Badge
-    let badgeClass = 'bg-secondary';
-    if (insight.volatility_status === 'Tinggi') badgeClass = 'bg-danger';
-    else if (insight.volatility_status === 'Sedang') badgeClass = 'bg-warning text-dark';
-    else badgeClass = 'bg-success';
-    
-    volBadge.className = `badge ${badgeClass}`;
-    volBadge.textContent = insight.volatility_status;
-    
-    // Update Warna Card Background (Opsional)
-    volCard.className = `alert ${insight.volatility_status === 'Tinggi' ? 'alert-warning' : 'alert-light'} border-0 h-100`;
+    volStatusEl.className = `mb-2 fw-bold display-6 ${colorClass}`;
+    document.getElementById('volDesc').textContent = insight.volatility_desc;
 }
 
-/**
- * Helper: Tampilkan Alert
- */
-function showAlert(message, type) {
-    const alertHTML = `
-        <div class="alert alert-${type} fade show position-fixed" 
-             style="top: 20px; right: 20px; z-index: 9999; max-width: 400px;" role="alert">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-info-circle me-2"></i>
-                ${message}
-            </div>
-        </div>
-    `;
+function renderAlerts(alerts) {
+    const container = document.getElementById('alertsList');
     
-    document.body.insertAdjacentHTML('beforeend', alertHTML);
-    
-    setTimeout(() => {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => {
-            if (alert.textContent.includes(message.substring(0, 20))) {
-                alert.remove();
-            }
-        });
-    }, 5000);
-}
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted py-3">Tidak ada peringatan aktif.</div>`;
+        return;
+    }
 
-/**
- * Helper: Tampilkan Error
- */
-function showError(containerId, message) {
-    const container = document.getElementById(containerId);
-    if (container) {
-        container.innerHTML = `
-            <div class="alert alert-danger border-0">
-                <i class="fas fa-times-circle me-2"></i>
-                ${message}
+    let html = '';
+    alerts.forEach(alert => {
+        html += `
+            <div class="alert alert-${alert.color} border-0 d-flex align-items-start mb-3">
+                <div class="fs-4 me-3"><i class="fas ${alert.icon}"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-1">${alert.title}</h6>
+                    <p class="mb-0 small">${alert.message}</p>
+                </div>
             </div>
         `;
-    }
+    });
+    container.innerHTML = html;
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadData(); // Panggil fungsi utama
+function renderRecommendations(recs) {
+    const container = document.getElementById('recommendationsList');
     
-    // Auto-refresh setiap 60 detik
-    setInterval(loadData, 60000);
-});
+    if (!recs || recs.length === 0) {
+        container.innerHTML = `<div class="p-4 text-center text-muted">Tidak ada rekomendasi khusus.</div>`;
+        return;
+    }
+
+    let html = '';
+    recs.forEach(rec => {
+        // Format bold text: **teks** -> <strong>teks</strong>
+        const formattedText = rec.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        html += `
+            <div class="list-group-item p-4 d-flex align-items-start">
+                <div class="flex-shrink-0 me-3">
+                    <div class="rounded-circle bg-${rec.color} bg-opacity-10 p-3 text-${rec.color}">
+                        <i class="fas ${rec.icon} fa-lg"></i>
+                    </div>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-1 text-dark">${rec.title}</h6>
+                    <p class="mb-0 text-muted">${formattedText}</p>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', loadAlertsData);
 </script>
 {% endblock %}

@@ -67,6 +67,9 @@ def logout():
 @admin_required
 def dashboard():
     """Admin dashboard view"""
+    from database import IPHData, AlertHistory, ModelPerformance, ActivityLog, AdminUser # Import AdminUser
+    from sqlalchemy import func
+
     # Get statistics
     total_records = IPHData.query.count()
     active_alerts = AlertHistory.query.filter_by(is_active=True).count()
@@ -75,8 +78,13 @@ def dashboard():
     # Recent activities (last 10)
     recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
     
-    last_login = current_user.last_login if current_user.is_authenticated else None
-    
+    last_login = None
+    if current_user.is_authenticated:
+        # Ambil user asli dari database berdasarkan ID current_user
+        user_db = AdminUser.query.get(int(current_user.id)) 
+        if user_db:
+            last_login = user_db.last_login    
+            
     return render_template('admin/dashboard.html', 
                          page_title="Admin Dashboard",
                          total_records=total_records,
