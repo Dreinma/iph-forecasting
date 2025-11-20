@@ -8,11 +8,14 @@ from flask_login import login_user, logout_user, login_required, current_user
 from auth.decorators import admin_required
 from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm
 from auth.utils import check_password, update_last_login, create_admin_user, hash_password
-from database import db, AdminUser
+from database import db, AdminUser, IPHData, CommodityData
 from datetime import datetime, timedelta
 import os
 import secrets
 import hashlib
+import psutil
+import pandas as pd
+import json
 
 # Create admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -222,12 +225,6 @@ def forecast():
     """Forecast management page"""
     return render_template('admin/forecast.html', page_title="Forecast Management")
 
-@admin_bp.route('/alerts')
-@admin_required
-def alerts_manage():
-    """Alert management page (different from public /alerts)"""
-    return render_template('admin/alerts_manage.html', page_title="Alert Management")
-
 @admin_bp.route('/settings')
 @admin_required
 def settings():
@@ -236,7 +233,8 @@ def settings():
     admin_users = AdminUser.query.all()
     return render_template('admin/settings.html', 
                          page_title="System Settings",
-                         admin_users=admin_users)
+                         admin_users=admin_users,
+                         memory_usage=f"{psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024:.2f} MB")
 
 @admin_bp.route('/create-admin', methods=['GET', 'POST'])
 @admin_required
@@ -343,6 +341,137 @@ def create_admin():
 
 # ==================== API ROUTES ====================
 
+@admin_bp.route('/api/add-manual-record', methods=['POST'])
+@admin_required
+def add_manual_record():
+    """Add manual IPH and commodity record to database"""
+
+    from database import db, IPHData, CommodityData
+    from datetime import datetime, timedelta
+    from services.forecast_service import forecast_service
+
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Tidak ada data yang dikirim'})
+        
+        # 1. Ekstrak Data dari Request
+        bulan = data.get('bulan')
+        minggu = data.get('minggu')
+        tahun = data.get('tahun')
+        kab_kota = data.get('kab_kota', 'BATU')
+        iph_value = data.get('iph_value')
+        
+        # Data Komoditas (Opsional)
+        komoditas_andil = data.get('komoditas_andil', '')
+        komoditas_fluktuasi = data.get('komoditas_fluktuasi', '')
+        nilai_fluktuasi = data.get('nilai_fluktuasi', 0.0)
+        
+        # 2. Validasi Field Wajib
+        if not all([bulan, minggu, tahun, iph_value]):
+            return jsonify({'success': False, 'message': 'Bulan, Minggu, Tahun, dan Nilai IPH wajib diisi'})
+        
+        # 3. Konversi Periode (Bulan/Minggu) menjadi Tanggal (Date)
+        #    Kita perlu tanggal spesifik agar bisa disimpan di kolom 'Tanggal'
+        try:
+            bulan_map = {
+                'Januari': 1, 'Februari': 2, 'Maret': 3, 'April': 4,
+                'Mei': 5, 'Juni': 6, 'Juli': 7, 'Agustus': 8,
+                'September': 9, 'Oktober': 10, 'November': 11, 'Desember': 12
+            }
+            
+            # Bersihkan input (misal "M1" -> 1)
+            minggu_clean = str(minggu).upper().replace('M', '').strip()
+            minggu_num = int(minggu_clean)
+            bulan_num = bulan_map.get(bulan, 1)
+            tahun_num = int(tahun)
+            
+            # Logika: Cari tanggal hari Senin pada minggu ke-X di bulan tersebut
+            # Mulai dari tanggal 1 bulan tersebut
+            first_day_of_month = datetime(tahun_num, bulan_num, 1)
+            
+            # Cari hari Senin pertama di bulan itu (atau hari pertama minggu statistik BPS)
+            # weekday(): Senin=0, Minggu=6. 
+            # Kita asumsikan data mingguan BPS biasanya dihitung per pekan.
+            # Ini adalah estimasi tanggal agar bisa masuk ke DB.
+            # Logic: (Minggu ke-X - 1) * 7 hari + offset
+            days_offset = (minggu_num - 1) * 7
+            target_date = first_day_of_month + timedelta(days=days_offset)
+            
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Gagal mengkonversi tanggal: {str(e)}'})
+
+        # 4. Buat DataFrame Satu Baris
+        #    Kita format agar mirip dengan hasil bacaan CSV, sehingga bisa
+        #    diproses oleh DataHandler.merge_and_save_data
+        new_record_data = {
+            'Tanggal': [target_date.strftime('%Y-%m-%d')],
+            'Indikator_Harga': [float(iph_value)],
+            'Bulan': [bulan],
+            'Minggu': [minggu],
+            'Tahun': [tahun_num],
+            'Kab/Kota': [kab_kota],
+            
+            # Masukkan data komoditas jika ada (agar disimpan ke tabel commodity_data juga)
+            'Komoditas_Andil': [komoditas_andil],
+            'Komoditas_Fluktuasi_Tertinggi': [komoditas_fluktuasi],
+            'Fluktuasi_Harga': [nilai_fluktuasi]
+        }
+        
+        new_record_df = pd.DataFrame(new_record_data)
+        
+        # 5. Simpan ke Database menggunakan DataHandler
+        #    Fungsi ini akan menangani duplikasi (update jika tanggal sama)
+        combined_df, merge_info = forecast_service.data_handler.merge_and_save_data(new_record_df)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Data berhasil ditambahkan ke database. Silakan jalankan training lokal untuk memperbarui model.',
+            'merge_info': merge_info,
+            'data': {
+                'tanggal': target_date.strftime('%d %B %Y'),
+                'iph': iph_value
+            }
+        })
+        
+    except Exception as e:
+        # Log error di sini jika perlu
+        return jsonify({'success': False, 'message': f'Error adding record: {str(e)}'}), 500
+
+    
+@admin_bp.route('/api/data/update', methods=['POST'])
+@admin_required
+def api_data_update():
+    """Update data IPH secara manual (Edit)"""
+    try:
+        data = request.get_json()
+        record_id = data.get('id')
+        
+        # Validasi input
+        if not record_id:
+             return jsonify({'success': False, 'message': 'ID tidak ditemukan'})
+
+        record = IPHData.query.get(record_id)
+        if not record:
+            return jsonify({'success': False, 'message': 'Record tidak ditemukan'})
+
+        # Update field yang diizinkan
+        if 'indikator_harga' in data:
+            record.indikator_harga = float(data['indikator_harga'])
+        
+        # (Opsional) Update field lain jika perlu
+        # if 'bulan' in data: record.bulan = data['bulan']
+        
+        record.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Data berhasil diperbarui'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+    
 @admin_bp.route('/api/stats')
 @admin_required
 def api_stats():
@@ -541,57 +670,6 @@ def api_models_performance_history():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@admin_bp.route('/api/models/retrain', methods=['POST'])
-@admin_required
-def api_retrain_models():
-    """API untuk retrain models (specific atau semua)"""
-    from app import forecast_service
-    from flask_login import current_user
-    
-    try:
-        data = request.get_json() or {}
-        model_name = data.get('model_name')  # None = retrain all
-        
-        # Load historical data
-        df = forecast_service.data_handler.load_historical_data()
-        
-        if df is None or df.empty:
-            return jsonify({
-                'success': False,
-                'message': 'No historical data available for training'
-            }), 400
-        
-        # Retrain models
-        result = forecast_service.model_manager.train_and_compare_models(df)
-        
-        # Log activity
-        try:
-            from database import ActivityLog
-            activity = ActivityLog(
-                user_id=current_user.id if current_user.is_authenticated else None,
-                username=current_user.username if current_user.is_authenticated else 'system',
-                action_type='train',
-                entity_type='model',
-                description=f'Retrained models: {", ".join(result.get("summary", {}).get("models_trained", []))}'
-            )
-            db.session.add(activity)
-            db.session.commit()
-        except:
-            db.session.rollback()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Models retrained successfully',
-            'best_model': result['summary']['best_model'],
-            'summary': {
-                'models_trained': result['summary']['total_models_trained'],
-                'is_improvement': result['summary']['is_improvement'],
-                'best_mae': result['comparison']['new_best_model']['mae']
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
 @admin_bp.route('/api/activities')
 @admin_required
 def api_activities():
@@ -612,38 +690,83 @@ def api_activities():
 
 # ==================== FORECAST MANAGEMENT APIs ====================
 
+
+@admin_bp.route('/api/generate-forecast', methods=['POST'])
+@admin_required
+def generate_forecast():
+    """Generate forecast on demand"""
+    from services.forecast_service import forecast_service
+    
+    try:
+        data = request.get_json()
+        model_name = data.get('model_name')
+        weeks = int(data.get('weeks', 8))
+        
+        # Panggil dengan save_history=True karena ini dari tombol admin
+        result = forecast_service.get_current_forecast(
+            model_name=model_name, 
+            forecast_weeks=weeks, 
+            save_history=True # <--- Pastikan ini True
+        )
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': 'Peramalan berhasil dibuat dan disimpan.',
+                'forecast': result['forecast']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': result.get('error', 'Gagal membuat peramalan')
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+# --- TAMBAHKAN API HISTORY INI ---
 @admin_bp.route('/api/forecasts/history')
 @admin_required
 def api_forecast_history():
-    """API untuk forecast history dengan filter"""
+    """Get forecast history with pagination"""
     from database import ForecastHistory
-    from sqlalchemy import func
     
     try:
-        model_filter = request.args.get('model', '')
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        
+        per_page = request.args.get('per_page', 10, type=int)
+        model_filter = request.args.get('model')
+
         query = ForecastHistory.query
-        
         if model_filter:
             query = query.filter(ForecastHistory.model_name == model_filter)
-        
+            
+        # Order by newest first
         pagination = query.order_by(ForecastHistory.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
         
-        data = {
-            'items': [forecast.to_dict() for forecast in pagination.items],
+        history_data = []
+        for item in pagination.items:
+            history_data.append({
+                'id': item.id,
+                'model_name': item.model_name,
+                'weeks': item.weeks_forecasted,
+                'avg_prediction': item.avg_prediction,
+                'trend': item.trend,
+                'created_at': item.created_at.strftime('%Y-%m-%d %H:%M'),
+                'created_by': item.created_by
+            })
+            
+        return jsonify({
+            'success': True,
+            'data': history_data,
             'pagination': {
-                'page': page,
-                'per_page': per_page,
                 'total': pagination.total,
-                'pages': pagination.pages
+                'pages': pagination.pages,
+                'current_page': page,
+                'per_page': per_page
             }
-        }
-        
-        return jsonify({'success': True, 'data': data})
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -986,6 +1109,18 @@ def api_app_settings():
             return jsonify({'success': True, 'message': 'Application settings saved'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/settings')
+@admin_required
+def settings():
+    # Get Memory Usage
+    process = psutil.Process(os.getpid())
+    memory_usage = process.memory_info().rss / 1024 / 1024 # MB
+    
+    return render_template('admin/settings.html', 
+                         memory_usage=f"{memory_usage:.2f} MB",
+                         page_title="Pengaturan")
+
 
 @admin_bp.route('/api/users/<int:user_id>', methods=['PUT', 'DELETE'])
 @admin_required
@@ -1431,42 +1566,20 @@ def api_system_health():
 @admin_bp.route('/api/system/storage')
 @admin_required
 def api_system_storage():
-    """API untuk storage information"""
-    import os
+    """API untuk storage information (Disederhanakan untuk Cloud)"""
     from config import Config
     
     try:
-        def get_folder_size(folder_path):
-            total = 0
-            if os.path.exists(folder_path):
-                for dirpath, dirnames, filenames in os.walk(folder_path):
-                    for filename in filenames:
-                        filepath = os.path.join(dirpath, filename)
-                        try:
-                            total += os.path.getsize(filepath)
-                        except:
-                            pass
-            return total
-        
-        # Database size
-        db_path = Config.SQLALCHEMY_DATABASE_URI.replace('sqlite:///', '')
-        database_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-        
-        # Models size
-        models_size = get_folder_size(Config.MODELS_PATH)
-        
-        # Backups size
-        backups_size = get_folder_size(Config.DB_BACKUP_FOLDER)
         
         return jsonify({
             'success': True,
             'storage': {
-                'database_size': database_size,
-                'models_size': models_size,
-                'backups_size': backups_size,
-                'total_size': database_size + models_size + backups_size
+                'database_size': 0, # Tidak relevan di Cloud SQL
+                'models_size': 0,   # Tidak relevan (read-only)
+                'backups_size': 0,  # Tidak ada backup lokal
+                'total_size': 0
             }
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 

@@ -123,7 +123,7 @@ async function loadForecastStatistics() {
 }
 
 // Load forecast history
-async function loadForecastHistory(page = 1) {
+async function loadForecastHistory() {
     const modelFilter = document.getElementById('filterModel')?.value || '';
     const url = `/admin/api/forecasts/history?page=${page}&per_page=${forecastPerPage}${modelFilter ? '&model=' + encodeURIComponent(modelFilter) : ''}`;
     

@@ -1900,6 +1900,7 @@ def available_models():
         })
 
 @app.route('/api/generate-forecast', methods=['POST'])
+@admin_required
 def generate_forecast():
     """Generate forecast using selected model"""
     try:
@@ -1926,6 +1927,7 @@ def generate_forecast():
         forecast_result = forecast_service.get_current_forecast(
             model_name=model_name,
             forecast_weeks=weeks,
+            save_history=True
         )
         
         if forecast_result['success']:
@@ -2083,6 +2085,26 @@ def health_check():
         'uptime': 'healthy'
     }), 200
 
+
+@admin_bp.route('/api/data/update', methods=['POST'])
+@admin_required
+def update_data():
+    try:
+        data = request.get_json()
+        record_id = data.get('id')
+        new_iph = data.get('indikator_harga')
+        
+        # Cari record di DB (asumsi IPHData punya kolom id)
+        record = IPHData.query.get(record_id)
+        if record:
+            record.indikator_harga = float(new_iph)
+            db.session.commit()
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'message': 'Record not found'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    
 # APPLICATION STARTUP
 if __name__ == '__main__':
     import os

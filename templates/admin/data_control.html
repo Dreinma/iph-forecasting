@@ -5,269 +5,88 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-    <div>
-        <h5 class="mb-1">Data Management</h5>
-        <p class="text-muted mb-0">Upload, edit, dan kelola data IPH dan komoditas</p>
-    </div>
-    <div class="w-100 w-md-auto">
-        <button type="button" class="btn btn-primary w-100 w-md-auto" onclick="showUploadModal()">
-            <i class="fas fa-upload me-2"></i>Upload Data
-        </button>
-    </div>
-</div>
-
-<!-- Upload Data Section -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white">
-        <h6 class="card-title mb-0">
-            <i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Data
-        </h6>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label">Upload CSV/Excel</label>
-                <input type="file" class="form-control" id="fileUpload" accept=".csv,.xlsx,.xls">
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Upload Template</label>
-                <a href="/download/template_iph_komoditas.csv" class="btn btn-outline-secondary w-100">
-                    <i class="fas fa-download me-2"></i>Download Template
-                </a>
-            </div>
-        </div>
-        <div class="mt-3">
-            <button class="btn btn-success" onclick="uploadData()">
-                <i class="fas fa-upload me-2"></i>Upload Data
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">Manajemen Data</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('static', filename='uploads/template_iph_komoditas.csv') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Template
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="fas fa-upload me-1"></i> Upload CSV
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addManualModal">
+                <i class="fas fa-plus me-1"></i> Tambah Manual
             </button>
         </div>
     </div>
 </div>
 
-<!-- Manual Input Section -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white">
-        <h6 class="card-title mb-0">
-            <i class="fas fa-edit text-info me-2"></i>Manual Input
-        </h6>
-    </div>
-    <div class="card-body">
-        <button class="btn btn-info" onclick="showManualInputModal()">
-            <i class="fas fa-plus me-2"></i>Tambah Data Manual
-        </button>
+<div class="modal fade" id="addManualModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="manualInputForm" onsubmit="submitManualData(event)">
+                <div class="modal-header">
+                    <h5 class="modal-title">Input Data Manual</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tahun</label>
+                        <input type="number" class="form-control" name="tahun" value="2025" required>
+                    </div>
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success">Simpan</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
 <!-- Data Table -->
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div>
-            <h6 class="card-title mb-0">
-                <i class="fas fa-database text-primary me-2"></i>Data Historis
-            </h6>
-            <small class="text-muted">
-                <i class="fas fa-list me-1"></i>Total: <strong id="totalRecordsCount">{{ total_records if total_records else 0 }}</strong> record
-            </small>
-        </div>
-        <div>
-            <input type="text" class="form-control form-control-sm d-inline-block" style="width: 200px;" 
-                   placeholder="Search..." id="searchInput">
-        </div>
-    </div>
-    <div class="card-body">
-        <div id="dataTableContainer">
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="text-muted mt-2">Memuat data...</p>
-            </div>
-        </div>
-    </div>
+<div class="table-responsive">
+    <table class="table table-striped table-sm" id="dataTable">
+        <thead>
+            <tr>
+                <th>Tanggal</th>
+                <th>Bulan</th>
+                <th>Minggu</th>
+                <th>Tahun</th>
+                <th>IPH (%)</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody id="dataBody">
+            </tbody>
+    </table>
 </div>
 
-<!-- Manual Input Modal -->
-<div class="modal fade" id="manualInputModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-keyboard me-2"></i>Input Manual Data IPH & Komoditas
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="manualInputForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualBulan" class="form-label">
-                                    <i class="fas fa-calendar me-1"></i>Bulan
-                                </label>
-                                <select class="form-select" id="manualBulan" required>
-                                    <option value="">Pilih Bulan</option>
-                                    <option value="Januari">Januari</option>
-                                    <option value="Februari">Februari</option>
-                                    <option value="Maret">Maret</option>
-                                    <option value="April">April</option>
-                                    <option value="Mei">Mei</option>
-                                    <option value="Juni">Juni</option>
-                                    <option value="Juli">Juli</option>
-                                    <option value="Agustus">Agustus</option>
-                                    <option value="September">September</option>
-                                    <option value="Oktober">Oktober</option>
-                                    <option value="November">November</option>
-                                    <option value="Desember">Desember</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualMinggu" class="form-label">
-                                    <i class="fas fa-calendar-week me-1"></i>Minggu ke-
-                                </label>
-                                <select class="form-select" id="manualMinggu" required>
-                                    <option value="">Pilih Minggu</option>
-                                    <option value="M1">M1</option>
-                                    <option value="M2">M2</option>
-                                    <option value="M3">M3</option>
-                                    <option value="M4">M4</option>
-                                    <option value="M5">M5</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualTahun" class="form-label">
-                                    <i class="fas fa-calendar-alt me-1"></i>Tahun
-                                </label>
-                                <input type="number" class="form-control" id="manualTahun" 
-                                       value="2024" min="2020" max="2100" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualKabKota" class="form-label">
-                                    <i class="fas fa-map-marker-alt me-1"></i>Kab/Kota
-                                </label>
-                                <input type="text" class="form-control" id="manualKabKota" 
-                                       value="BATU" required>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="manualIPH" class="form-label">
-                            <i class="fas fa-chart-line me-1"></i>Indikator Perubahan Harga (%)
-                        </label>
-                        <input type="number" step="0.001" class="form-control" id="manualIPH" 
-                               placeholder="e.g., 1.25 atau -0.85" required>
-                        <div class="form-text">Masukkan nilai IPH dalam persen (positif untuk inflasi, negatif untuk deflasi)</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="manualKomoditasAndil" class="form-label">
-                            <i class="fas fa-seedling me-1"></i>Komoditas Andil Perubahan Harga
-                        </label>
-                        <input type="text" class="form-control" id="manualKomoditasAndil" 
-                               placeholder="e.g., BERAS(0.5);CABAI(0.3);MINYAK GORENG(0.2)">
-                        <div class="form-text">Format: KOMODITAS(nilai);KOMODITAS(nilai)</div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualKomoditasFluktuasi" class="form-label">
-                                    <i class="fas fa-chart-bar me-1"></i>Komoditas Fluktuasi Tertinggi
-                                </label>
-                                <input type="text" class="form-control" id="manualKomoditasFluktuasi" 
-                                       placeholder="e.g., CABAI RAWIT">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="manualNilaiFluktuasi" class="form-label">
-                                    <i class="fas fa-percentage me-1"></i>Nilai Fluktuasi
-                                </label>
-                                <input type="number" step="0.0001" class="form-control" id="manualNilaiFluktuasi" 
-                                       placeholder="e.g., 0.0553">
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i>Batal
-                </button>
-                <button type="button" class="btn btn-success" onclick="addManualRecord()">
-                    <i class="fas fa-plus me-1"></i>Tambah Data
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Edit Data Modal -->
 <div class="modal fade" id="editDataModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>Edit Data
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editDataForm">
-                    <input type="hidden" id="editDataId">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editTanggal" class="form-label">Tanggal</label>
-                                <input type="date" class="form-control" id="editTanggal" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="editIPH" class="form-label">IPH Value (%)</label>
-                                <input type="number" step="0.001" class="form-control" id="editIPH" required>
-                            </div>
-                        </div>
+            <form id="editDataForm" onsubmit="submitEditData(event)">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit_id" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">IPH Value (%)</label>
+                        <input type="number" step="0.01" class="form-control" id="edit_iph" name="indikator_harga" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="editBulan" class="form-label">Bulan</label>
-                                <input type="text" class="form-control" id="editBulan">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="editMinggu" class="form-label">Minggu</label>
-                                <input type="text" class="form-control" id="editMinggu">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="editKabKota" class="form-label">Kab/Kota</label>
-                                <input type="text" class="form-control" id="editKabKota">
-                            </div>
-                        </div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-primary" onclick="saveEditData()">
-                    <i class="fas fa-save me-1"></i>Simpan Perubahan
-                </button>
-            </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Update</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
 
 <!-- Results Area -->
 <div id="uploadResults"></div>
@@ -490,6 +309,60 @@ function renderDataTable(data) {
     }
     
     document.getElementById('dataTableContainer').innerHTML = html;
+}
+
+function renderRow(item) {
+    return `
+        <tr>
+            <td>${item.Tanggal || '-'}</td>
+            <td>${item.Bulan || '-'}</td>
+            <td>${item.Minggu || '-'}</td>
+            <td>${item.Tahun || '-'}</td>
+            <td>${item['Indikator_Harga']}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" 
+                    onclick='openEditModal(${JSON.stringify(item)})'>
+                    <i class="fas fa-edit"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function openEditModal(item) {
+    // Pastikan item memiliki ID (perlu disesuaikan jika API list data belum return ID)
+    // Jika data list belum return ID, Anda harus update backend 'get_data_list' dulu
+    document.getElementById('edit_id').value = item.id || ''; 
+    document.getElementById('edit_iph').value = item['Indikator_Harga'];
+    
+    const modal = new bootstrap.Modal(document.getElementById('editDataModal'));
+    modal.show();
+}
+
+async function submitEditData(event) {
+    event.preventDefault();
+    const form = document.getElementById('editDataForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Anda perlu membuat route API ini di admin/routes.py
+    try {
+        const response = await fetch('/api/data/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if(result.success) {
+            alert('Data berhasil diupdate');
+            bootstrap.Modal.getInstance(document.getElementById('editDataModal')).hide();
+            loadData(); // Reload tabel
+        } else {
+            alert('Gagal: ' + result.message);
+        }
+    } catch (e) {
+        alert('Error sistem');
+    }
 }
 
 // Edit data

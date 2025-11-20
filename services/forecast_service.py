@@ -126,14 +126,14 @@ class ForecastService:
         except Exception as e:
             logger.error(f"Error saving forecast to database: {e}")
 
-    def get_current_forecast(self, model_name=None, forecast_weeks=8):
-        """Get forecast using current best model or specified model"""
+    
+    def get_current_forecast(self, model_name=None, forecast_weeks=8, save_history=False):
+        """
+        Get forecast, save to DB for persistence, and cache in memory.
+        """
         logger.debug(f"Getting current forecast: model={model_name}, weeks={forecast_weeks}")
         
         try:
-            original_model_name = model_name  # Store original request
-            
-            # Determine which model to use
             if not model_name or model_name.strip() == '':
                 best_model = self.model_manager.get_current_best_model()
                 if not best_model:
@@ -145,102 +145,48 @@ class ForecastService:
                 logger.debug(f"Using best model: '{model_name}'")
             else:
                 logger.debug(f"Using specified model: '{model_name}'")
-                
-                # Validate that the specified model exists
-                available_models = self.model_manager.engine.get_available_models()
-                model_names = [m['name'].replace(' ', '_') for m in available_models]
-                
-                logger.debug(f"Available models: {model_names}")
-                
-                if model_name not in model_names:
-                    logger.warning(f"Model '{model_name}' not found in available models")
-                    return {
-                        'success': False,
-                        'error': f'Model "{model_name}" not found. Available models: {", ".join(model_names)}'
-                    }
-                else:
-                    logger.debug(f"Model '{model_name}' found in available models")
-            
-            # Validate forecast weeks
+
             if not (4 <= forecast_weeks <= 12):
-                return {
-                    'success': False,
-                    'error': 'Forecast weeks must be between 4 and 12'
-                }
+                return {'success': False, 'error': 'Forecast weeks must be between 4 and 12'}
             
-            logger.debug(f"Calling engine.generate_forecast: model='{model_name}', weeks={forecast_weeks}")
-            
-            # Generate forecast
+            # 1. Generate forecast (Menggunakan Engine ONNX)
             forecast_df, model_performance, forecast_summary = self.model_manager.engine.generate_forecast(
                 model_name, forecast_weeks
             )
             
             logger.debug(f"Forecast generated: shape={forecast_df.shape}")
             
-            self._save_forecast_to_database(forecast_df, model_name, forecast_summary, forecast_weeks, model_performance)
+            # 2. SIMPAN KE DATABASE (ForecastHistory)
+            # KITA UBAH AGAR SELALU MENYIMPAN JIKA save_history=True ATAU belum ada forecast terbaru
+            if save_history:
+                logger.info("Saving forecast to database history...")
+                self._save_forecast_to_database(forecast_df, model_name, forecast_summary, forecast_weeks, model_performance)
+            else:
+                 # Opsi: Tetap simpan otomatis sebagai 'latest' tanpa intervensi user?
+                 # Untuk saat ini, kita ikuti flag save_history agar tidak spam database saat refresh halaman dashboard
+                 pass
 
-            # Clean forecast data for JSON serialization
-            forecast_data_clean = []
-            for record in forecast_df.to_dict('records'):
-                clean_record = {}
-                for key, value in record.items():
-                    if key == 'Tanggal':
-                        # Ensure Tanggal is string
-                        if isinstance(value, pd.Timestamp):
-                            clean_record[key] = value.strftime('%Y-%m-%d')
-                        else:
-                            clean_record[key] = str(value)
-                    elif isinstance(value, (np.floating, float)):
-                        if np.isnan(value) or np.isinf(value):
-                            clean_record[key] = None
-                        else:
-                            clean_record[key] = float(value)
-                    elif isinstance(value, (np.integer, int)):
-                        clean_record[key] = int(value)
-                    elif isinstance(value, np.bool_):
-                        clean_record[key] = bool(value)
-                    else:
-                        clean_record[key] = value
-                forecast_data_clean.append(clean_record)
-            
-            logger.debug(f"Cleaned forecast: {len(forecast_data_clean)} records")
-            
+            # 3. Buat hasil JSON
             result = {
                 'success': True,
                 'timestamp': datetime.now().isoformat(),
                 'forecast': {
-                    'data': forecast_data_clean,
-                    'model_name': str(model_name),  # Ensure this is the actual model used
-                    'model_performance': {
-                        'mae': float(model_performance['mae']) if not np.isnan(model_performance['mae']) else 0.0,
-                        'rmse': float(model_performance['rmse']) if not np.isnan(model_performance['rmse']) else 0.0,
-                        'r2_score': float(model_performance['r2_score']) if not np.isnan(model_performance['r2_score']) else 0.0,
-                        'training_time': float(model_performance['training_time'])
-                    },
-                    'summary': {
-                        'avg_prediction': float(forecast_summary['avg_prediction']) if not np.isnan(forecast_summary['avg_prediction']) else 0.0,
-                        'trend': str(forecast_summary['trend']),
-                        'volatility': float(forecast_summary['volatility']) if not np.isnan(forecast_summary['volatility']) else 0.0,
-                        'min_prediction': float(forecast_summary['min_prediction']) if not np.isnan(forecast_summary['min_prediction']) else 0.0,
-                        'max_prediction': float(forecast_summary['max_prediction']) if not np.isnan(forecast_summary['max_prediction']) else 0.0
-                    },
+                    'data': clean_data_for_json(forecast_df.to_dict('records')),
+                    'model_name': str(model_name),
+                    'model_performance': clean_data_for_json(model_performance),
+                    'summary': clean_data_for_json(forecast_summary),
                     'weeks_forecasted': int(forecast_weeks)
                 }
             }
             
-            #  PERBAIKAN UTAMA: Simpan forecast terbaru di memory
+            # 4. Update Cache
             self._latest_forecast = result['forecast'].copy()
-            logger.debug(f"Latest forecast saved in memory: {self._latest_forecast['model_name']}")
             
             return result
             
         except Exception as e:
             error_msg = f"Error generating forecast: {str(e)}"
-            logger.error(f"Exception in get_current_forecast: {error_msg}")
-            
-            import traceback
-            traceback.print_exc()
-            
+            logger.error(f"Exception in get_current_forecast: {error_msg}", exc_info=True)
             return {
                 'success': False, 
                 'error': error_msg,
