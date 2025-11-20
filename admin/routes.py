@@ -688,6 +688,25 @@ def api_activities():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@admin_bp.route('/api/data/update', methods=['POST'])
+@admin_required
+def update_data():
+    try:
+        data = request.get_json()
+        record_id = data.get('id')
+        new_iph = data.get('indikator_harga')
+        
+        # Cari record di DB (asumsi IPHData punya kolom id)
+        record = IPHData.query.get(record_id)
+        if record:
+            record.indikator_harga = float(new_iph)
+            db.session.commit()
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'message': 'Record not found'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
 # ==================== FORECAST MANAGEMENT APIs ====================
 
 
