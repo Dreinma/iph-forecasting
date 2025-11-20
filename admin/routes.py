@@ -82,34 +82,47 @@ def logout():
 @admin_required
 def dashboard():
     """Admin dashboard view"""
-    # Pastikan import AdminUser ada
     from database import IPHData, AlertHistory, ModelPerformance, ActivityLog, AdminUser
+    from sqlalchemy import func
     
-    # Get statistics
+    # 1. Ambil Statistik (Tetap Sama)
     total_records = IPHData.query.count()
     active_alerts = AlertHistory.query.filter_by(is_active=True).count()
     trained_models = ModelPerformance.query.distinct(ModelPerformance.model_name).count()
     
-    # Recent activities (last 10)
+    # 2. Ambil Aktivitas Terbaru (Tetap Sama)
     recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
     
-    # --- PERBAIKAN DI SINI ---
-    last_login = None
-    if current_user.is_authenticated:
-        # Ambil object user asli dari database berdasarkan ID
-        # current_user.id adalah string, kita cast ke int jika perlu
-        user_db = AdminUser.query.get(int(current_user.get_id()))
-        if user_db:
-            last_login = user_db.last_login
-    # -------------------------
+    # 3. PERBAIKAN TOTAL UNTUK LAST LOGIN
+    last_login_str = "-" # Default jika gagal/belum pernah login
     
+    if current_user.is_authenticated:
+        try:
+            # Ambil ID user dari sesi
+            user_id = int(current_user.get_id())
+            
+            # Query langsung ke Database (AdminUser) menggunakan ID tersebut
+            user_from_db = AdminUser.query.get(user_id)
+            
+            if user_from_db and user_from_db.last_login:
+                # Format tanggal agar cantik
+                last_login_str = user_from_db.last_login.strftime('%d %B %Y %H:%M')
+        except Exception as e:
+            print(f"Error mengambil last_login: {e}")
+            # Jika error, biarkan default "-" agar dashboard TIDAK CRASH
+            
+    print("DEBUG USER INFO:")
+    print(f"Is Authenticated: {current_user.is_authenticated}")
+    print(f"User ID: {current_user.get_id()}")
+    print(f"Dir Current User: {dir(current_user)}") # Ini akan mencetak semua atribut yang dimiliki current_user
+
     return render_template('admin/dashboard.html', 
                          page_title="Admin Dashboard",
                          total_records=total_records,
                          active_alerts=active_alerts,
                          trained_models=trained_models,
                          recent_activities=recent_activities,
-                         last_login=last_login)
+                         last_login=last_login_str) # Kirim string yang sudah aman
 
 @admin_bp.route('/data-control')
 @admin_required
