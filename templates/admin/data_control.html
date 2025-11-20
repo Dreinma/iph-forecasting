@@ -95,135 +95,41 @@
 
 {% block scripts %}
 <script>
-
-    
-// Show upload modal (if needed in future)
-function showUploadModal() {
-    // Currently using inline form, but can be converted to modal if needed
-    document.getElementById('fileUpload')?.click();
-}
-
-// Show manual input modal
-function showManualInputModal() {
-    const modal = new bootstrap.Modal(document.getElementById('manualInputModal'));
-    modal.show();
-}
-
-// Add manual record
-async function addManualRecord() {
-    const formData = {
-        bulan: document.getElementById('manualBulan').value,
-        minggu: document.getElementById('manualMinggu').value,
-        tahun: parseInt(document.getElementById('manualTahun').value),
-        kab_kota: document.getElementById('manualKabKota').value,
-        iph_value: parseFloat(document.getElementById('manualIPH').value),
-        komoditas_andil: document.getElementById('manualKomoditasAndil').value,
-        komoditas_fluktuasi: document.getElementById('manualKomoditasFluktuasi').value,
-        nilai_fluktuasi: parseFloat(document.getElementById('manualNilaiFluktuasi').value) || 0
-    };
-    
-    // Validate required fields
-    if (!formData.bulan || !formData.minggu || !formData.iph_value) {
-        showAlert('Mohon isi semua field yang wajib diisi', 'warning');
-        return;
-    }
-    
-    try {
-        showLoading('Menambahkan data manual...');
-        
-        const response = await fetch('/api/add-manual-record', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('Data berhasil ditambahkan!', 'success');
-            
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('manualInputModal'));
-            modal.hide();
-            
-            // Clear form
-            document.getElementById('manualInputForm').reset();
-            document.getElementById('manualTahun').value = '2024';
-            document.getElementById('manualKabKota').value = 'BATU';
-            
-            // Reload data table
-            loadDataTable(currentPage);
-        } else {
-            showAlert(`Error: ${result.message}`, 'danger');
-        }
-        
-    } catch (error) {
-        showAlert(`Error menambahkan data: ${error.message}`, 'danger');
-    } finally {
-        hideLoading();
-    }
-}
-
-// Upload data
-async function uploadData() {
-    const fileInput = document.getElementById('fileUpload');
-    const file = fileInput?.files[0];
-    
-    if (!file) {
-        showAlert('Silakan pilih file terlebih dahulu', 'warning');
-        return;
-    }
-    
-    const forecastWeeks = document.getElementById('forecastWeeks')?.value || 8;
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('forecast_weeks', forecastWeeks);
-    
-    try {
-        showLoading('Mengupload dan memproses data...');
-        
-        const response = await fetch('/api/upload-data', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert('✅ Data berhasil diupload dan diproses!', 'success');
-            fileInput.value = '';
-            
-            // Reload data table
-            setTimeout(() => {
-                loadDataTable(1);
-            }, 2000);
-        } else {
-            showAlert(`❌ Error: ${result.message || result.error}`, 'danger');
-        }
-    } catch (error) {
-        showAlert(`❌ Error: ${error.message}`, 'danger');
-    } finally {
-        hideLoading();
-    }
-}
-
-// Load data table
+// Variabel Global
 let currentPage = 1;
 const perPage = 20;
-async function loadData(page = 1) {
-    const search = document.getElementById('searchInput')?.value || '';
+let searchTimeout = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Data Management page loaded');
+    loadDataTable(1);
     
-    // PERBAIKAN: Gunakan URL '/admin/api/data/list'
+    // Search Listener (Debounce)
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                loadDataTable(1);
+            }, 500); // Tunggu 500ms setelah user berhenti mengetik
+        });
+    }
+});
+
+// --- LOAD DATA TABLE ---
+async function loadDataTable(page = 1) {
+    const search = document.getElementById('searchInput')?.value || '';
+    // URL API yang sudah diperbaiki
     const url = `/admin/api/data/list?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`;
     
-    const tbody = document.getElementById('dataBody');
+    const tbody = document.getElementById('dataBody'); // Pastikan ID ini ada di <tbody> tabel Anda
+    
+    // Tampilkan Loading
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="text-muted mt-2">Memuat data...</p>
+            <td colspan="6" class="text-center py-5">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <p class="text-muted small mb-0">Memuat data...</p>
             </td>
         </tr>
     `;
@@ -233,59 +139,64 @@ async function loadData(page = 1) {
         const result = await response.json();
         
         if (result.success && result.data) {
-            renderTable(result.data.items);
-            updatePagination(result.data.pagination);
+            renderTableRows(result.data.items);
+            renderPagination(result.data.pagination);
             
-            // Update total records counter jika ada
-            const totalEl = document.getElementById('totalRecords');
-            if (totalEl) totalEl.textContent = result.data.pagination.total;
+            // Update total count di header card (jika ada elemennya)
+            const totalEl = document.getElementById('totalRecordsCount'); // Ganti ID jika beda
+            if (totalEl && result.data.pagination) {
+                totalEl.textContent = result.data.pagination.total;
+            }
             
             currentPage = page;
         } else {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${result.error || 'Gagal memuat data'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${result.error || 'Gagal memuat data'}</td></tr>`;
         }
     } catch (error) {
-        console.error('Error loading data:', error);
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error koneksi: ${error.message}</td></tr>`;
+        console.error('Load Error:', error);
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error koneksi: ${error.message}</td></tr>`;
     }
 }
 
-function renderTable(items) {
+// --- RENDER TABLE ROWS ---
+function renderTableRows(items) {
     const tbody = document.getElementById('dataBody');
     tbody.innerHTML = '';
     
-    if (items.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">Tidak ada data ditemukan</td></tr>`;
+    if (!items || items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">Tidak ada data ditemukan</td></tr>`;
         return;
     }
     
     items.forEach(item => {
-        // Format tanggal
-        let dateStr = item.tanggal;
-        try {
-            dateStr = new Date(item.tanggal).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
-        } catch(e) {}
+        // Format Tanggal (Fallback aman)
+        let dateStr = item.tanggal; 
+        if (item.tanggal && item.tanggal.includes('T')) {
+            dateStr = item.tanggal.split('T')[0]; // Ambil YYYY-MM-DD
+        }
 
-        // PERBAIKAN: Gunakan properti yang benar (sesuai JSON response dari to_dict)
+        const sourceBadge = item.data_source === 'manual_input' 
+            ? '<span class="badge bg-info">Manual</span>' 
+            : '<span class="badge bg-secondary">Upload</span>';
+
         const row = `
             <tr>
-                <td>${dateStr}</td>
-                <td>${item.bulan || '-'}</td>
-                <td>${item.minggu || '-'}</td>
-                <td>${item.tahun || '-'}</td>
-                <td>${item.indikator_harga.toFixed(2)}%</td>
-                <td>
-                    <span class="badge ${item.data_source === 'manual_input' ? 'bg-info' : 'bg-secondary'}">
-                        ${item.data_source === 'manual_input' ? 'Manual' : 'Upload'}
-                    </span>
+                <td class="align-middle font-monospace small">${dateStr}</td>
+                <td class="align-middle">${item.bulan || '-'}</td>
+                <td class="align-middle">${item.minggu || '-'}</td>
+                <td class="align-middle">${item.tahun || '-'}</td>
+                <td class="align-middle fw-bold ${item.indikator_harga < 0 ? 'text-success' : 'text-danger'}">
+                    ${item.indikator_harga ? item.indikator_harga.toFixed(2) : '0.00'}%
                 </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick='editData(${JSON.stringify(item)})' title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteData(${item.id})" title="Hapus">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                <td class="align-middle">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" onclick='openEditModal(${JSON.stringify(item)})' title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteData(${item.id})" title="Hapus">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -293,316 +204,191 @@ function renderTable(items) {
     });
 }
 
-function updatePagination(pagination) {
-    const container = document.getElementById('paginationContainer'); // Pastikan ID ini ada di HTML
-    if (!container) return;
+// --- RENDER PAGINATION ---
+function renderPagination(pagination) {
+    // Pastikan Anda memiliki <div id="paginationContainer"></div> di HTML di bawah tabel
+    const container = document.getElementById('paginationContainer');
+    if (!container) return; // Skip jika container tidak ada
 
-    let html = `
-        <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center mb-0">
-                <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
-                    <button class="page-link" onclick="loadData(${pagination.page - 1})">Previous</button>
-                </li>
-                <li class="page-item disabled">
-                    <span class="page-link">Halaman ${pagination.page} dari ${pagination.pages}</span>
-                </li>
-                <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
-                    <button class="page-link" onclick="loadData(${pagination.page + 1})">Next</button>
-                </li>
-            </ul>
-        </nav>
+    if (pagination.pages <= 1) {
+        container.innerHTML = ''; // Sembunyikan jika hanya 1 halaman
+        return;
+    }
+
+    let html = `<nav><ul class="pagination justify-content-center mb-0">`;
+
+    // Prev Button
+    html += `
+        <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadDataTable(${pagination.page - 1})">Prev</button>
+        </li>
     `;
+
+    // Page Numbers (Simple: Current +/- 1)
+    const start = Math.max(1, pagination.page - 1);
+    const end = Math.min(pagination.pages, pagination.page + 1);
+
+    for (let i = start; i <= end; i++) {
+        html += `
+            <li class="page-item ${i === pagination.page ? 'active' : ''}">
+                <button class="page-link" onclick="loadDataTable(${i})">${i}</button>
+            </li>
+        `;
+    }
+
+    // Next Button
+    html += `
+        <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadDataTable(${pagination.page + 1})">Next</button>
+        </li>
+    `;
+
+    html += `</ul></nav>`;
     container.innerHTML = html;
 }
 
-function loadDataTable(page = 1) {
-    const search = document.getElementById('searchInput')?.value || '';
-    const url = `/admin/api/data/list?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`;
-    
-    document.getElementById('dataTableContainer').innerHTML = `
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="text-muted mt-2">Memuat data...</p>
-        </div>
-    `;
-    
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderDataTable(data.data);
-                currentPage = page;
-                
-                // Update total records count
-                if (data.data && data.data.pagination && data.data.pagination.total !== undefined) {
-                    const totalCountElement = document.getElementById('totalRecordsCount');
-                    if (totalCountElement) {
-                        totalCountElement.textContent = data.data.pagination.total;
-                    }
-                }
-            } else {
-                document.getElementById('dataTableContainer').innerHTML = 
-                    `<div class="alert alert-danger">Error: ${data.error || 'Gagal memuat data'}</div>`;
-            }
-        })
-        .catch(error => {
-            document.getElementById('dataTableContainer').innerHTML = 
-                `<div class="alert alert-danger">Error: ${error.message}</div>`;
-        });
-}
+// --- CRUD OPERATIONS ---
 
-function renderDataTable(data) {
-    if (!data.items || data.items.length === 0) {
-        document.getElementById('dataTableContainer').innerHTML = 
-            `<div class="alert alert-info">Tidak ada data</div>`;
+// 1. Upload CSV
+async function uploadData() {
+    const fileInput = document.getElementById('fileUpload'); // Pastikan ID ini benar di HTML
+    const file = fileInput?.files[0];
+    
+    if (!file) {
+        showAlert('Silakan pilih file CSV/Excel terlebih dahulu', 'warning');
         return;
     }
     
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Tanggal</th>
-                        <th>Bulan</th>
-                        <th>Minggu</th>
-                        <th>IPH Value</th>
-                        <th>Kab/Kota</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
+    const formData = new FormData();
+    formData.append('file', file);
     
-    data.items.forEach(item => {
-        const tanggal = item.tanggal ? (typeof item.tanggal === 'string' ? item.tanggal : item.tanggal.split('T')[0]) : '-';
-        html += `
-            <tr>
-                <td>${tanggal}</td>
-                <td>${item.bulan || '-'}</td>
-                <td>${item.minggu || '-'}</td>
-                <td>${item.indikator_harga ? item.indikator_harga.toFixed(2) : '-'}</td>
-                <td>${item.kab_kota || '-'}</td>
-                <td>
-                    <button class="btn btn-sm btn-info" onclick="editData(${item.id})" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteData(${item.id})" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `</tbody></table></div>`;
-    
-    // Pagination
-    if (data.pagination && data.pagination.pages > 1) {
-        html += `<nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center">
-        `;
+    // Ambil tombol untuk loading state
+    const btn = document.querySelector('button[onclick="uploadData()"]');
+    if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...'; }
+
+    try {
+        const response = await fetch('/api/upload-data', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
         
-        for (let i = 1; i <= data.pagination.pages; i++) {
-            html += `<li class="page-item ${i === data.pagination.page ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="loadDataTable(${i}); return false;">${i}</a>
-            </li>`;
+        if (result.success) {
+            showAlert(`✅ Sukses! ${result.merge_info.new_records} data baru ditambahkan.`, 'success');
+            fileInput.value = ''; // Reset input
+            bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide(); // Tutup modal
+            loadDataTable(1); // Reload tabel
+        } else {
+            showAlert(`❌ Gagal: ${result.message}`, 'danger');
         }
-        
-        html += `</ul></nav>`;
+    } catch (error) {
+        showAlert(`❌ Error: ${error.message}`, 'danger');
+    } finally {
+        if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-upload me-1"></i> Upload'; }
     }
-    
-    document.getElementById('dataTableContainer').innerHTML = html;
 }
 
-function renderRow(item) {
-    return `
-        <tr>
-            <td>${item.Tanggal || '-'}</td>
-            <td>${item.Bulan || '-'}</td>
-            <td>${item.Minggu || '-'}</td>
-            <td>${item.Tahun || '-'}</td>
-            <td>${item['Indikator_Harga']}</td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary" 
-                    onclick='openEditModal(${JSON.stringify(item)})'>
-                    <i class="fas fa-edit"></i>
-                </button>
-            </td>
-        </tr>
-    `;
+// 2. Add Manual
+async function addManualRecord() {
+    // Pastikan ID input di HTML sesuai dengan ini
+    const data = {
+        bulan: document.getElementById('manualBulan').value,
+        minggu: document.getElementById('manualMinggu').value,
+        tahun: document.getElementById('manualTahun').value,
+        kab_kota: 'BATU', // Default
+        iph_value: document.getElementById('manualIPH').value
+    };
+
+    if (!data.bulan || !data.minggu || !data.tahun || !data.iph_value) {
+        alert('Mohon lengkapi semua field wajib!');
+        return;
+    }
+
+    try {
+        const response = await fetch('/admin/api/add-manual-record', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Data manual berhasil disimpan', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addManualModal')).hide();
+            loadDataTable(1);
+        } else {
+            alert('Gagal: ' + result.message);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 
+// 3. Edit Data
 function openEditModal(item) {
-    // Pastikan item memiliki ID (perlu disesuaikan jika API list data belum return ID)
-    // Jika data list belum return ID, Anda harus update backend 'get_data_list' dulu
-    document.getElementById('edit_id').value = item.id || ''; 
-    document.getElementById('edit_iph').value = item['Indikator_Harga'];
-    
+    document.getElementById('edit_id').value = item.id;
+    document.getElementById('edit_iph').value = item.indikator_harga;
+    // Set value lain jika form edit punya field lain
     const modal = new bootstrap.Modal(document.getElementById('editDataModal'));
     modal.show();
 }
 
 async function submitEditData(event) {
     event.preventDefault();
-    const form = document.getElementById('editDataForm');
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
+    const id = document.getElementById('edit_id').value;
+    const iph = document.getElementById('edit_iph').value;
 
-    // Anda perlu membuat route API ini di admin/routes.py
     try {
-        const response = await fetch('/api/data/update', {
+        const response = await fetch('/admin/api/data/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify({ id: id, indikator_harga: iph })
         });
         const result = await response.json();
         if(result.success) {
-            alert('Data berhasil diupdate');
+            showAlert('Data berhasil diupdate', 'success');
             bootstrap.Modal.getInstance(document.getElementById('editDataModal')).hide();
-            loadData(); // Reload tabel
+            loadDataTable(currentPage);
         } else {
-            alert('Gagal: ' + result.message);
+            alert('Gagal update: ' + result.message);
         }
     } catch (e) {
-        alert('Error sistem');
+        alert('Error sistem: ' + e.message);
     }
 }
 
-// Edit data
-async function editData(id) {
-    try {
-        const response = await fetch(`/admin/api/data/${id}`);
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-            const data = result.data;
-            
-            document.getElementById('editDataId').value = id;
-            document.getElementById('editTanggal').value = data.tanggal ? (typeof data.tanggal === 'string' ? data.tanggal.split('T')[0] : data.tanggal) : '';
-            document.getElementById('editIPH').value = data.indikator_harga || '';
-            document.getElementById('editBulan').value = data.bulan || '';
-            document.getElementById('editMinggu').value = data.minggu || '';
-            document.getElementById('editKabKota').value = data.kab_kota || '';
-            
-            const modal = new bootstrap.Modal(document.getElementById('editDataModal'));
-            modal.show();
-        } else {
-            showAlert('Gagal memuat data untuk diedit', 'danger');
-        }
-    } catch (error) {
-        showAlert(`Error: ${error.message}`, 'danger');
-    }
-}
-
-// Save edit data
-async function saveEditData() {
-    const id = document.getElementById('editDataId').value;
-    const data = {
-        tanggal: document.getElementById('editTanggal').value,
-        indikator_harga: parseFloat(document.getElementById('editIPH').value),
-        bulan: document.getElementById('editBulan').value,
-        minggu: document.getElementById('editMinggu').value,
-        kab_kota: document.getElementById('editKabKota').value
-    };
+// 4. Delete Data
+async function deleteData(id) {
+    if(!confirm('Yakin ingin menghapus data ini permanen?')) return;
     
     try {
-        showLoading('Menyimpan perubahan...');
-        
-        const response = await fetch(`/admin/api/data/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
+        const response = await fetch(`/admin/api/data/${id}`, { method: 'DELETE' });
         const result = await response.json();
-        
-        if (result.success) {
-            showAlert('Data berhasil diupdate!', 'success');
-            
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editDataModal'));
-            modal.hide();
-            
+        if(result.success) {
+            showAlert('Data dihapus', 'success');
             loadDataTable(currentPage);
         } else {
-            showAlert(`Error: ${result.error || 'Gagal menyimpan perubahan'}`, 'danger');
+            alert('Gagal hapus: ' + result.error);
         }
-    } catch (error) {
-        showAlert(`Error: ${error.message}`, 'danger');
-    } finally {
-        hideLoading();
+    } catch(e) {
+        alert('Error: ' + e.message);
     }
 }
 
-// Delete data
-function deleteData(id) {
-    if (!confirm('Apakah Anda yakin ingin menghapus data ini?')) {
-        return;
-    }
-    
-    fetch(`/admin/api/data/${id}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Data berhasil dihapus', 'success');
-            loadDataTable(currentPage);
-        } else {
-            showAlert('Error: ' + (data.error || 'Gagal menghapus data'), 'danger');
-        }
-    })
-    .catch(error => showAlert('Error: ' + error.message, 'danger'));
-}
-
-// Utility functions
-function showAlert(message, type) {
-    const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-    
-    const resultsArea = document.getElementById('actionResults');
-    if (resultsArea) {
-        resultsArea.innerHTML = alertHtml;
-        setTimeout(() => {
-            const alert = resultsArea.querySelector('.alert');
-            if (alert) {
-                alert.remove();
-            }
-        }, 5000);
+// --- UTILS ---
+function showAlert(msg, type) {
+    // Pastikan ada <div id="actionResults"></div> di HTML untuk menampilkan alert
+    const container = document.getElementById('actionResults');
+    if(container) {
+        container.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${msg}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
     } else {
-        alert(message);
+        alert(msg);
     }
 }
-
-function showLoading(message) {
-    console.log('Loading:', message);
-    // Can add loading overlay here if needed
-}
-
-function hideLoading() {
-    // Hide loading overlay if added
-}
-
-// Search functionality
-document.getElementById('searchInput')?.addEventListener('keyup', function(e) {
-    if (e.key === 'Enter') {
-        loadDataTable(1);
-    }
-});
-
-// Load data table on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadDataTable(1);
-    console.log('Data Management page loaded');
-});
 </script>
 {% endblock %}

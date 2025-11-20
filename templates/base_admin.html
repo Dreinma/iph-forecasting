@@ -441,7 +441,7 @@
                             {% if current_user.is_authenticated %}{{ current_user.username }}{% else %}Admin{% endif %}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                            <!-- <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li> -->
                             <li><a class="dropdown-item" href="/admin/change-password" id="changePasswordLink" data-route="admin.change_password"><i class="fas fa-key me-2"></i>Change Password</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="{{ url_for('admin.logout') }}">

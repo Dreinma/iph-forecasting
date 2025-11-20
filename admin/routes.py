@@ -428,7 +428,9 @@ def generate_forecast():
 @admin_bp.route('/api/forecasts/history')
 @admin_required
 def api_forecast_history():
-    """Get forecast history"""
+    """Get forecast history with pagination"""
+    from database import ForecastHistory
+    
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
@@ -438,19 +440,24 @@ def api_forecast_history():
         if model_filter:
             query = query.filter(ForecastHistory.model_name == model_filter)
             
+        # Order by newest first
         pagination = query.order_by(ForecastHistory.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
         
         history_data = []
         for item in pagination.items:
+            # Pastikan atribut ini ada di model database Anda
+            # Gunakan getattr untuk keamanan jika ragu
+            weeks = getattr(item, 'forecast_weeks', getattr(item, 'weeks_forecasted', 0))
+            
             history_data.append({
                 'id': item.id,
                 'model_name': item.model_name,
-                'weeks': item.weeks_forecasted,
-                'avg_prediction': item.avg_prediction,
+                'weeks': weeks,
+                'avg_prediction': float(item.avg_prediction) if item.avg_prediction else 0.0,
                 'trend': item.trend,
-                'created_at': item.created_at.strftime('%Y-%m-%d %H:%M'),
+                'created_at': item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else '-',
                 'created_by': item.created_by
             })
             
@@ -465,6 +472,8 @@ def api_forecast_history():
             }
         })
     except Exception as e:
+        # Log error untuk debugging yang lebih baik
+        print(f"Error in api_forecast_history: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @admin_bp.route('/api/forecasts/<int:forecast_id>', methods=['DELETE'])

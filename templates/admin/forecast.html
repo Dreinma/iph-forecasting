@@ -10,11 +10,6 @@
         <h5 class="mb-1">Forecast Management</h5>
         <p class="text-muted mb-0">History dan analitik forecast yang pernah dibuat</p>
     </div>
-    <div class="w-100 w-md-auto">
-        <button type="button" class="btn btn-outline-secondary w-100 w-md-auto" onclick="exportForecastHistory()">
-            <i class="fas fa-download me-2"></i>Export History
-        </button>
-    </div>
 </div>
 
 <!-- Forecast Statistics -->
@@ -108,13 +103,34 @@
 let currentForecastPage = 1;
 const forecastPerPage = 10;
 
+async function loadForecastStats() {
+    try {
+        const response = await fetch('/admin/api/forecasts/statistics');
+        const result = await response.json();
+        
+        if (result.success && result.statistics) {
+            document.getElementById('totalForecasts').textContent = result.statistics.total_forecasts;
+            document.getElementById('forecastsThisMonth').textContent = result.statistics.this_month;
+            
+            // Hapus underscore dari nama model
+            const cleanName = (result.statistics.most_used_model || '-').replace(/_/g, ' ');
+            document.getElementById('mostUsedModel').textContent = cleanName;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Forecast management page loaded');
     loadForecastHistory(1); // Panggil dengan page 1
-    
+    loadForecastStats();
     // Event listener filter
     document.getElementById('filterModel')?.addEventListener('change', () => loadForecastHistory(1));
 });
+
+
 
 async function loadForecastHistory(page = 1) {
     const modelFilter = document.getElementById('filterModel')?.value || '';
