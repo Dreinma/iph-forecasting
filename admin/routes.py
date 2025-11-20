@@ -110,7 +110,7 @@ def dashboard():
         except Exception as e:
             print(f"Error mengambil last_login: {e}")
             # Jika error, biarkan default "-" agar dashboard TIDAK CRASH
-            
+
     print("DEBUG USER INFO:")
     print(f"Is Authenticated: {current_user.is_authenticated}")
     print(f"User ID: {current_user.get_id()}")
@@ -122,8 +122,7 @@ def dashboard():
                          active_alerts=active_alerts,
                          trained_models=trained_models,
                          recent_activities=recent_activities,
-                         last_login=last_login_str) # Kirim string yang sudah aman
-
+                         last_login=last_login_str) 
 @admin_bp.route('/data-control')
 @admin_required
 def data_control():
