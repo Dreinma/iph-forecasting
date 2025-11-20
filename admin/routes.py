@@ -1110,16 +1110,6 @@ def api_app_settings():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@admin_bp.route('/settings')
-@admin_required
-def settings():
-    # Get Memory Usage
-    process = psutil.Process(os.getpid())
-    memory_usage = process.memory_info().rss / 1024 / 1024 # MB
-    
-    return render_template('admin/settings.html', 
-                         memory_usage=f"{memory_usage:.2f} MB",
-                         page_title="Pengaturan")
 
 
 @admin_bp.route('/api/users/<int:user_id>', methods=['PUT', 'DELETE'])
