@@ -155,7 +155,6 @@ function formatCommodityName(name) {
 // --- LOAD ALL INSIGHTS ---
 async function loadAllInsights() {
     showLoading('sparklineListContainer', 'Menganalisis tren...');
-    showLoading('rankingChartFreq', 'Menyiapkan ranking...');
     
     try {
         const { params, rangeText } = getFilterParams('trend');
@@ -289,39 +288,38 @@ function renderFrequencyChart(freqData, rangeText) {
         x: freqData.x,
         y: freqData.y,
         type: 'bar',
-        // Lebar bar proporsional
-        width: 0.5, 
-        marker: { 
-            color: '#4361ee', 
+        marker: {
+            color: '#4361ee', // Warna biru
             opacity: 0.9,
             line: { width: 0 }
         },
-        text: freqData.y.map(v => String(v)),
+        text: freqData.y.map(v => String(v)), // Angka di atas bar
         textposition: 'auto',
         hoverinfo: 'x+y'
     };
 
     const layout = {
         title: {
-            text: `Top 5 Paling Sering Muncul<br><span style="font-size: 12px; color: #777;">${rangeText}</span>`,
+            text: `<span style="font-size: 12px; color: #777;">${rangeText}</span>`,
             font: { size: 16 },
-            x: 0.5, // Judul di tengah
+            x: 0.5, // Judul di tengah (0 = kiri, 1 = kanan)
             xanchor: 'center'
         },
-        margin: { t: 60, b: 40, l: 40, r: 40 }, // Margin seimbang kiri-kanan
+        // Margin seimbang kiri-kanan agar chart di tengah
+        margin: { t: 60, b: 40, l: 50, r: 50 }, 
         yaxis: { 
-            visible: false, // Sembunyikan axis Y agar lebih bersih
-            fixedrange: true
-        }, 
+            title: 'Frekuensi',
+            showgrid: true,
+            gridcolor: '#f0f0f0'
+        },
         xaxis: { 
-            tickfont: {size: 11},
-            fixedrange: true
+            title: '',
+            tickfont: {size: 11}
         },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
         showlegend: false,
-        // Membantu pemusatan visual
-        bargap: 0.4 
+        bargap: 0.4 // Jarak antar bar agar tidak terlalu gemuk
     };
 
     Plotly.newPlot(container, [trace], layout, {displayModeBar: false, responsive: true});
