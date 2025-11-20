@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from flask_login import login_user, logout_user, login_required, current_user
 from auth.decorators import admin_required
 from auth.forms import LoginForm, ChangePasswordForm, CreateAdminForm
-from auth.utils import check_password, update_last_login, create_admin_user, hash_password
+from auth.utils import check_password, update_last_login, create_admin_user, hash_password, load_user, User
 from database import db, AdminUser, IPHData, CommodityData, ForecastHistory, AlertHistory, ModelPerformance, ActivityLog
 from datetime import datetime, timedelta
 import os
@@ -18,7 +18,7 @@ from sqlalchemy import func, or_, distinct
 
 # Create admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
-from auth.utils import load_user, User
+
 # =================================================================
 # AUTHENTICATION ROUTES
 # =================================================================
@@ -40,9 +40,24 @@ def login():
             if not user.is_active:
                 flash('Akun tidak aktif.', 'danger')
                 return render_template('admin/login.html', form=form)
-                
-            login_user(user, remember=form.remember_me.data)
-            update_last_login(user)
+            
+            # Buat objek wrapper User untuk Flask-Login
+            flask_user = User(
+                user_id=user.id,
+                username=user.username,
+                email=user.email,
+                is_active=user.is_active
+            )
+            
+            login_user(flask_user, remember=form.remember_me.data)
+            
+            # Update last login (gunakan ID atau objek, tergantung implementasi utils)
+            try:
+                # Coba update manual jika fungsi util bermasalah
+                user.last_login = datetime.utcnow()
+                db.session.commit()
+            except Exception as e:
+                print(f"Warning: Failed to update last_login: {e}")
             
             next_page = request.args.get('next')
             return redirect(next_page or url_for('admin.dashboard'))
@@ -67,9 +82,6 @@ def logout():
 @admin_required
 def dashboard():
     """Admin dashboard view"""
-    from database import IPHData, AlertHistory, ModelPerformance, ActivityLog, AdminUser # Import AdminUser
-    from sqlalchemy import func
-
     # Get statistics
     total_records = IPHData.query.count()
     active_alerts = AlertHistory.query.filter_by(is_active=True).count()
@@ -78,13 +90,21 @@ def dashboard():
     # Recent activities (last 10)
     recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
     
+    # --- PERBAIKAN ERROR 'User object has no attribute last_login' ---
     last_login = None
     if current_user.is_authenticated:
-        # Ambil user asli dari database berdasarkan ID current_user
-        user_db = AdminUser.query.get(int(current_user.id)) 
-        if user_db:
-            last_login = user_db.last_login    
-            
+        try:
+            # Ambil data asli dari Database, bukan dari current_user wrapper
+            # Pastikan ID dikonversi ke int
+            user_db = AdminUser.query.get(int(current_user.id))
+            if user_db:
+                last_login = user_db.last_login
+        except Exception as e:
+            print(f"Error fetching last_login: {e}")
+            # Fallback jika gagal
+            last_login = datetime.utcnow() 
+    # ------------------------------------------------------------------
+    
     return render_template('admin/dashboard.html', 
                          page_title="Admin Dashboard",
                          total_records=total_records,
@@ -121,9 +141,12 @@ def settings():
     admin_users = AdminUser.query.all()
     
     # Get memory usage (Container safe)
-    process = psutil.Process(os.getpid())
-    mem_info = process.memory_info()
-    memory_usage = f"{mem_info.rss / 1024 / 1024:.2f} MB"
+    try:
+        process = psutil.Process(os.getpid())
+        mem_info = process.memory_info()
+        memory_usage = f"{mem_info.rss / 1024 / 1024:.2f} MB"
+    except:
+        memory_usage = "N/A"
     
     return render_template('admin/settings.html', 
                          page_title="Pengaturan Sistem",
@@ -150,8 +173,11 @@ def change_password():
     """Change password for current user"""
     form = ChangePasswordForm()
     if form.validate_on_submit():
-        if check_password(current_user.password_hash, form.current_password.data):
-            current_user.password_hash = hash_password(form.new_password.data)
+        # Ambil user asli dari DB untuk cek password
+        user_db = AdminUser.query.get(int(current_user.id))
+        
+        if user_db and check_password(user_db.password_hash, form.current_password.data):
+            user_db.password_hash = hash_password(form.new_password.data)
             db.session.commit()
             flash('Password berhasil diubah', 'success')
             return redirect(url_for('admin.settings'))
@@ -453,14 +479,13 @@ def api_delete_forecast(forecast_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # =================================================================
-# API ROUTES: SYSTEM & AUDIT (Disederhanakan untuk Cloud)
+# API ROUTES: SYSTEM & AUDIT
 # =================================================================
 
 @admin_bp.route('/api/system/storage')
 @admin_required
 def api_system_storage():
     """API untuk storage information (Dummy/Minimal untuk Cloud)"""
-    # Di cloud, kita tidak track local storage
     return jsonify({
         'success': True,
         'storage': {
@@ -496,8 +521,6 @@ def api_manage_user(user_id):
             db.session.commit()
             return jsonify({'success': True, 'message': 'User deleted'})
         
-        # PUT Update logic...
-        # (Sederhanakan: implementasi lengkap update user jika diperlukan)
         return jsonify({'success': False, 'message': 'Update not implemented yet'})
         
     except Exception as e:
