@@ -82,6 +82,9 @@ def logout():
 @admin_required
 def dashboard():
     """Admin dashboard view"""
+    # Pastikan import AdminUser ada
+    from database import IPHData, AlertHistory, ModelPerformance, ActivityLog, AdminUser
+    
     # Get statistics
     total_records = IPHData.query.count()
     active_alerts = AlertHistory.query.filter_by(is_active=True).count()
@@ -90,20 +93,15 @@ def dashboard():
     # Recent activities (last 10)
     recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
     
-    # --- PERBAIKAN ERROR 'User object has no attribute last_login' ---
+    # --- PERBAIKAN DI SINI ---
     last_login = None
     if current_user.is_authenticated:
-        try:
-            # Ambil data asli dari Database, bukan dari current_user wrapper
-            # Pastikan ID dikonversi ke int
-            user_db = AdminUser.query.get(int(current_user.id))
-            if user_db:
-                last_login = user_db.last_login
-        except Exception as e:
-            print(f"Error fetching last_login: {e}")
-            # Fallback jika gagal
-            last_login = datetime.utcnow() 
-    # ------------------------------------------------------------------
+        # Ambil object user asli dari database berdasarkan ID
+        # current_user.id adalah string, kita cast ke int jika perlu
+        user_db = AdminUser.query.get(int(current_user.get_id()))
+        if user_db:
+            last_login = user_db.last_login
+    # -------------------------
     
     return render_template('admin/dashboard.html', 
                          page_title="Admin Dashboard",
