@@ -1842,12 +1842,10 @@ def download_file(filename):
 def download_template():
     """Download CSV template for IPH and commodity data"""
     try:
-        # Create template CSV content
-        template_content = """Bulan,Minggu ke-,Kab/Kota,Indikator Perubahan Harga (%),Komoditas Andil Perubahan Harga,Komoditas Fluktuasi Harga Tertinggi,Fluktuasi Harga
-Januari,M1,BATU,1.25,"BERAS(0.5);CABAI(0.3);MINYAK GORENG(0.2)",CABAI RAWIT,0.0553
-Januari,M2,BATU,-0.85,"TELUR AYAM RAS(-0.4);PISANG(-0.3);DAGING AYAM RAS(-0.2)",CABAI MERAH,0.0329
-Februari,M1,BATU,2.10,"BERAS(0.8);CABAI(0.6);MINYAK GORENG(0.4)",BAWANG MERAH,0.0657
-Februari,M2,BATU,0.75,"DAGING AYAM RAS(0.3);BERAS(0.2);TELUR AYAM RAS(0.1)",CABAI RAWIT,0.0409"""
+        
+        template_content = """Bulan,Minggu ke,Kab/Kota,Indikator Perubahan Harga (%),Komoditas Andil Perubahan Harga,Komoditas Fluktuasi Harga Tertinggi,Fluktuasi Harga
+Juni'25,M4,BATU,-0.43,BAWANG PUTIH(-0.4191); BAWANG MERAH(-0.1707); CABAI MERAH(-0.1261),CABAI RAWIT,0.18124
+Juni'25,M3,BATU,-0.66,BAWANG PUTIH(-0.396); BAWANG MERAH(-0.2503); CABAI RAWIT(-0.0854),CABAI RAWIT,0.14304"""
         
         # Create temporary file
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], 'template_iph_komoditas.csv')

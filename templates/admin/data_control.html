@@ -4,7 +4,6 @@
 {% block page_subtitle %}Upload, edit, dan kelola data IPH{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
     <h1 class="h2">Manajemen Data</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
@@ -15,10 +14,38 @@
             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
                 <i class="fas fa-upload me-1"></i> Upload CSV
             </button>
-            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addManualModal">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="openManualModal()">
                 <i class="fas fa-plus me-1"></i> Tambah Manual
             </button>
         </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-4 ms-auto">
+        <input type="text" class="form-control" id="searchInput" placeholder="Cari data...">
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0" id="dataTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Bulan</th>
+                        <th>Minggu</th>
+                        <th>Tahun</th>
+                        <th>IPH (%)</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="dataBody">
+                    </tbody>
+            </table>
+        </div>
+        <div id="paginationContainer" class="p-3 border-top"></div>
     </div>
 </div>
 
@@ -31,10 +58,13 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="fileUpload" class="form-label">Pilih File</label>
+                    <label for="fileUpload" class="form-label">Pilih File (.csv, .xlsx)</label>
                     <input type="file" class="form-control" id="fileUpload" accept=".csv, .xlsx">
+                    <div class="form-text small mt-2">
+                        Pastikan kolom sesuai template: Bulan, Minggu ke, Kab/Kota, Indikator IPH, Komoditas Andil, dll.
+                    </div>
                 </div>
-                </div>
+            </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                 <button type="button" class="btn btn-primary" onclick="uploadData()">Upload</button>
@@ -43,66 +73,113 @@
     </div>
 </div>
 
-<!-- Data Table -->
-<div class="table-responsive">
-    <table class="table table-striped table-sm" id="dataTable">
-        <thead>
-            <tr>
-                <th>Tanggal</th>
-                <th>Bulan</th>
-                <th>Minggu</th>
-                <th>Tahun</th>
-                <th>IPH (%)</th>
-                <th>Aksi</th>
-            </tr>
-        </thead>
-        <tbody id="dataBody">
-            </tbody>
-    </table>
+<div class="modal fade" id="addManualModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Tambah Data Manual</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="manualInputForm">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Bulan</label>
+                            <select class="form-select" name="bulan" required>
+                                <option value="">Pilih...</option>
+                                <option value="Januari">Januari</option>
+                                <option value="Februari">Februari</option>
+                                <option value="Maret">Maret</option>
+                                <option value="April">April</option>
+                                <option value="Mei">Mei</option>
+                                <option value="Juni">Juni</option>
+                                <option value="Juli">Juli</option>
+                                <option value="Agustus">Agustus</option>
+                                <option value="September">September</option>
+                                <option value="Oktober">Oktober</option>
+                                <option value="November">November</option>
+                                <option value="Desember">Desember</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Minggu ke-</label>
+                            <select class="form-select" name="minggu" required>
+                                <option value="M1">M1</option>
+                                <option value="M2">M2</option>
+                                <option value="M3">M3</option>
+                                <option value="M4">M4</option>
+                                <option value="M5">M5</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tahun</label>
+                            <input type="number" class="form-control" name="tahun" value="2025" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Kab/Kota</label>
+                            <input type="text" class="form-control" name="kab_kota" value="BATU" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Indikator Perubahan Harga (%)</label>
+                            <input type="number" step="0.01" class="form-control" name="iph_value" placeholder="Contoh: -0.43" required>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Komoditas Andil Perubahan Harga</label>
+                            <textarea class="form-control" name="komoditas_andil" rows="2" placeholder='Contoh: BAWANG PUTIH(-0.42); BAWANG MERAH(-0.17); CABAI MERAH(-0.13)'></textarea>
+                            <div class="form-text">Format: NAMA KOMODITAS(NILAI); NAMA KOMODITAS(NILAI)</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Komoditas Fluktuasi Tertinggi</label>
+                            <input type="text" class="form-control" name="komoditas_fluktuasi" placeholder="Contoh: CABAI RAWIT">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nilai Fluktuasi</label>
+                            <input type="number" step="0.0001" class="form-control" name="nilai_fluktuasi" placeholder="Contoh: 0.1812">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-success" onclick="submitManualData()">Simpan Data</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="editDataModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="editDataForm" onsubmit="submitEditData(event)">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Data</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Data IPH</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editDataForm">
                     <input type="hidden" id="edit_id" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Tanggal (Read-only)</label>
+                        <input type="text" class="form-control" id="edit_tanggal" readonly disabled>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">IPH Value (%)</label>
                         <input type="number" step="0.01" class="form-control" id="edit_iph" name="indikator_harga" required>
                     </div>
-                    </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Update</button>
-                </div>
-            </form>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditData()">Update</button>
+            </div>
         </div>
     </div>
 </div>
 
-<form id="editDataModal" onsubmit="submitEditData(event)">
-    <input type="hidden" id="edit_id" name="id">
-    <div class="mb-3">
-        <label class="form-label">IPH Value (%)</label>
-        <input type="number" step="0.01" class="form-control" id="edit_iph" name="indikator_harga" required>
-    </div>
-</form>
+<div id="actionResults" class="position-fixed top-0 end-0 p-3" style="z-index: 1050"></div>
 
-<form id="manualInputForm" onsubmit="submitManualData(event)">
-    <select class="form-select" name="bulan" id="manualBulan" required>...</select>
-    <select class="form-select" name="minggu" id="manualMinggu" required>...</select>
-    <input type="number" class="form-control" name="tahun" id="manualTahun" value="2025" required>
-    <input type="number" step="0.01" class="form-control" name="iph_value" id="manualIPH" required>
-</form>
-
-<!-- Results Area -->
-<div id="uploadResults"></div>
-<div id="actionResults"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -113,47 +190,24 @@ const perPage = 20;
 let searchTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Data Management page loaded');
     loadDataTable(1);
     
-    // Search Listener (Debounce)
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                loadDataTable(1);
-            }, 500); // Tunggu 500ms setelah user berhenti mengetik
-        });
-    }
-
-    const uploadForm = document.getElementById('uploadForm'); // Pastikan ID form upload benar
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            uploadData();
-        });
-    }
-
+    // Search Listener
+    document.getElementById('searchInput')?.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            loadDataTable(1);
+        }, 500);
+    });
 });
 
 // --- LOAD DATA TABLE ---
 async function loadDataTable(page = 1) {
     const search = document.getElementById('searchInput')?.value || '';
-    // URL API yang sudah diperbaiki
     const url = `/admin/api/data/list?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`;
+    const tbody = document.getElementById('dataBody'); 
     
-    const tbody = document.getElementById('dataBody'); // Pastikan ID ini ada di <tbody> tabel Anda
-    
-    // Tampilkan Loading
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center py-5">
-                <div class="spinner-border text-primary mb-2" role="status"></div>
-                <p class="text-muted small mb-0">Memuat data...</p>
-            </td>
-        </tr>
-    `;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary mb-2"></div><p class="text-muted small mb-0">Memuat data...</p></td></tr>`;
     
     try {
         const response = await fetch(url);
@@ -162,13 +216,6 @@ async function loadDataTable(page = 1) {
         if (result.success && result.data) {
             renderTableRows(result.data.items);
             renderPagination(result.data.pagination);
-            
-            // Update total count di header card (jika ada elemennya)
-            const totalEl = document.getElementById('totalRecordsCount'); // Ganti ID jika beda
-            if (totalEl && result.data.pagination) {
-                totalEl.textContent = result.data.pagination.total;
-            }
-            
             currentPage = page;
         } else {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${result.error || 'Gagal memuat data'}</td></tr>`;
@@ -179,7 +226,6 @@ async function loadDataTable(page = 1) {
     }
 }
 
-// --- RENDER TABLE ROWS ---
 function renderTableRows(items) {
     const tbody = document.getElementById('dataBody');
     tbody.innerHTML = '';
@@ -190,15 +236,8 @@ function renderTableRows(items) {
     }
     
     items.forEach(item => {
-        // Format Tanggal (Fallback aman)
-        let dateStr = item.tanggal; 
-        if (item.tanggal && item.tanggal.includes('T')) {
-            dateStr = item.tanggal.split('T')[0]; // Ambil YYYY-MM-DD
-        }
-
-        const sourceBadge = item.data_source === 'manual_input' 
-            ? '<span class="badge bg-info">Manual</span>' 
-            : '<span class="badge bg-secondary">Upload</span>';
+        let dateStr = item.tanggal ? item.tanggal.split('T')[0] : '-';
+        const iphClass = (item.indikator_harga < 0) ? 'text-success' : (item.indikator_harga > 0 ? 'text-danger' : 'text-dark');
 
         const row = `
             <tr>
@@ -206,18 +245,16 @@ function renderTableRows(items) {
                 <td class="align-middle">${item.bulan || '-'}</td>
                 <td class="align-middle">${item.minggu || '-'}</td>
                 <td class="align-middle">${item.tahun || '-'}</td>
-                <td class="align-middle fw-bold ${item.indikator_harga < 0 ? 'text-success' : 'text-danger'}">
-                    ${item.indikator_harga ? item.indikator_harga.toFixed(2) : '0.00'}%
+                <td class="align-middle fw-bold ${iphClass}">
+                    ${item.indikator_harga !== null ? item.indikator_harga.toFixed(2) + '%' : '-'}
                 </td>
-                <td class="align-middle">
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary" onclick='openEditModal(${JSON.stringify(item)})' title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteData(${item.id})" title="Hapus">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
+                <td class="align-middle text-end">
+                    <button class="btn btn-sm btn-link text-primary p-0 me-2" onclick='openEditModal(${JSON.stringify(item)})' title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteData(${item.id})" title="Hapus">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             </tr>
         `;
@@ -225,127 +262,55 @@ function renderTableRows(items) {
     });
 }
 
-// --- RENDER PAGINATION ---
 function renderPagination(pagination) {
-    // Pastikan Anda memiliki <div id="paginationContainer"></div> di HTML di bawah tabel
     const container = document.getElementById('paginationContainer');
-    if (!container) return; // Skip jika container tidak ada
+    if (!container) return;
+    if (pagination.pages <= 1) { container.innerHTML = ''; return; }
 
-    if (pagination.pages <= 1) {
-        container.innerHTML = ''; // Sembunyikan jika hanya 1 halaman
-        return;
-    }
+    let html = `<nav><ul class="pagination justify-content-center mb-0 pagination-sm">`;
+    
+    // Prev
+    html += `<li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadDataTable(${pagination.page - 1})"><i class="fas fa-chevron-left"></i></button></li>`;
 
-    let html = `<nav><ul class="pagination justify-content-center mb-0">`;
-
-    // Prev Button
-    html += `
-        <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
-            <button class="page-link" onclick="loadDataTable(${pagination.page - 1})">Prev</button>
-        </li>
-    `;
-
-    // Page Numbers (Simple: Current +/- 1)
+    // Pages (Simplified)
     const start = Math.max(1, pagination.page - 1);
     const end = Math.min(pagination.pages, pagination.page + 1);
-
     for (let i = start; i <= end; i++) {
-        html += `
-            <li class="page-item ${i === pagination.page ? 'active' : ''}">
-                <button class="page-link" onclick="loadDataTable(${i})">${i}</button>
-            </li>
-        `;
+        html += `<li class="page-item ${i === pagination.page ? 'active' : ''}">
+                <button class="page-link" onclick="loadDataTable(${i})">${i}</button></li>`;
     }
 
-    // Next Button
-    html += `
-        <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
-            <button class="page-link" onclick="loadDataTable(${pagination.page + 1})">Next</button>
-        </li>
-    `;
+    // Next
+    html += `<li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadDataTable(${pagination.page + 1})"><i class="fas fa-chevron-right"></i></button></li>`;
 
     html += `</ul></nav>`;
     container.innerHTML = html;
 }
 
-// --- CRUD OPERATIONS ---
-
-// 1. Upload CSV
-async function uploadData() {
-    const fileInput = document.getElementById('fileUpload');
-    const file = fileInput?.files[0];
-    
-    if (!file) {
-        showAlert('Silakan pilih file CSV/Excel terlebih dahulu', 'warning');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // Tombol di dalam modal upload (jika menggunakan form submit)
-    // Jika menggunakan onclick, pastikan button id atau selector benar
-    const btn = document.querySelector('#uploadModal .btn-primary'); 
-    const originalText = btn ? btn.innerHTML : 'Upload';
-    
-    if(btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Uploading...'; }
-
-    try {
-        const response = await fetch('/api/upload-data', {
-            method: 'POST',
-            body: formData
-        });
-        const result = await response.json();
-        
-        if (result.success) {
-            showAlert(`✅ Sukses! ${result.merge_info.new_records} data baru ditambahkan.`, 'success');
-            fileInput.value = ''; 
-            
-            // Tutup modal
-            const modalEl = document.getElementById('uploadModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            
-            loadDataTable(1); 
-        } else {
-            showAlert(`❌ Gagal: ${result.message}`, 'danger');
-        }
-    } catch (error) {
-        showAlert(`❌ Error: ${error.message}`, 'danger');
-    } finally {
-        if(btn) { btn.disabled = false; btn.innerHTML = originalText; }
-    }
+// --- FITUR TAMBAH MANUAL ---
+function openManualModal() {
+    // Reset form
+    document.getElementById('manualInputForm').reset();
+    // Set default tahun
+    document.querySelector('[name="tahun"]').value = new Date().getFullYear();
+    const modal = new bootstrap.Modal(document.getElementById('addManualModal'));
+    modal.show();
 }
 
-// 2. Add Manual
-async function submitManualData(event) {
-    event.preventDefault(); // Mencegah reload form
-    
-    // Ambil data dari form manualInputForm
+async function submitManualData() {
     const form = document.getElementById('manualInputForm');
-    const data = {
-        bulan: form.querySelector('[name="bulan"]').value,
-        minggu: form.querySelector('[name="minggu"]').value,
-        tahun: form.querySelector('[name="tahun"]').value,
-        kab_kota: 'BATU', 
-        iph_value: form.querySelector('[name="iph_value"]').value,
-        // Optional fields
-        komoditas_andil: form.querySelector('[name="komoditas_andil"]')?.value || '',
-        komoditas_fluktuasi: form.querySelector('[name="komoditas_fluktuasi"]')?.value || '',
-        nilai_fluktuasi: form.querySelector('[name="nilai_fluktuasi"]')?.value || 0
-    };
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
 
+    // Validasi dasar
     if (!data.bulan || !data.minggu || !data.tahun || !data.iph_value) {
-        alert('Mohon lengkapi semua field wajib!');
+        alert('Mohon lengkapi field wajib (Bulan, Minggu, Tahun, IPH)');
         return;
     }
 
-    const btn = form.querySelector('button[type="submit"]');
-    const originalText = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = 'Menyimpan...';
-
     try {
-        // Panggil endpoint admin yang benar
         const response = await fetch('/admin/api/add-manual-record', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -354,35 +319,28 @@ async function submitManualData(event) {
         const result = await response.json();
         
         if (result.success) {
-            showAlert('✅ Data manual berhasil disimpan', 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addManualModal'));
-            if (modal) modal.hide();
-            form.reset();
-            // Set default tahun lagi
-            form.querySelector('[name="tahun"]').value = new Date().getFullYear(); 
-            loadDataTable(1);
+            showAlert('Data berhasil disimpan!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addManualModal')).hide();
+            loadDataTable(1); // Reload ke halaman pertama
         } else {
             alert('Gagal: ' + result.message);
         }
     } catch (e) {
         alert('Error: ' + e.message);
-    } finally {
-        btn.disabled = false; btn.innerHTML = originalText;
     }
 }
 
-
-// 3. Edit Data
+// --- FITUR EDIT ---
 function openEditModal(item) {
     document.getElementById('edit_id').value = item.id;
     document.getElementById('edit_iph').value = item.indikator_harga;
-    // Set value lain jika form edit punya field lain
+    document.getElementById('edit_tanggal').value = item.tanggal;
+    
     const modal = new bootstrap.Modal(document.getElementById('editDataModal'));
     modal.show();
 }
 
-async function submitEditData(event) {
-    event.preventDefault();
+async function submitEditData() {
     const id = document.getElementById('edit_id').value;
     const iph = document.getElementById('edit_iph').value;
 
@@ -393,6 +351,7 @@ async function submitEditData(event) {
             body: JSON.stringify({ id: id, indikator_harga: iph })
         });
         const result = await response.json();
+        
         if(result.success) {
             showAlert('Data berhasil diupdate', 'success');
             bootstrap.Modal.getInstance(document.getElementById('editDataModal')).hide();
@@ -401,11 +360,11 @@ async function submitEditData(event) {
             alert('Gagal update: ' + result.message);
         }
     } catch (e) {
-        alert('Error sistem: ' + e.message);
+        alert('Error: ' + e.message);
     }
 }
 
-// 4. Delete Data
+// --- FITUR DELETE ---
 async function deleteData(id) {
     if(!confirm('Yakin ingin menghapus data ini permanen?')) return;
     
@@ -423,20 +382,47 @@ async function deleteData(id) {
     }
 }
 
-// --- UTILS ---
-function showAlert(msg, type) {
-    // Pastikan ada <div id="actionResults"></div> di HTML untuk menampilkan alert
-    const container = document.getElementById('actionResults');
-    if(container) {
-        container.innerHTML = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${msg}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-    } else {
-        alert(msg);
+// --- FITUR UPLOAD ---
+async function uploadData() {
+    const fileInput = document.getElementById('fileUpload');
+    const file = fileInput?.files[0];
+    if (!file) { alert('Pilih file dulu!'); return; }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        // UI Loading state
+        const btn = document.querySelector('#uploadModal .btn-primary');
+        const oldText = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = 'Uploading...';
+
+        const response = await fetch('/api/upload-data', { method: 'POST', body: formData });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`Upload Sukses! ${result.merge_info.new_records} data baru.`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+            loadDataTable(1);
+        } else {
+            alert('Upload Gagal: ' + result.message);
+        }
+        
+        btn.disabled = false; btn.innerHTML = oldText;
+    } catch (error) {
+        alert('Error: ' + error.message);
     }
+}
+
+function showAlert(message, type) {
+    const container = document.getElementById('actionResults');
+    container.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    setTimeout(() => { container.innerHTML = ''; }, 3000);
 }
 </script>
 {% endblock %}
