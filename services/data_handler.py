@@ -266,52 +266,66 @@ class DataHandler:
             raise Exception(f"Database merge failed: {str(e)}")
 
     def get_full_export_data(self):
-            """
-            Mengambil data lengkap (IPH + Komoditas) untuk export CSV.
-            Menggabungkan data komoditas menjadi string dalam satu kolom.
-            """
-            try:
-                # 1. Query semua data IPH
-                iph_records = IPHData.query.order_by(IPHData.tanggal.desc()).all()
-                
-                export_list = []
-                
-                for iph in iph_records:
-                    # 2. Cari komoditas yang terkait dengan IPH ini
-                    # Asumsi: Ada relasi atau query manual ke CommodityData
-                    commodities = CommodityData.query.filter_by(iph_id=iph.id).all()
-                    
-                    # 3. Format string komoditas: "Beras(0.5); Cabai(-0.2)"
-                    komoditas_str = ""
-                    if commodities:
-                        items = []
-                        for c in commodities:
-                            # Gunakan share_value, impact, atau iph_value sesuai model Anda
-                            val = getattr(c, 'share_value', getattr(c, 'impact', 0))
-                            name = getattr(c, 'commodity_name', getattr(c, 'name', 'Unknown'))
-                            items.append(f"{name}({val})")
-                        komoditas_str = "; ".join(items)
-                    
-                    # 4. Buat dictionary untuk baris CSV
-                    row = {
-                        'Tanggal': iph.tanggal,
-                        'Tahun': iph.tahun,
-                        'Bulan': iph.bulan,
-                        'Minggu ke-': iph.minggu,
-                        'Kab/Kota': iph.kab_kota,
-                        'Indikator Perubahan Harga (%)': iph.indikator_harga,
-                        'Komoditas Andil Perubahan Harga': komoditas_str
-                    }
-                    export_list.append(row)
-                
-                # 5. Buat DataFrame
-                df = pd.DataFrame(export_list)
-                return df
-                
-            except Exception as e:
-                logger.error(f"Export data error: {str(e)}")
-                return pd.DataFrame()
+        """
+        Mengambil data lengkap untuk export CSV sesuai format spesifik:
+        Bulan, Minggu ke-, Kab/Kota, Indikator Perubahan Harga (%),
+        Komoditas Andil Perubahan Harga, Komoditas Fluktuasi Harga Tertinggi, Fluktuasi Harga"""
+        try:
+            # Join IPHData dengan CommodityData untuk mendapatkan detail lengkap
+            # Menggunakan outerjoin agar jika data komoditas kosong, data IPH tetap muncul
+            query = db.session.query(
+                IPHData, CommodityData
+            ).outerjoin(
+                CommodityData, IPHData.id == CommodityData.iph_id
+            ).order_by(IPHData.tanggal.desc()).all()
             
+            export_list = []
+            
+            for iph, comm in query:
+                # Logika fallback jika data komoditas kosong
+                komoditas_andil = comm.komoditas_andil if comm else ''
+                komoditas_fluktuasi = comm.komoditas_fluktuasi if comm else ''
+                nilai_fluktuasi = comm.nilai_fluktuasi if comm else 0.0
+                
+                # Bersihkan format string komoditas jika perlu (opsional)
+                if pd.isna(komoditas_andil): komoditas_andil = ""
+                if pd.isna(komoditas_fluktuasi): komoditas_fluktuasi = ""
+
+                row = {
+                    'Bulan': iph.bulan,
+                    'Minggu ke': iph.minggu,
+                    'Kab/Kota': iph.kab_kota,
+                    'Indikator Perubahan Harga (%)': iph.indikator_harga,
+                    'Komoditas Andil Perubahan Harga': komoditas_andil,
+                    'Komoditas Fluktuasi Harga Tertinggi': komoditas_fluktuasi,
+                    'Fluktuasi Harga': nilai_fluktuasi
+                }
+                export_list.append(row)
+            
+            # Buat DataFrame dengan urutan kolom yang spesifik
+            df = pd.DataFrame(export_list)
+            
+            # Pastikan urutan kolom sesuai gambar referensi
+            ordered_columns = [
+                'Bulan', 
+                'Minggu ke', 
+                'Kab/Kota', 
+                'Indikator Perubahan Harga (%)', 
+                'Komoditas Andil Perubahan Harga', 
+                'Komoditas Fluktuasi Harga Tertinggi', 
+                'Fluktuasi Harga'
+            ]
+            
+            # Filter hanya kolom yang ada (jaga-jaga jika df kosong)
+            if not df.empty:
+                df = df[ordered_columns]
+                
+            return df
+            
+        except Exception as e:
+            logger.error(f"Export data error: {str(e)}")
+            return pd.DataFrame()
+
     def get_data_summary(self):
         """
         Get summary statistics of IPH data from database.

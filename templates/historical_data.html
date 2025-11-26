@@ -63,21 +63,19 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover table-striped" id="dataTable">
-                <thead class="table-light">
-                    <tr>
-                        <th>No</th>
-                        <th>Tanggal</th>
-                        <th>Nilai IPH (%)</th>
-                        <th>Bulan</th>
-                        <th>Minggu</th>
-                        <th>Tahun</th>
-                        <th>Kota</th>
-                        <th>Sumber Data</th>
-                    </tr>
-                </thead>
+                        <thead class="table-light">
+                            <tr>
+                                <th>No</th>
+                                <th>Bulan</th>
+                                <th>Minggu</th>
+                                <th>Tahun</th>
+                                <th>Kota</th>
+                                <th>Nilai IPH (%)</th>
+                                </tr>
+                        </thead>                
                 <tbody id="dataTableBody">
                     <tr>
-                        <td colspan="8" class="text-center py-4">
+                        <td colspan="6" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -162,7 +160,7 @@ function renderTable(items) {
     if (items.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
+                <td colspan="6" class="text-center py-4 text-muted">
                     <i class="fas fa-inbox fa-2x mb-2"></i>
                     <p class="mb-0">Tidak ada data ditemukan</p>
                 </td>
@@ -182,15 +180,11 @@ function renderTable(items) {
         return `
             <tr>
                 <td>${rowNum}</td>
-                <td>${item.tanggal || '-'}</td>
-                <td class="${iphClass} fw-bold">${iphValue}${item.indikator_harga !== null ? '%' : ''}</td>
                 <td>${item.bulan || '-'}</td>
                 <td>${item.minggu || '-'}</td>
                 <td>${item.tahun || '-'}</td>
                 <td>${item.kab_kota || '-'}</td>
-                <td>
-                    <span class="badge bg-secondary">${item.data_source || 'manual'}</span>
-                </td>
+                <td class="${iphClass} fw-bold">${iphValue}${item.indikator_harga !== null ? '%' : ''}</td>
             </tr>
         `;
     }).join('');
