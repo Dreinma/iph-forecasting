@@ -1,6 +1,6 @@
 """
 Admin routes untuk IPH Forecasting Platform
-VERSI PRESENTASI / DEMO MODE (Login Bypass + Safe Dashboard)
+VERSI PRODUCTION (Login Aman dengan Autentikasi Database)
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
@@ -20,51 +20,59 @@ from sqlalchemy import func, or_, distinct
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 # =================================================================
-# AUTHENTICATION ROUTES (DEMO MODE)
+# AUTHENTICATION ROUTES
 # =================================================================
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """
-    Admin login page - DEMO MODE (BYPASS PASSWORD)
-    Langsung login saat tombol ditekan, mengabaikan password.
+    Admin login page - PRODUCTION MODE
+    Memverifikasi username dan password dari database.
     """
+    # Jika sudah login, redirect ke dashboard
     if current_user.is_authenticated:
         return redirect(url_for('admin.dashboard'))
         
     form = LoginForm()
     
-    # Abaikan validasi form standar, cek method POST saja
-    if request.method == 'POST':
-        # 1. Cari user admin sungguhan di DB untuk dipinjam ID-nya
-        user = AdminUser.query.first()
+    # Validasi form saat submit (POST)
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
         
-        # Jika DB kosong (kasus jarang), buat dummy object
-        user_id = user.id if user else 1
-        username = user.username if user else "admin_demo"
-        email = user.email if user else "demo@example.com"
+        # 1. Cari user berdasarkan username
+        user = AdminUser.query.filter_by(username=username).first()
         
-        # 2. Buat Session User (Flask-Login Wrapper)
-        flask_user = User(
-            user_id=user_id,
-            username=username,
-            email=email,
-            is_active=True
-        )
-        
-        # 3. Login Paksa
-        login_user(flask_user, remember=True)
-        
-        # 4. Update Last Login (Opsional, agar DB terupdate)
-        if user:
-            try:
-                user.last_login = datetime.utcnow()
-                db.session.commit()
-            except:
-                db.session.rollback()
-
-        flash('Login Berhasil (Mode Presentasi)', 'success')
-        return redirect(url_for('admin.dashboard'))
+        # 2. Verifikasi password dan status aktif
+        if user and check_password(user.password_hash, password):
+            if not user.is_active:
+                flash('Akun ini telah dinonaktifkan.', 'warning')
+                return render_template('admin/login.html', form=form, page_title="Login Admin")
+            
+            # 3. Buat Session User (Flask-Login Wrapper)
+            flask_user = User(
+                user_id=user.id,
+                username=user.username,
+                email=user.email,
+                is_active=user.is_active
+            )
+            
+            # 4. Login User
+            login_user(flask_user, remember=form.remember_me.data)
+            
+            # 5. Update waktu login terakhir
+            update_last_login(user.id)
+            
+            # 6. Redirect ke halaman yang dituju atau dashboard
+            next_page = request.args.get('next')
+            # Validasi keamanan redirect (mencegah open redirect vulnerability)
+            if not next_page or not next_page.startswith('/'):
+                next_page = url_for('admin.dashboard')
+                
+            flash('Login Berhasil', 'success')
+            return redirect(next_page)
+        else:
+            flash('Username atau password salah.', 'danger')
             
     return render_template('admin/login.html', form=form, page_title="Login Admin")
 
@@ -73,17 +81,17 @@ def login():
 def logout():
     """Admin logout"""
     logout_user()
-    flash('Anda telah logout', 'info')
+    flash('Anda telah logout.', 'info')
     return redirect(url_for('admin.login'))
 
 # =================================================================
-# PAGE ROUTES (DASHBOARD FIX)
+# PAGE ROUTES
 # =================================================================
 
 @admin_bp.route('/dashboard')
 @admin_required
 def dashboard():
-    """Admin dashboard view - DENGAN FIX CRASH LAST_LOGIN"""
+    """Admin dashboard view"""
     
     # 1. Statistik Dasar
     total_records = IPHData.query.count()
@@ -93,7 +101,7 @@ def dashboard():
     # 2. Aktivitas Terbaru
     recent_activities = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(10).all()
     
-    # 3. FIX CRASH: Ambil last_login dari DB, bukan dari session current_user
+    # 3. Ambil last_login dari DB untuk ditampilkan
     last_login_str = "-"
     if current_user.is_authenticated:
         try:
@@ -101,14 +109,13 @@ def dashboard():
             uid_str = current_user.get_id()
             if uid_str:
                 uid = int(uid_str)
-                # Query ke tabel asli
+                # Query ke tabel asli untuk data fresh
                 real_user = AdminUser.query.get(uid)
                 if real_user and real_user.last_login:
-                    # Format menjadi string agar aman dikirim ke template
                     last_login_str = real_user.last_login.strftime('%d %b %Y %H:%M')
         except Exception as e:
+            # Fallback diam-diam jika gagal load detail user
             print(f"Warning: Gagal ambil last login: {e}")
-            # Jangan crash, gunakan default
             last_login_str = "Baru saja"
     
     return render_template('admin/dashboard.html', 
@@ -117,7 +124,7 @@ def dashboard():
                          active_alerts=active_alerts,
                          trained_models=trained_models,
                          recent_activities=recent_activities,
-                         last_login=last_login_str) # Kirim string aman
+                         last_login=last_login_str)
 
 @admin_bp.route('/data-control')
 @admin_required
@@ -179,22 +186,26 @@ def change_password():
     form = ChangePasswordForm()
     if form.validate_on_submit():
         try:
+            # Dapatkan user asli dari DB
             user_db = AdminUser.query.get(int(current_user.id))
-            if user_db:
-                # Di mode presentasi, kita izinkan ganti password tanpa cek password lama
-                # agar tidak error jika lupa
+            
+            # Verifikasi password lama
+            if user_db and check_password(user_db.password_hash, form.current_password.data):
                 user_db.password_hash = hash_password(form.new_password.data)
                 db.session.commit()
-                flash('Password berhasil diubah', 'success')
-                return redirect(url_for('admin.settings'))
-        except:
-            pass
-        flash('Gagal mengubah password', 'danger')
+                flash('Password berhasil diubah. Silakan login ulang.', 'success')
+                logout_user() # Logout keamanan setelah ganti password
+                return redirect(url_for('admin.login'))
+            else:
+                flash('Password saat ini salah.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Gagal mengubah password: {str(e)}', 'danger')
             
     return render_template('admin/change_password.html', form=form, page_title="Ubah Password")
 
 # =================================================================
-# API ROUTES
+# API ROUTES (Semua dilindungi @admin_required)
 # =================================================================
 
 @admin_bp.route('/api/data/list')
@@ -239,12 +250,10 @@ def api_data_list():
 @admin_bp.route('/api/add-manual-record', methods=['POST'])
 @admin_required
 def add_manual_record():
-    """
-    Menambah data manual IPH & Komoditas ke Database.
-    Menggunakan DataHandler untuk standardisasi penyimpanan.
-    """
+    """Menambah data manual IPH & Komoditas ke Database."""
     # Import service di dalam fungsi untuk menghindari circular import
-    from services.forecast_service import forecast_service
+    from services.forecast_service import ForecastService
+    forecast_service = ForecastService()
     
     try:
         data = request.get_json()
@@ -396,7 +405,8 @@ def api_models_performance_history():
 @admin_required
 def generate_forecast():
     """Generate forecast on demand (Admin Button)"""
-    from services.forecast_service import forecast_service
+    from services.forecast_service import ForecastService
+    forecast_service = ForecastService()
     
     try:
         data = request.get_json()
@@ -429,8 +439,6 @@ def generate_forecast():
 @admin_required
 def api_forecast_history():
     """Get forecast history with pagination"""
-    from database import ForecastHistory
-    
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
@@ -448,7 +456,6 @@ def api_forecast_history():
         history_data = []
         for item in pagination.items:
             # Pastikan atribut ini ada di model database Anda
-            # Gunakan getattr untuk keamanan jika ragu
             weeks = getattr(item, 'forecast_weeks', getattr(item, 'weeks_forecasted', 0))
             
             history_data.append({
@@ -472,7 +479,6 @@ def api_forecast_history():
             }
         })
     except Exception as e:
-        # Log error untuk debugging yang lebih baik
         print(f"Error in api_forecast_history: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -520,13 +526,31 @@ def api_manage_user(user_id):
     """API Manage Admin Users"""
     try:
         user = AdminUser.query.get_or_404(user_id)
+        
         if request.method == 'DELETE':
             if user.id == current_user.id:
                 return jsonify({'success': False, 'error': 'Cannot delete your own account'}), 400
             db.session.delete(user)
             db.session.commit()
             return jsonify({'success': True, 'message': 'User deleted'})
-        return jsonify({'success': False, 'message': 'Update not implemented'})
+            
+        elif request.method == 'PUT':
+            data = request.get_json()
+            
+            # Update basic fields
+            if 'username' in data: user.username = data['username']
+            if 'email' in data: user.email = data['email']
+            if 'is_active' in data: user.is_active = data['is_active']
+            
+            # Update password only if provided and not empty
+            if 'password' in data and data['password'].strip():
+                user.password_hash = hash_password(data['password'])
+                
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'User updated successfully'})
+            
+        return jsonify({'success': False, 'message': 'Method not allowed'}), 405
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
