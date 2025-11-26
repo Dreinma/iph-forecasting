@@ -13,42 +13,47 @@
 
 <div class="card mb-4 border-0 shadow-sm">
     <div class="card-body py-4">
-        <div class="row g-3 align-items-center">
+        <div class="row g-3 align-items-end">
             <div class="col-lg-5">
                 <label class="form-label fw-bold mb-2 text-muted small text-uppercase">
                     Periode Window
                 </label>
                 <div class="btn-group w-100" role="group">
-                    <button type="button" class="btn btn-outline-primary" 
-                        onclick="changeTimeframe('1M')">1 Bulan</button>
-                    <button type="button" class="btn btn-outline-primary" 
-                        onclick="changeTimeframe('3M')">3 Bulan</button>
-                    <button type="button" class="btn btn-outline-primary active" 
-                        onclick="changeTimeframe('6M')">6 Bulan</button>
-                    <button type="button" class="btn btn-outline-primary" 
-                        onclick="changeTimeframe('ALL')">Semua Data</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('1M')">1 Bulan</button>
+                    <button type="button" class="btn btn-outline-primary active" onclick="changeTimeframe('3M')">3 Bulan</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('6M')">6 Bulan</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('ALL')">Semua Data</button>
                 </div>
             </div>
 
             <div class="col-lg-7">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <label class="form-label fw-bold mb-0 text-muted small text-uppercase">
-                        Mulai Dari (Bulan/Tahun)
-                    </label>
-                    <span class="badge bg-light text-primary border border-primary-subtle" id="rangeInfoBadge">
-                        <i class="fas fa-calendar-alt me-1"></i>
-                        <span id="dynamicRangeDisplay">Memuat data...</span>
-                    </span>
-                </div>
-                
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0"><i class="fas fa-calendar"></i></span>
-                    <select class="form-select border-start-0" id="startPeriodSelect" onchange="applyDateSelection(this.value)">
-                        <option value="" selected disabled>Pilih Periode Awal Data</option>
+                <label class="form-label fw-bold mb-2 text-muted small text-uppercase">
+                    Mulai Dari (Bulan / Tahun)
+                </label>
+                <div class="row g-2">
+                    <div class="col-7">
+                        <select class="form-select" id="startMonthSelect" onchange="applyDateSelection()">
+                            <option value="01">Januari</option>
+                            <option value="02">Februari</option>
+                            <option value="03">Maret</option>
+                            <option value="04">April</option>
+                            <option value="05">Mei</option>
+                            <option value="06">Juni</option>
+                            <option value="07">Juli</option>
+                            <option value="08">Agustus</option>
+                            <option value="09">September</option>
+                            <option value="10">Oktober</option>
+                            <option value="11">November</option>
+                            <option value="12">Desember</option>
                         </select>
+                    </div>
+                    <div class="col-5">
+                        <select class="form-select" id="startYearSelect" onchange="applyDateSelection()">
+                            </select>
+                    </div>
                 </div>
-                <div class="form-text small text-muted mt-1">
-                    Pilih bulan dimulainya data untuk ditampilkan di grafik.
+                <div class="form-text small text-muted mt-1" id="rangeInfoText">
+                    Menampilkan data mulai dari periode yang dipilih.
                 </div>
             </div>
         </div>
@@ -61,15 +66,11 @@
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white py-3">
-                        <h5 class="card-title mb-0 text-primary">
-                            Grafik Pergerakan & Volatilitas IPH
-                        </h5>
+                        <h5 class="card-title mb-0 text-primary">Grafik Pergerakan & Volatilitas IPH</h5>
                     </div>
                     <div class="card-body">
-                        <div id="volatilityChart" style="height: 550px;">
-                            <div class="d-flex justify-content-center align-items-center h-100 text-muted">
-                                Memuat grafik...
-                            </div>
+                        <div id="volatilityChart" style="height: 500px;">
+                            <div class="d-flex justify-content-center align-items-center h-100 text-muted">Memuat grafik...</div>
                         </div>
                     </div>
                 </div>
@@ -80,7 +81,7 @@
                     <div class="col-md-6 col-lg-3">
                         <div class="card border-info h-100 shadow-sm">
                             <div class="card-body text-center p-4">
-                                <h6 class="card-title text-muted text-uppercase small mb-3">Volatilitas Terkini</h6>
+                                <h6 class="card-title text-muted text-uppercase small mb-3">Volatilitas Data Terbaru</h6>
                                 <div id="currentVolatility" class="display-6 text-info fw-bold">-</div>
                             </div>
                         </div>
@@ -98,15 +99,9 @@
                             <div class="card-body text-center p-4">
                                 <h6 class="card-title text-muted text-uppercase small mb-3">Range Volatilitas</h6>
                                 <div class="d-flex justify-content-center gap-3 align-items-end">
-                                    <div>
-                                        <span class="text-danger fw-bold d-block">Max</span>
-                                        <span id="maxVolatility" class="h5">-</span>
-                                    </div>
+                                    <div><span class="text-danger fw-bold d-block">Max</span><span id="maxVolatility" class="h5">-</span></div>
                                     <div class="border-end h-100"></div>
-                                    <div>
-                                        <span class="text-success fw-bold d-block">Min</span>
-                                        <span id="minVolatility" class="h5">-</span>
-                                    </div>
+                                    <div><span class="text-success fw-bold d-block">Min</span><span id="minVolatility" class="h5">-</span></div>
                                 </div>
                             </div>
                         </div>
@@ -115,9 +110,7 @@
                         <div class="card border-warning h-100 shadow-sm">
                             <div class="card-body text-center p-4">
                                 <h6 class="card-title text-muted text-uppercase small mb-3">Level Risiko</h6>
-                                <div id="riskLevel" class="display-6 fw-bold">
-                                    <span id="riskLevelText">-</span>
-                                </div>
+                                <div id="riskLevelText" class="display-6 fw-bold">-</div>
                             </div>
                         </div>
                     </div>
@@ -130,24 +123,17 @@
 
 {% block scripts %}
 <script>
-    // --- VARIABEL GLOBAL ---
-    let currentTimeframe = '6M'; // Default ke 6 Bulan
+    let currentTimeframe = '3M'; // DEFAULT 3 BULAN
     let selectedStartDate = null;
-    let allPeriods = []; // Menyimpan data dari API periods
 
-    // --- FUNGSI LOAD UTAMA ---
     async function loadVolatility() {
         console.log(`🔄 Loading visualization: ${currentTimeframe}, Start: ${selectedStartDate}`);
         
-        // UI Loading State
         const chartDiv = document.getElementById('volatilityChart');
-        // Jangan clear total jika hanya update, tapi utk initial load boleh
         if(!chartDiv.querySelector('.js-plotly-plot')) {
-             chartDiv.innerHTML = '<div class="d-flex justify-content-center align-items-center h-100"><div class="spinner-border text-primary"></div></div>';
         }
 
         try {
-            // Bangun URL dengan parameter baru
             let url = `/api/visualization/volatility?timeframe=${currentTimeframe}`;
             if (selectedStartDate && currentTimeframe !== 'ALL') {
                 url += `&start_date=${selectedStartDate}`;
@@ -157,34 +143,19 @@
             const data = await response.json();
             
             if (data.success && data.charts) {  
-                const chartData = data.charts.accuracy_trends || data.charts.forecast_vs_actual;
-                
+                const chartData = data.charts.accuracy_trends;
                 if (chartData) {
-                    // Format Tanggal untuk Hover
-                    if(chartData.data[0].x){
-                        const dates = chartData.data[0].x;
-                        const customHoverText = dates.map(dateStr => formatDateToWeekLabel(dateStr));
-                        chartData.data[0].text = customHoverText;
-                        chartData.data[0].hovertemplate = '<b>%{text}</b><br>IPH: %{y:.2f}%<extra></extra>';
-                    }
-                    
                     // Update Layout
-                    chartData.layout.title = {
-                        text: `Data Aktual (${currentTimeframe})`,
-                        font: { size: 16 }
-                    };
+                    chartData.layout.title = { text: `Data Aktual (${currentTimeframe})`, font: { size: 16 } };
+                    chartData.layout.margin = {l: 50, r: 20, t: 50, b: 50};
                     
-                    // Pastikan chart responsif
                     const config = { responsive: true, displayModeBar: false };
                     Plotly.newPlot('volatilityChart', chartData.data, chartData.layout, config);
                 } else {
                     chartDiv.innerHTML = '<div class="alert alert-info text-center m-5">Tidak ada data untuk periode ini.</div>';
                 }
                 
-                // Update Statistik Cards
-                if (data.stats) {
-                    updateVolatilityStats(data.stats);
-                }
+                if (data.stats) updateVolatilityStats(data.stats);
             } else {
                 chartDiv.innerHTML = `<div class="alert alert-warning m-4">${data.message || 'Gagal memuat data'}</div>`;
                 resetStats();
@@ -195,133 +166,134 @@
         }
     }
 
-    // --- UPDATE STATISTIK CARD ---
     function updateVolatilityStats(stats) {
-        const current = parseFloat(stats.current_volatility ?? 0).toFixed(2);
-        const avg = parseFloat(stats.avg_volatility_30 ?? 0).toFixed(2);
-        const max = parseFloat(stats.max_volatility ?? 0).toFixed(2);
-        const min = parseFloat(stats.min_volatility ?? 0).toFixed(2);
+        // Pastikan nilai ada dan format float
+        const current = parseFloat(stats.current_volatility || 0).toFixed(2);
+        const avg = parseFloat(stats.avg_volatility_30 || 0).toFixed(2);
+        const max = parseFloat(stats.max_volatility || 0).toFixed(2);
+        const min = parseFloat(stats.min_volatility || 0).toFixed(2);
 
-        // Logika Risiko Sederhana
-        const riskLevel = current > 2.0 ? 'TINGGI' : current > 1.0 ? 'SEDANG' : 'RENDAH';
-        const riskColor = riskLevel === 'TINGGI' ? 'danger' : riskLevel === 'SEDANG' ? 'warning' : 'success';
-        
+        // Update DOM
         document.getElementById('currentVolatility').textContent = current;
         document.getElementById('avgVolatility30').textContent = avg;
-        
-        const riskLevelText = document.getElementById('riskLevelText');
-        riskLevelText.textContent = riskLevel;
-        riskLevelText.className = `display-6 fw-bold text-${riskColor}`;
-        
         document.getElementById('maxVolatility').textContent = max;
         document.getElementById('minVolatility').textContent = min;
+
+        // Hitung Risk Level
+        const riskLevelText = document.getElementById('riskLevelText');
+        let riskLevel = 'RENDAH';
+        let riskColor = 'success';
+
+        if (current > 1.5) { riskLevel = 'TINGGI'; riskColor = 'danger'; }
+        else if (current > 0.5) { riskLevel = 'SEDANG'; riskColor = 'warning'; }
+
+        riskLevelText.textContent = riskLevel;
+        riskLevelText.className = `display-6 fw-bold text-${riskColor}`;
     }
 
     function resetStats() {
-        ['currentVolatility', 'avgVolatility30', 'maxVolatility', 'minVolatility'].forEach(id => {
+        ['currentVolatility', 'avgVolatility30', 'maxVolatility', 'minVolatility', 'riskLevelText'].forEach(id => {
             document.getElementById(id).textContent = '-';
         });
-        document.getElementById('riskLevelText').textContent = '-';
     }
 
-    // --- INTERAKSI TOMBOL PERIODE ---
     function changeTimeframe(timeframe) {
         currentTimeframe = timeframe;
         
-        // Update UI Button Active State
+        // Update UI Button
         document.querySelectorAll('.btn-group .btn-outline-primary').forEach(btn => {
             btn.classList.remove('active');
-            if(btn.textContent.includes(timeframe === 'ALL' ? 'Semua' : timeframe.replace('M', ' Bulan'))) {
+            // Logic simple untuk highlight tombol yang benar
+            if((timeframe === 'ALL' && btn.innerText.includes('Semua')) || 
+               btn.innerText.includes(timeframe.replace('M', ' Bulan').replace('Y', ' Tahun'))) {
                 btn.classList.add('active');
             }
         });
 
-        // Disable dropdown jika ALL
-        const dropdown = document.getElementById('startPeriodSelect');
+        const mSelect = document.getElementById('startMonthSelect');
+        const ySelect = document.getElementById('startYearSelect');
+
         if (timeframe === 'ALL') {
-            dropdown.disabled = true;
-            selectedStartDate = null; // Reset start date
-            document.getElementById('dynamicRangeDisplay').textContent = "Menampilkan semua data tersedia";
+            mSelect.disabled = true;
+            ySelect.disabled = true;
+            selectedStartDate = null;
         } else {
-            dropdown.disabled = false;
-            // Update text range display
-            const selectedText = dropdown.options[dropdown.selectedIndex]?.text || "Data Terbaru";
-            document.getElementById('dynamicRangeDisplay').textContent = `Mulai dari: ${selectedText}`;
+            mSelect.disabled = false;
+            ySelect.disabled = false;
+            // Re-apply date from dropdowns
+            applyDateSelection(); 
+            return; // applyDateSelection calls loadVolatility
         }
 
         loadVolatility();
     }
 
-    // --- INTERAKSI DROPDOWN ---
-    function applyDateSelection(dateValue) {
-        selectedStartDate = dateValue; // Format YYYY-MM-DD (biasanya tanggal 01)
+    function applyDateSelection() {
+        const month = document.getElementById('startMonthSelect').value;
+        const year = document.getElementById('startYearSelect').value;
         
-        // Update badge text
-        const dropdown = document.getElementById('startPeriodSelect');
-        const selectedText = dropdown.options[dropdown.selectedIndex].text;
-        document.getElementById('dynamicRangeDisplay').textContent = `Mulai dari: ${selectedText}`;
-        
-        loadVolatility();
+        if (month && year) {
+            selectedStartDate = `${year}-${month}-01`; // Format YYYY-MM-DD
+            
+            // Update info text
+            const mName = document.getElementById('startMonthSelect').options[document.getElementById('startMonthSelect').selectedIndex].text;
+            document.getElementById('rangeInfoText').textContent = `Menampilkan ${currentTimeframe} data mulai dari ${mName} ${year}`;
+            
+            loadVolatility();
+        }
     }
 
-    // --- INISIALISASI DATA DROPDOWN ---
-    async function initializeDropdown() {
+    async function initializeDropdowns() {
         try {
             const response = await fetch('/api/data/available-periods');
             const data = await response.json();
             
-            if (data.success && data.periods.length > 0) {
-                allPeriods = data.periods; // Simpan data global
-                const dropdown = document.getElementById('startPeriodSelect');
-                dropdown.innerHTML = ''; // Clear
-
-                // Urutkan dari yang terbaru ke terlama
-                const sortedPeriods = data.periods.slice().reverse();
-
-                sortedPeriods.forEach(p => {
-                    // Buat tanggal awal bulan untuk value (misal: 2024-01-01)
-                    const dateVal = `${p.year}-${String(p.month).padStart(2, '0')}-01`;
-                    const option = document.createElement('option');
-                    option.value = dateVal;
-                    option.text = `${p.display}`; // Contoh: "Januari 2024"
-                    dropdown.appendChild(option);
+            if (data.success && data.years && data.years.length > 0) {
+                const yearSelect = document.getElementById('startYearSelect');
+                yearSelect.innerHTML = '';
+                
+                // Isi Tahun (Terbaru ke Terlama)
+                const sortedYears = data.years.sort((a, b) => b - a);
+                sortedYears.forEach(y => {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.text = y;
+                    yearSelect.appendChild(opt);
                 });
 
-                // Set default ke yang terbaru (opsional)
-                if(sortedPeriods.length > 0) {
-                    // selectedStartDate = `${sortedPeriods[0].year}-${String(sortedPeriods[0].month).padStart(2, '0')}-01`;
-                    // dropdown.value = selectedStartDate;
-                    // Default biarkan null (otomatis ambil latest di backend), kecuali user memilih
-                    dropdown.selectedIndex = 0; // Pilih opsi pertama visual saja
-                    // Kita set selectedStartDate ke opsi pertama agar konsisten dengan tampilan
-                    selectedStartDate = dropdown.value;
-                    document.getElementById('dynamicRangeDisplay').textContent = `Mulai dari: ${dropdown.options[0].text}`;
+                // --- LOGIKA DEFAULT: 3 BULAN TERAKHIR ---
+                // Ambil periode terakhir yang tersedia
+                if (data.periods && data.periods.length > 0) {
+                    const lastPeriod = data.periods[data.periods.length - 1]; // e.g. {year: 2025, month: 6}
+                    
+                    // Hitung mundur 3 bulan
+                    let targetDate = new Date(lastPeriod.year, lastPeriod.month - 1, 1); // JS month 0-11
+                    targetDate.setMonth(targetDate.getMonth() - 3);
+                    
+                    const defYear = targetDate.getFullYear();
+                    const defMonth = String(targetDate.getMonth() + 1).padStart(2, '0'); // Kembali ke format 01-12
+
+                    // Set Dropdown Values
+                    yearSelect.value = defYear; 
+                    // Fallback jika tahun hasil hitungan tidak ada di data (jarang terjadi)
+                    if (!yearSelect.value) yearSelect.value = sortedYears[0];
+
+                    document.getElementById('startMonthSelect').value = defMonth;
+                    
+                    // Set global start date
+                    selectedStartDate = `${defYear}-${defMonth}-01`;
+                    
+                    console.log(`📅 Default Start Date set to: ${selectedStartDate} (3 months window)`);
                 }
-            } else {
-                document.getElementById('dynamicRangeDisplay').textContent = "Data tidak tersedia";
             }
         } catch (error) {
-            console.error('❌ Dropdown init error:', error);
+            console.error('❌ Init error:', error);
         }
     }
 
-    // --- UTILS: FORMAT TANGGAL ---
-    function formatDateToWeekLabel(dateStr) {
-        if (!dateStr) return '';
-        const parts = dateStr.split('-');
-        const year = parseInt(parts[0]);
-        const monthIndex = parseInt(parts[1]) - 1; 
-        const day = parseInt(parts[2]);
-        const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-        const weekNum = Math.ceil(day / 7); 
-        return `M${weekNum} ${monthNames[monthIndex]} ${year}`;
-    }
-
-    // --- ON LOAD ---
     document.addEventListener('DOMContentLoaded', async function() {
-        console.log('📄 [INIT] Visualization Page loaded');
-        await initializeDropdown();
-        loadVolatility();
+        await initializeDropdowns();
+        loadVolatility(); // Load awal dengan default 3 bulan
     });
 </script>
 {% endblock %}

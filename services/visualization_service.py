@@ -35,48 +35,33 @@ class VisualizationService:
             return obj
     
     def filter_by_timeframe(self, df, timeframe, start_date_str=None):
-        """
-        Filter based on specific START date and window size.
-        Args:
-            timeframe: '1M', '3M', '6M', 'ALL'
-            start_date_str: String 'YYYY-MM-DD' (optional)
-        """
-        if df.empty:
-            return df, None
+        if df.empty: return df, None
         
         df = df.copy()
-        if not pd.api.types.is_datetime64_any_dtype(df['Tanggal']):
-            df['Tanggal'] = pd.to_datetime(df['Tanggal'])
-        
+        df['Tanggal'] = pd.to_datetime(df['Tanggal'])
         df = df.sort_values('Tanggal').reset_index(drop=True)
         
-        if timeframe == 'ALL':
-            return df, None
+        if timeframe == 'ALL': return df, None
         
-        # Window size map (days) - Updated requirements
-        window_days_map = {'1M': 30, '3M': 90, '6M': 180, '1Y': 365, '2Y': 730}
-        window_days = window_days_map.get(timeframe, 180) # Default 6M
+        # Mapping durasi
+        days_map = {'1M': 30, '3M': 90, '6M': 180, '1Y': 365, '2Y': 730}
+        window_days = days_map.get(timeframe, 90) # Default fallback
         
-        # Determine Start and End Date
-        if start_date_str and start_date_str != 'null':
-            try:
-                start_date = pd.to_datetime(start_date_str)
-            except:
-                start_date = df['Tanggal'].min()
+        # Tentukan Start Date
+        if start_date_str:
+            start_date = pd.to_datetime(start_date_str)
         else:
-            # Default to latest window if no start date provided
-            latest_date = df['Tanggal'].max()
-            start_date = latest_date - timedelta(days=window_days)
-
+            # Default: data paling akhir dikurangi window
+            start_date = df['Tanggal'].max() - timedelta(days=window_days)
+            
         end_date = start_date + timedelta(days=window_days)
         
-        # Filter
-        df_filtered = df[(df['Tanggal'] >= start_date) & (df['Tanggal'] <= end_date)].reset_index(drop=True)
+        # Filter Data
+        mask = (df['Tanggal'] >= start_date) & (df['Tanggal'] <= end_date)
+        df_filtered = df.loc[mask].reset_index(drop=True)
         
-        # Coverage logic (simplified for brevity)
-        coverage_info = {'coverage': 100, 'status': 'OK'} 
-        
-        return df_filtered, coverage_info
+        return df_filtered, None
+
 
     def calculate_moving_averages(self, timeframe='1M', offset_months=0):
         """Moving averages analysis"""
@@ -249,86 +234,62 @@ class VisualizationService:
             traceback.print_exc()
             return {'success': False, 'message': f'Error: {str(e)}'}
 
-    def analyze_volatility(self, timeframe='1M', start_date=None): # Changed param from offset_months to start_date
+    def analyze_volatility(self, timeframe='3M', start_date=None):
         try:
-            print(f" Starting volatility analysis for {timeframe}, start: {start_date}")
-            
             df = self.data_handler.load_historical_data()
-            if df.empty:
-                return {'success': False, 'message': 'Tidak ada data tersedia'}
+            if df.empty: return {'success': False, 'message': 'No Data'}
             
-            # Use the new filter logic
-            df_filtered, coverage_info = self.filter_by_timeframe(df, timeframe, start_date)
-            df = df_filtered.sort_values('Tanggal').reset_index(drop=True)
+            # 1. Filter Data sesuai Window & Start Date
+            df_filtered, _ = self.filter_by_timeframe(df, timeframe, start_date)
+            
+            if df_filtered.empty:
+                 return {'success': True, 'charts': None, 'stats': {}}
 
-            if len(df) < 2: # Need at least 2 points
-                 return {
-                    'success': True, # Return true but empty to prevent frontend crash
-                    'charts': None,
-                    'stats': {
-                        'current_volatility': 0, 'avg_volatility_30': 0,
-                        'max_volatility': 0, 'min_volatility': 0
-                    }
-                }
+            # 2. Hitung Volatilitas (Rolling Std Dev 7 Hari)
+            # Kita hitung pada data yang sudah difilter agar 'terkini' mengacu pada titik akhir filter
+            df_filtered['Volatility_7'] = df_filtered['Indikator_Harga'].rolling(window=7, min_periods=1).std().fillna(0)
             
-            # --- Volatility Calculation Logic ---
-            # Rolling standard deviation
-            df['Volatility_7'] = df['Indikator_Harga'].rolling(window=7, min_periods=1).std().fillna(0)
-            
-            dates = [d.strftime('%Y-%m-%d') for d in df['Tanggal']]
-            
-            # Calculate Statistics for Cards
-            # 1. Current Volatility (Last point in the selected window)
-            current_vol = float(df['Volatility_7'].iloc[-1]) if not df.empty else 0
-            
-            # 2. Average Volatility (Mean of the window)
-            avg_vol = float(df['Volatility_7'].mean()) if not df.empty else 0
-            
-            # 3. Range
-            max_vol = float(df['Volatility_7'].max()) if not df.empty else 0
-            min_vol = float(df['Volatility_7'][df['Volatility_7'] > 0].min()) if not df[df['Volatility_7'] > 0].empty else 0
+            # 3. Statistik Card
+            current_vol = df_filtered['Volatility_7'].iloc[-1] # Data paling kanan di grafik
+            avg_vol = df_filtered['Volatility_7'].mean()
+            max_vol = df_filtered['Volatility_7'].max()
+            # Min vol (exclude 0 awal jika ada)
+            min_vol = df_filtered[df_filtered['Volatility_7'] > 0]['Volatility_7'].min()
+            if pd.isna(min_vol): min_vol = 0
 
-            # Helper for JSON safe
-            def safe_convert(series):
-                return [float(x) if pd.notna(x) and x not in [np.inf, -np.inf] else 0 for x in series]
-
-            # Charts Data
-            accuracy_chart = {
+            # 4. Siapkan Data Chart
+            dates = [d.strftime('%Y-%m-%d') for d in df_filtered['Tanggal']]
+            values = [float(x) if pd.notna(x) else 0 for x in df_filtered['Indikator_Harga']]
+            
+            chart_data = {
                 'data': [{
                     'x': dates,
-                    'y': safe_convert(df['Indikator_Harga']),
+                    'y': values,
                     'mode': 'lines+markers',
                     'name': 'IPH Aktual',
-                    'line': {'color': '#1f77b4', 'width': 2}
+                    'line': {'color': '#667eea', 'width': 3}
                 }],
                 'layout': {
-                    'title': f'Pergerakan IPH ({timeframe})',
-                    'xaxis': {'title': 'Tanggal'},
-                    'yaxis': {'title': 'IPH (%)'},
-                    'margin': {'l': 40, 'r': 20, 't': 40, 'b': 40},
-                    'height': 450
+                    'xaxis': {'title': 'Tanggal', 'fixedrange': True},
+                    'yaxis': {'title': 'IPH (%)', 'fixedrange': True},
+                    'margin': {'l': 40, 'r': 10, 't': 40, 'b': 40}
                 }
-            }
-
-            stats = {
-                'current_volatility': round(current_vol, 2),
-                'avg_volatility_30': round(avg_vol, 2), # Reusing variable name for compatibility
-                'max_volatility': round(max_vol, 2),
-                'min_volatility': round(min_vol, 2)
             }
 
             return {
                 'success': True,
-                'charts': {'accuracy_trends': accuracy_chart}, # Using accuracy_trends key to match frontend
-                'stats': stats
+                'charts': {'accuracy_trends': chart_data},
+                'stats': {
+                    'current_volatility': current_vol,
+                    'avg_volatility_30': avg_vol,
+                    'max_volatility': max_vol,
+                    'min_volatility': min_vol
+                }
             }
-
+            
         except Exception as e:
-            print(f"Error: {e}")
-            import traceback
-            traceback.print_exc()
             return {'success': False, 'message': str(e)}
-        
+                
     def analyze_model_performance(self, timeframe='6M', offset_months=0):
         """
         Load REAL model performance from database
