@@ -1055,11 +1055,12 @@ def api_moving_averages():
 def api_volatility():
     """API for volatility analysis"""
     try:
-        timeframe = request.args.get('timeframe', '6M')
-        offset = request.args.get('offset', 0, type=int)
-        logger.debug(f"   timeframe={timeframe}, offset={offset}")
+        timeframe = request.args.get('timeframe', '3M')
+        start_date = request.args.get('start_date', None)
+        logger.debug(f"   timeframe={timeframe}, start_date={start_date}")
 
-        result = visualization_service.analyze_volatility(timeframe, offset)
+        result = visualization_service.analyze_volatility(timeframe, start_date)
+
         if result.get('success'):
             return jsonify(result), 200
         else:
