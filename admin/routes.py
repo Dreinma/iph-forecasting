@@ -250,10 +250,12 @@ def api_data_list():
 @admin_bp.route('/api/add-manual-record', methods=['POST'])
 @admin_required
 def add_manual_record():
-    """Menambah data manual IPH & Komoditas ke Database."""
-    # Import service di dalam fungsi untuk menghindari circular import
-    from services.forecast_service import ForecastService
-    forecast_service = ForecastService()
+    """
+    Menambah data manual IPH & Komoditas ke Database.
+    FIX: Menggunakan DataHandler langsung & memperbaiki nama kolom DataFrame.
+    """
+    # Gunakan DataHandler langsung (lebih ringan & stabil daripada ForecastService)
+    from services.data_handler import DataHandler
     
     try:
         data = request.get_json()
@@ -291,7 +293,7 @@ def add_manual_record():
         except Exception as e:
             return jsonify({'success': False, 'message': f'Gagal konversi tanggal: {str(e)}'})
 
-        # 4. Buat DataFrame
+        # 4. Buat DataFrame (FIX: Nama kolom harus sesuai dengan ekspektasi DataHandler/DB)
         new_record_data = {
             'Tanggal': [target_date.strftime('%Y-%m-%d')],
             'Indikator_Harga': [float(iph_value)],
@@ -299,14 +301,16 @@ def add_manual_record():
             'Minggu': [minggu],
             'Tahun': [tahun_num],
             'Kab/Kota': [kab_kota],
-            'Komoditas_Andil': [komoditas_andil],
-            'Komoditas_Fluktuasi_Tertinggi': [komoditas_fluktuasi],
-            'Fluktuasi_Harga': [nilai_fluktuasi]
+            # PENTING: Gunakan nama kolom lengkap dengan spasi, bukan underscore
+            'Komoditas Andil Perubahan Harga': [komoditas_andil],
+            'Komoditas Fluktuasi Harga Tertinggi': [komoditas_fluktuasi],
+            'Fluktuasi Harga': [nilai_fluktuasi]
         }
         new_record_df = pd.DataFrame(new_record_data)
         
         # 5. Simpan via DataHandler
-        combined_df, merge_info = forecast_service.data_handler.merge_and_save_data(new_record_df)
+        data_handler = DataHandler()
+        combined_df, merge_info = data_handler.merge_and_save_data(new_record_df)
         
         return jsonify({
             'success': True,
@@ -315,7 +319,9 @@ def add_manual_record():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+        # Log error untuk debugging di server console
+        print(f"Add Manual Error: {e}")
+        return jsonify({'success': False, 'message': f'Error System: {str(e)}'}), 500
 
 @admin_bp.route('/api/data/update', methods=['POST'])
 @admin_required
