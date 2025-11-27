@@ -1,1 +1,63 @@
-Mode Presentasi
+<aside class="admin-sidebar" id="adminSidebar">
+    <div class="brand-section">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-chart-line text-white me-2" style="font-size: 1.5rem;"></i>
+                <span class="text-white fw-bold brand-text">PRISMA</span>
+            </div>
+            <button class="btn btn-sm text-white" onclick="toggleAdminSidebar()" title="Toggle Sidebar" id="sidebarToggleBtn">
+                <i class="fas fa-chevron-left" id="toggleIcon" style="transition: transform 0.3s ease;"></i>
+            </button>
+        </div>
+    </div>
+    
+    <nav class="nav-section">
+        <div class="px-3 py-2 mt-3">
+            <small class="text-white-50 text-uppercase">Admin Panel</small>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}" data-tooltip="Dashboard Admin">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard Admin</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin.data_control' %}active{% endif %}" href="{{ url_for('admin.data_control') }}" data-tooltip="Data Management">
+                    <i class="fas fa-database"></i>
+                    <span>Data Management</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin.models' %}active{% endif %}" href="{{ url_for('admin.models') }}" data-tooltip="Model Management">
+                    <i class="fas fa-cogs"></i>
+                    <span>Model Management</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin.forecast' %}active{% endif %}" href="{{ url_for('admin.forecast') }}" data-tooltip="Forecast Management">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Forecast Management</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}" data-tooltip="Settings">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>Settings</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="px-3 py-2 mt-4 border-top border-white-50">
+            <small class="text-white-50 text-uppercase">Public Area</small>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('visualization') }}" data-tooltip="Ke Halaman Publik">
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Lihat Web Publik</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</aside>
